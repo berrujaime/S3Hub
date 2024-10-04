@@ -1,0 +1,135 @@
+# -----------------------------------
+# Archivos y Directorios Generales
+# -----------------------------------
+
+# Dependencias de Node.js
+node_modules/
+
+# Archivos de Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Carpetas de Construcción
+build/
+dist/
+
+# Configuraciones de Editor/IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos Temporales
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Archivos del Sistema Operativo
+.DS_Store          # macOS
+Thumbs.db          # Windows
+ehthumbs.db        # Windows
+Desktop.ini        # Windows
+
+# -----------------------------------
+# React Native Específico
+# -----------------------------------
+
+# Carpetas de Plataformas
+android/
+ios/
+
+# Archivos de Configuración de la Plataforma
+*.iml
+.gradle/
+local.properties
+
+# Archivos de Usuario de Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+.xcuserstate
+
+# Archivos de Construcción de Xcode
+DerivedData/
+build/
+
+# -----------------------------------
+# Expo Específico
+# -----------------------------------
+
+# Carpetas y Archivos de Expo
+.expo/
+.expo-shared/
+
+# Archivos de Bundles de Expo
+*.bundle
+
+# -----------------------------------
+# Control de Versiones de Git
+# -----------------------------------
+
+# Archivo de Lock de NPM y Yarn
+package-lock.json
+yarn.lock
+
+# Carpetas de Reportes de Pruebas
+coverage/
+
+# -----------------------------------
+# Variables de Entorno
+# -----------------------------------
+
+# Archivos de Variables de Entorno
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# -----------------------------------
+# Otros Archivos y Carpetas
+# -----------------------------------
+
+# Storybook
+.storybook/
+storybook-static/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# Sentry
+.sentry/
+
+# Archivos de Certificados y Claves
+*.pem
+*.key
+
+# Archivos de Sesión de Usuario
+*.swp
+*.swo
+
+# -----------------------------------
+# Instrucciones Adicionales
+# -----------------------------------
+
+# Si utilizas TypeScript, puedes excluir los archivos compilados
+# *.tsbuildinfo
+
+# Bibliotecas que generan archivos de salida
+
+# -----------------------------------
+# Fin del Archivo .gitignore
+# -----------------------------------
