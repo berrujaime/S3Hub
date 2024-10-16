@@ -14,11 +14,14 @@ import {
 import { Image } from "expo-image";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
-import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles } from "../services/s3Service";
+import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles, getPresignedUploadUrl } from "../services/s3Service";
 import { FAB, Button, Checkbox, IconButton } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
+import * as Notifications from 'expo-notifications';
+import { ProgressBar } from 'react-native-paper';
+import UploadProgressPopup from '../components/UploadProgressPopup';
 
 
 export default function FileListScreen() {
@@ -29,9 +32,11 @@ export default function FileListScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [modalMediaUrl, setModalMediaUrl] = useState('');
   const [modalMediaInfo, setModalMediaInfo] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'list'
-  const [currentPath, setCurrentPath] = useState(''); // Para navegación de carpetas
-  const isMounted = useRef(true); // Para evitar actualizaciones de estado en componentes desmontados
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [currentPath, setCurrentPath] = useState('');
+  const isMounted = useRef(true); // Avoid state updates on unmounted components
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -374,38 +379,70 @@ export default function FileListScreen() {
   const handleUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        multiple: false,
+        multiple: true, // Permitir selección múltiple
         copyToCacheDirectory: true,
       });
   
       if (result.canceled === false && result.assets.length > 0) {
-        const asset = result.assets[0];
+        const totalFiles = result.assets.length;
+        let uploadedFiles = 0;
   
-        const fileUri = asset.uri;
-        const fileName = asset.name;
-        const mimeType = asset.mimeType || "application/octet-stream";
+        setIsUploading(true); // Mostrar el popup de progreso
   
-        // Read the file using fetch
-        const response = await fetch(fileUri);
-        const blob = await response.blob();
-  
-        const key = currentPath + fileName;
-  
-        await uploadFile(currentConnection, currentBucket, {
-          name: key,
-          content: blob,
-          mimeType: mimeType,
+        // Enviar notificación al inicio de la subida
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Subida de Archivos',
+            body: 'La subida de archivos ha comenzado.',
+          },
+          trigger: null,
         });
   
-        Alert.alert("Éxito", "Archivo subido exitosamente.");
-        fetchFiles(); // Update the file list
+        for (const asset of result.assets) {
+          const fileUri = asset.uri;
+          const fileName = asset.name;
+          const mimeType = asset.mimeType || 'application/octet-stream';
+  
+          const key = currentPath + fileName;
+  
+          // Obtener la URL firmada para subir
+          const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
+  
+          // Subir el archivo usando uploadAsync para permitir subida en segundo plano
+          await FileSystem.uploadAsync(uploadUrl, fileUri, {
+            httpMethod: 'PUT',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: {
+              'Content-Type': mimeType,
+            },
+          });
+  
+          uploadedFiles += 1;
+          const progress = uploadedFiles / totalFiles;
+          setUploadProgress(progress);
+        }
+  
+        setIsUploading(false); // Ocultar el popup de progreso
+        setUploadProgress(1);
+        Alert.alert('Éxito', 'Archivos subidos exitosamente.');
+        fetchFiles(); // Actualizar la lista de archivos
+  
+        // Enviar notificación al finalizar la subida
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Subida de Archivos',
+            body: 'La subida de archivos ha finalizado.',
+          },
+          trigger: null,
+        });
       }
     } catch (error) {
-      console.error("Error al subir el archivo:", error);
-      Alert.alert("Error", "Error al subir el archivo.");
+      console.error('Error al subir los archivos:', error);
+      setIsUploading(false);
+      Alert.alert('Error', 'Error al subir los archivos.');
     }
   };
-
+  
   const handleDownloadSelected = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -549,6 +586,9 @@ export default function FileListScreen() {
 
   return (
     <View style={styles.container}>
+      {isUploading && (
+        <UploadProgressPopup progress={uploadProgress} />
+      )}
       <Text style={styles.title}>Archivos en {currentBucket}</Text>
 
       <View style={styles.actionContainer}>

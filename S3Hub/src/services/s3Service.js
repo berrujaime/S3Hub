@@ -8,6 +8,7 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createPresignedPost, S3RequestPresigner } from "@aws-sdk/s3-presigned-post";
 import { getS3Client } from "./s3Client";
 import { Buffer } from 'buffer';
 
@@ -156,6 +157,30 @@ export const deleteFiles = async (connection, bucketName, keys) => {
     return response;
   } catch (error) {
     console.error("Error deleting files:", error);
+    throw error;
+  }
+};
+
+/**
+ * Gets a presigned URL for uploading an object to S3.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {string} key - Object key.
+ * @param {string} mimeType - MIME type of the file.
+ * @returns {string} Presigned URL.
+ */
+export const getPresignedUploadUrl = async (connection, bucketName, key, mimeType) => {
+  try {
+    const s3Client = getS3Client(connection);
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      ContentType: mimeType,
+    });
+    const url = await getAWSSignedUrl(s3Client, command, { expiresIn: 3600 });
+    return url;
+  } catch (error) {
+    console.error('Error obtaining the presigned upload URL:', error);
     throw error;
   }
 };
