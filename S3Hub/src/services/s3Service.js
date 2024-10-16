@@ -184,3 +184,27 @@ export const getPresignedUploadUrl = async (connection, bucketName, key, mimeTyp
     throw error;
   }
 };
+
+/**
+ * Creates an empty folder by uploading a zero-byte object with a trailing slash.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {string} folderKey - Folder key ending with '/'.
+ * @returns {Object} AWS S3 response.
+ */
+export const uploadEmptyFolder = async (connection, bucketName, folderKey) => {
+  try {
+    const s3Client = getS3Client(connection);
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: folderKey,
+      Body: '', // Zero-byte content
+    });
+    const response = await s3Client.send(command);
+    return response;
+  } catch (error) {
+    console.error('Error creating empty folder:', error);
+    throw error;
+  }
+};
+

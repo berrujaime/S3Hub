@@ -14,13 +14,13 @@ import {
 import { Image } from "expo-image";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
-import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles, getPresignedUploadUrl } from "../services/s3Service";
+import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles, getPresignedUploadUrl, uploadEmptyFolder } from "../services/s3Service";
 import { FAB, Button, Checkbox, IconButton } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
-import { ProgressBar } from 'react-native-paper';
+import { ProgressBar, Dialog, Portal, TextInput } from 'react-native-paper';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 
 
@@ -37,6 +37,9 @@ export default function FileListScreen() {
   const isMounted = useRef(true); // Avoid state updates on unmounted components
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDialogVisible, setIsDialogVisible] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
 
   useEffect(() => {
     isMounted.current = true;
@@ -576,6 +579,27 @@ export default function FileListScreen() {
     }
   };
 
+  const handleCreateFolder = async () => {
+    if (newFolderName.trim() === '') {
+      Alert.alert('Error', 'El nombre de la carpeta no puede estar vacío.');
+      return;
+    }
+  
+    const folderKey = currentPath + newFolderName.trim() + '/';
+  
+    try {
+      await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
+      setIsDialogVisible(false);
+      setNewFolderName('');
+      fetchFiles(); // Actualizar la lista de archivos
+      Alert.alert('Éxito', 'Carpeta creada exitosamente.');
+    } catch (error) {
+      console.error('Error al crear la carpeta:', error);
+      Alert.alert('Error', 'No se pudo crear la carpeta.');
+    }
+  };
+  
+
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -657,6 +681,30 @@ export default function FileListScreen() {
         key={viewMode} // Forzar redibujado al cambiar de vista
         contentContainerStyle={styles.flatListContent}
       />
+
+      <FAB
+        style={styles.createFolderFab}
+        icon="folder-plus"
+        onPress={() => setIsDialogVisible(true)}
+      />
+
+      <Portal>
+        <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
+          <Dialog.Title>Crear Nueva Carpeta</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Nombre de la Carpeta"
+              value={newFolderName}
+              onChangeText={setNewFolderName}
+              mode="outlined"
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setIsDialogVisible(false)}>Cancelar</Button>
+            <Button onPress={handleCreateFolder}>Crear</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <FAB
         style={styles.fab}
@@ -850,9 +898,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 16,
     right: 0,
-    bottom: 64, // Ajuste para el menú inferior
+    bottom: 64,
   },
+  createFolderFab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 140,
+  },
+  
   flatListContent: {
-    paddingBottom: 80, // Espacio para el menú inferior
+    paddingBottom: 80,
   },
 });
