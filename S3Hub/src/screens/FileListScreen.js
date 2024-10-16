@@ -12,6 +12,7 @@ import {
   Text,
 } from "react-native";
 import { Image } from "expo-image";
+import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
 import { listObjects, getSignedUrl, uploadFile } from "../services/s3Service";
 import { FAB, Button, Checkbox, IconButton } from 'react-native-paper';
@@ -26,8 +27,8 @@ export default function FileListScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [modalImageUrl, setModalImageUrl] = useState('');
-  const [modalImageInfo, setModalImageInfo] = useState(null);
+  const [modalMediaUrl, setModalMediaUrl] = useState('');
+  const [modalMediaInfo, setModalMediaInfo] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'list'
   const [currentPath, setCurrentPath] = useState(''); // Para navegación de carpetas
   const isMounted = useRef(true); // Para evitar actualizaciones de estado en componentes desmontados
@@ -96,17 +97,19 @@ export default function FileListScreen() {
             directories.add(dirName);
           } else {
             // Es un archivo
-            const isImage = key.match(/\.(jpg|jpeg|png|gif)$/i);
-            if (isImage) {
+            const isMedia = key.match(/\.(jpg|jpeg|png|gif|mp4|mov|avi|mkv)$/i);
+            if (isMedia) {
+              const isVideo = key.match(/\.(mp4|mov|avi|mkv)$/i) ? true : false;
               const fileItem = {
                 id: key,
                 key: key,
                 name: relativeKey,
                 size: object.Size,
                 isFolder: false,
+                isVideo: isVideo,
                 url: null, // Inicialmente null
               };
-              // Agregamos la promesa para obtener la URL firmada
+              // Obtener la URL firmada
               filePromises.push(
                 getSignedUrl(currentConnection, currentBucket, key)
                   .then(url => {
@@ -182,6 +185,84 @@ export default function FileListScreen() {
           <Text>{item.name}</Text>
         </TouchableOpacity>
       );
+    }
+    if (item.isVideo) {
+      // Vista en cuadrícula
+      if (viewMode === 'grid') {
+        return (
+          <TouchableOpacity
+            onPress={() => handleItemPress(item.id)}
+            onLongPress={() => toggleSelection(item.id)}
+            style={[
+              styles.itemContainer,
+              {
+                width: itemSize - 16,
+                height: itemSize - 16,
+                margin: 8,
+              },
+            ]}
+          >
+            {item.url ? (
+              <View style={styles.videoContainer}>
+                <Video
+                  source={{ uri: item.url }}
+                  style={styles.videoThumbnail}
+                  resizeMode="cover"
+                  isMuted
+                />
+                <View style={styles.playIconContainer}>
+                  <IconButton icon="play-circle-outline" size={50} color="#fff" />
+                </View>
+              </View>
+            ) : (
+              <ActivityIndicator style={{ flex: 1 }} />
+            )}
+            {isSelected && (
+              <View style={styles.checkboxContainer}>
+                <Checkbox
+                  status="checked"
+                  style={styles.checkbox}
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      } else {
+        // Vista en lista
+        return (
+          <TouchableOpacity
+            onPress={() => handleItemPress(item.id)}
+            onLongPress={() => toggleSelection(item.id)}
+            style={styles.listItemContainer}
+          >
+            {item.url ? (
+              <View style={styles.listVideoContainer}>
+                <Video
+                  source={{ uri: item.url }}
+                  style={styles.listVideo}
+                  resizeMode="cover"
+                  isMuted
+                />
+                <View style={styles.playIconContainerList}>
+                  <IconButton icon="play-circle-outline" size={30} color="#fff" />
+                </View>
+              </View>
+            ) : (
+              <ActivityIndicator style={styles.listVideo} />
+            )}
+            <View style={styles.listTextContainer}>
+              <Text style={styles.listText}>{item.name}</Text>
+              <Text style={styles.listSubText}>{(item.size / (1024 * 1024)).toFixed(2)} MB</Text>
+            </View>
+            {isSelected && (
+              <Checkbox
+                status="checked"
+                style={styles.listCheckbox}
+              />
+            )}
+          </TouchableOpacity>
+        );
+      }
     } else {
       // Renderizar archivo
       if (viewMode === 'grid') {
@@ -277,18 +358,18 @@ export default function FileListScreen() {
     if (selectedFiles.length > 0) {
       toggleSelection(id);
     } else {
-      // Abrir imagen y mostrar información
       const file = files.find((f) => f.id === id);
       if (file) {
-        setModalImageUrl(file.url);
-        setModalImageInfo({
+        setModalMediaUrl(file.url);
+        setModalMediaInfo({
           name: file.name,
           size: file.size,
+          isVideo: file.isVideo,
         });
         setIsModalVisible(true);
       }
     }
-  };
+  };  
 
   const handleUpload = async () => {
     try {
@@ -504,22 +585,33 @@ export default function FileListScreen() {
         transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalContainer}
-          onPress={() => setIsModalVisible(false)}
-        >
-          <RNImage
-            source={{ uri: modalImageUrl }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
-          {modalImageInfo && (
+        <View style={styles.modalContainer}>
+          {modalMediaInfo && modalMediaInfo.isVideo ? (
+            <Video
+              source={{ uri: modalMediaUrl }}
+              rate={1.0}
+              volume={1.0}
+              isMuted={false}
+              resizeMode="contain"
+              shouldPlay
+              useNativeControls
+              style={styles.fullMedia}
+            />
+          ) : modalMediaInfo ? (
+            <RNImage
+              source={{ uri: modalMediaUrl }}
+              style={styles.fullMedia}
+              resizeMode="contain"
+            />
+          ) : null}
+          {modalMediaInfo && (
             <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>Nombre: {modalImageInfo.name}</Text>
-              <Text style={styles.infoText}>Tamaño: {(modalImageInfo.size / (1024 * 1024)).toFixed(2)} MB</Text>
+              <Text style={styles.infoText}>Nombre: {modalMediaInfo.name}</Text>
+              <Text style={styles.infoText}>Tamaño: {(modalMediaInfo.size / (1024 * 1024)).toFixed(2)} MB</Text>
             </View>
           )}
-        </TouchableOpacity>
+          <Button onPress={() => setIsModalVisible(false)} style={styles.closeButton}>Cerrar</Button>
+        </View>
       </Modal>
     </View>
   );
@@ -565,6 +657,45 @@ const styles = StyleSheet.create({
   itemContainer: {
     position: 'relative',
   },
+  videoContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  playIconContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -40 }, { translateY: -40 }],
+  },
+  listVideoContainer: {
+    width: 50,
+    height: 50,
+    position: 'relative',
+    marginRight: 8,
+  },
+  listVideo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
+  },
+  playIconContainerList: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -15 }, { translateY: -15 }],
+  },
+  fullMedia: {
+    width: '100%',
+    height: '80%',
+  },
+  closeButton: {
+    marginTop: 16,
+  },  
   image: {
     borderWidth: 1,
     borderColor: '#ccc',
