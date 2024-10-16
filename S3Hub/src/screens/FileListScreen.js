@@ -394,10 +394,9 @@ export default function FileListScreen() {
 
   const handleSelectAll = () => {
     if (selectedFiles.length === files.length) {
-      // Deseleccionar todos
       setSelectedFiles([]);
     } else {
-      // Seleccionar todos
+      // Select all
       const allFileIds = files.map(file => file.id);
       setSelectedFiles(allFileIds);
     }

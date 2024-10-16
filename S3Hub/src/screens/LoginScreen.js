@@ -8,21 +8,20 @@ import { validateCredentials } from '../services/authService';
 export default function LoginScreen({ navigation }) {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
-  const [service, setService] = useState('storj'); // Valor por defecto
-  const [region, setRegion] = useState('eu1'); // Valor por defecto para Storj
-  const [rememberMe, setRememberMe] = useState(false);
+  const [service, setService] = useState('storj');
+  const [region, setRegion] = useState('eu1');
   const [regionMenuVisible, setRegionMenuVisible] = useState(false);
 
   const { addConnection, setActiveConnection } = useContext(AuthContext);
 
-  // Lista de regiones según el servicio
+  // Region list depending on the service
   const regionsByService = {
     storj: ['us1', 'eu1', 'ap1'],
     aws: ['us-east-1', 'us-west-1', 'eu-west-1', 'ap-southeast-1'],
   };
 
   /**
-   * Maneja el inicio de sesión del usuario.
+   * Handles the login process.
    */
   const handleLogin = async () => {
     if (accessKey && secretKey) {
@@ -42,9 +41,7 @@ export default function LoginScreen({ navigation }) {
             service,
             region,
           };
-          if (rememberMe) {
-            await addConnection(newConnection);
-          }
+          await addConnection(newConnection);
           await setActiveConnection(newConnection);
           navigation.navigate('Connections');
         } else {
@@ -60,22 +57,22 @@ export default function LoginScreen({ navigation }) {
   };
 
   /**
-   * Abre el menú desplegable de regiones.
+   * Handles the opening of the region menu.
    */
   const openRegionMenu = () => setRegionMenuVisible(true);
 
   /**
-   * Cierra el menú desplegable de regiones.
+   * Handles the closing of the region menu.
    */
   const closeRegionMenu = () => setRegionMenuVisible(false);
 
   /**
-   * Maneja el cambio de servicio y actualiza la región por defecto.
-   * @param {string} value - Servicio seleccionado.
+   * Handles the service change and updates the default region.
+   * @param {string} value - Service selected.
    */
   const handleServiceChange = (value) => {
     setService(value);
-    setRegion(regionsByService[value][0]); // Establecer la primera región por defecto
+    setRegion(regionsByService[value][0]); // Set the first region as default
   };
 
   return (
@@ -96,12 +93,6 @@ export default function LoginScreen({ navigation }) {
         mode="outlined"
         secureTextEntry
         style={styles.input}
-      />
-
-      <Checkbox.Item
-        label="Recordar acceso"
-        status={rememberMe ? 'checked' : 'unchecked'}
-        onPress={() => setRememberMe(!rememberMe)}
       />
 
       <Text style={styles.label}>Selecciona el servicio:</Text>
@@ -146,7 +137,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    marginTop: 40, // Añadimos el espacio en la parte superior
+    marginTop: 40,
   },
   title: {
     fontSize: 28,

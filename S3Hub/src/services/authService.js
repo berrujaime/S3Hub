@@ -3,19 +3,19 @@ import { ListBucketsCommand } from "@aws-sdk/client-s3";
 import { getS3Client } from "./s3Client";
 
 /**
- * Valida las credenciales ingresadas para S3/Storj.
- * @param {Object} authData - Datos de autenticación.
- * @returns {boolean} - `true` si las credenciales son válidas, de lo contrario `false`.
+ * Validate the credentials.
+ * @param {Object} authData - Authentication data.
+ * @returns {boolean} - True if the credentials are valid, false otherwise.
  */
 export const validateCredentials = async (authData) => {
   try {
     const s3Client = getS3Client(authData);
 
-    // Intentar listar los buckets disponibles
+    // Try to list buckets to check if the credentials are valid
     const command = new ListBucketsCommand({});
     const response = await s3Client.send(command);
 
-    // Si se obtiene una lista de buckets, las credenciales son válidas
+    // If the response has buckets, the credentials are valid
     if (response.Buckets) {
       return true;
     } else {

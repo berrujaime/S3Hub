@@ -7,18 +7,13 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [connections, setConnections] = useState([]);
-  const [temporaryConnections, setTemporaryConnections] = useState([]);
   const [currentConnection, setCurrentConnection] = useState(null);
   const [currentBucket, setCurrentBucket] = useState(null);
 
-  const addConnection = async (connection, remember) => {
-    if (remember) {
-      const newConnections = [...connections, connection];
-      setConnections(newConnections);
-      await SecureStore.setItemAsync('connections', JSON.stringify(newConnections));
-    } else {
-      setTemporaryConnections(prev => [...prev, connection]);
-    }
+  const addConnection = async (connection) => {
+    const newConnections = [...connections, connection];
+    setConnections(newConnections);
+    await SecureStore.setItemAsync('connections', JSON.stringify(newConnections));
     await setActiveConnection(connection);
   };
 
@@ -38,17 +33,14 @@ export const AuthProvider = ({ children }) => {
 
   const deleteConnection = async (id) => {
     const updatedConnections = connections.filter(conn => conn.id !== id);
-    const updatedTemporaryConnections = temporaryConnections.filter(conn => conn.id !== id);
 
     setConnections(updatedConnections);
-    setTemporaryConnections(updatedTemporaryConnections);
 
     await SecureStore.setItemAsync('connections', JSON.stringify(updatedConnections));
 
     if (currentConnection && currentConnection.id === id) {
-      const allConnections = [...updatedConnections, ...updatedTemporaryConnections];
-      if (allConnections.length > 0) {
-        await setActiveConnection(allConnections[0]);
+      if (updatedConnections.length > 0) {
+        await setActiveConnection(updatedConnections[0]);
       } else {
         setCurrentConnection(null);
         await SecureStore.deleteItemAsync('currentConnection');
@@ -56,10 +48,6 @@ export const AuthProvider = ({ children }) => {
         await SecureStore.deleteItemAsync('currentBucket');
       }
     }
-  };
-
-  const getAllConnections = () => {
-    return [...connections, ...temporaryConnections];
   };
 
   useEffect(() => {
@@ -78,9 +66,6 @@ export const AuthProvider = ({ children }) => {
       if (storedCurrentBucket) {
         setCurrentBucket(storedCurrentBucket);
       }
-
-      // No cargamos conexiones temporales, asegurando que se eliminen al reiniciar la app
-      setTemporaryConnections([]);
     };
 
     loadStoredData();
@@ -88,7 +73,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{
-      connections: getAllConnections(),
+      connections,
       currentConnection,
       currentBucket,
       addConnection,

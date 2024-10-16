@@ -2,9 +2,9 @@
 import { S3Client } from "@aws-sdk/client-s3";
 
 /**
- * Configura el cliente de S3 para usar el endpoint correcto.
- * @param {Object} connection - Datos de conexión.
- * @returns {S3Client} - Instancia configurada de S3Client.
+ * Configure the S3Client instance.
+ * @param {Object} connection - Connection data.
+ * @returns {S3Client} - Configured S3Client instance.
  */
 export const getS3Client = (connection) => {
   const { accessKey, secretKey, region, service } = connection;
@@ -23,7 +23,7 @@ export const getS3Client = (connection) => {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
     },
-    forcePathStyle: service === 'storj', // Necesario para Storj
+    forcePathStyle: service === 'storj', // Necessary for Storj
   });
 
   return s3Client;

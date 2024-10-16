@@ -8,7 +8,7 @@ import ConnectionSelectScreen from '../screens/ConnectionSelectScreen';
 import BucketSelectScreen from '../screens/BucketSelectScreen';
 import FileListScreen from '../screens/FileListScreen';
 import { AuthContext } from '../context/AuthContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importar iconos
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();

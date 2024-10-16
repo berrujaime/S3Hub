@@ -9,9 +9,9 @@ import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getS3Client } from "./s3Client";
 
 /**
- * Lista los buckets disponibles.
- * @param {Object} connection - Datos de conexión del usuario.
- * @returns {Array} Lista de buckets.
+ * Lists available buckets.
+ * @param {Object} connection - User connection data.
+ * @returns {Array} List of buckets.
  */
 export const listBuckets = async (connection) => {
   try {
@@ -19,26 +19,25 @@ export const listBuckets = async (connection) => {
     const command = new ListBucketsCommand({});
     const response = await s3Client.send(command);
 
-    // Filtrar los buckets si es necesario (por ejemplo, para Storj)
     if (connection.service === 'storj') {
-      // Storj devuelve todos los buckets, no es necesario filtrar
+      // Storj returns all buckets, no need to filter
       return response.Buckets;
     } else {
-      // Para AWS S3, podrías filtrar los buckets por región si es necesario
+      // For AWS S3, you could filter buckets by region if necessary
       return response.Buckets;
     }
   } catch (error) {
-    console.error("Error al listar los buckets:", error);
+    console.error("Error listing buckets:", error);
     throw error;
   }
 };
 
 /**
- * Lista los objetos dentro de un bucket.
- * @param {Object} connection - Datos de conexión del usuario.
- * @param {string} bucketName - Nombre del bucket.
- * @param {string} [prefix] - Prefijo opcional para filtrar objetos.
- * @returns {Object} Respuesta de AWS S3.
+ * Lists the objects within a bucket.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {string} [prefix] - Optional prefix to filter objects.
+ * @returns {Object} AWS S3 response.
  */
 export const listObjects = async (connection, bucketName, prefix = '') => {
   try {
@@ -50,17 +49,17 @@ export const listObjects = async (connection, bucketName, prefix = '') => {
     const response = await s3Client.send(command);
     return response;
   } catch (error) {
-    console.error("Error al listar objetos:", error);
+    console.error("Error listing objects:", error);
     throw error;
   }
 };
 
 /**
- * Sube un archivo a un bucket S3.
- * @param {Object} connection - Datos de conexión del usuario.
- * @param {string} bucketName - Nombre del bucket.
- * @param {Object} file - Archivo a subir.
- * @returns {Object} Respuesta de AWS S3.
+ * Uploads a file to an S3 bucket.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {Object} file - File to upload.
+ * @returns {Object} AWS S3 response.
  */
 export const uploadFile = async (connection, bucketName, file) => {
   try {
@@ -74,17 +73,17 @@ export const uploadFile = async (connection, bucketName, file) => {
     const response = await s3Client.send(command);
     return response;
   } catch (error) {
-    console.error("Error al subir el archivo:", error);
+    console.error("Error uploading the file:", error);
     throw error;
   }
 };
 
 /**
- * Obtiene una URL firmada para un objeto en S3.
- * @param {Object} connection - Datos de conexión del usuario.
- * @param {string} bucketName - Nombre del bucket.
- * @param {string} key - Clave del objeto.
- * @returns {string} URL firmada.
+ * Gets a signed URL for an object in S3.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {string} key - Object key.
+ * @returns {string} Signed URL.
  */
 export const getSignedUrl = async (connection, bucketName, key) => {
   try {
@@ -96,39 +95,7 @@ export const getSignedUrl = async (connection, bucketName, key) => {
     const url = await getAWSSignedUrl(s3Client, command, { expiresIn: 3600 });
     return url;
   } catch (error) {
-    console.error("Error al obtener la URL firmada:", error);
-    throw error;
-  }
-};
-
-/**
- * Valida las credenciales ingresadas para S3/Storj.
- * @param {Object} connection - Datos de conexión.
- * @returns {boolean} - `true` si las credenciales son válidas, de lo contrario `false`.
- */
-export const validateCredentials = async (connection) => {
-  try {
-    const s3Client = getS3Client(connection);
-
-    // Intentar listar los buckets disponibles
-    const command = new ListBucketsCommand({});
-    const response = await s3Client.send(command);
-
-    // Si se obtiene una lista de buckets, las credenciales son válidas
-    if (response.Buckets) {
-      return true;
-    } else {
-      return false;
-    }
-  } catch (error) {
-    console.error("Error al validar las credenciales:", error);
-    if (
-      error.name === "InvalidAccessKeyId" ||
-      error.name === "SignatureDoesNotMatch" ||
-      error.name === "AccessDenied"
-    ) {
-      return false;
-    }
+    console.error("Error obtaining the signed URL:", error);
     throw error;
   }
 };

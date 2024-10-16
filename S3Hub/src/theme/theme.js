@@ -5,8 +5,8 @@ const theme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#6200ee', // Color primario de la app
-    accent: '#03dac4',  // Color secundario o de acento
+    primary: '#6200ee', // Primary color
+    accent: '#03dac4',  // Secondary color
   },
 };
 
