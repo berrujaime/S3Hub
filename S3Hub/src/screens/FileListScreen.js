@@ -19,6 +19,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 
+
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
   const [files, setFiles] = useState([]);
@@ -293,25 +294,30 @@ export default function FileListScreen() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         multiple: false,
-        copyToCacheDirectory: false,
+        copyToCacheDirectory: true,
       });
-
-      if (result.type === "success") {
-        const fileUri = result.uri;
-        const fileName = result.name;
+  
+      if (result.canceled === false && result.assets.length > 0) {
+        const asset = result.assets[0];
+  
+        const fileUri = asset.uri;
+        const fileName = asset.name;
+        const mimeType = asset.mimeType || "application/octet-stream";
+  
+        // Read the file using fetch
         const response = await fetch(fileUri);
-        const fileContent = await response.blob();
-
+        const blob = await response.blob();
+  
         const key = currentPath + fileName;
-
+  
         await uploadFile(currentConnection, currentBucket, {
           name: key,
-          content: fileContent,
-          mimeType: result.mimeType || "application/octet-stream",
+          content: blob,
+          mimeType: mimeType,
         });
-
+  
         Alert.alert("Éxito", "Archivo subido exitosamente.");
-        fetchFiles(); // Actualizar la lista de archivos
+        fetchFiles(); // Update the file list
       }
     } catch (error) {
       console.error("Error al subir el archivo:", error);

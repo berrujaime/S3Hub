@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getS3Client } from "./s3Client";
+import { Buffer } from 'buffer';
 
 /**
  * Lists available buckets.
@@ -64,13 +65,22 @@ export const listObjects = async (connection, bucketName, prefix = '') => {
 export const uploadFile = async (connection, bucketName, file) => {
   try {
     const s3Client = getS3Client(connection);
+
+    // Convert base64 string to Buffer if necessary
+    let bodyContent = file.content;
+    if (typeof file.content === 'string') {
+      const base64Data = file.content.replace(/^data:.+;base64,/, '');
+      bodyContent = Buffer.from(base64Data, 'base64');
+    }
+
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: file.name,
-      Body: file.content,
+      Body: bodyContent,
       ContentType: file.mimeType,
     });
     const response = await s3Client.send(command);
+    console.log(response);
     return response;
   } catch (error) {
     console.error("Error uploading the file:", error);
