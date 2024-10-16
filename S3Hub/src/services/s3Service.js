@@ -139,13 +139,12 @@ export const deleteFile = async (connection, bucketName, key) => {
  * Deletes multiple files from an S3 bucket.
  * @param {Object} connection - User connection data.
  * @param {string} bucketName - Bucket name.
- * @param {Array} keys - Array of object keys to delete.
+ * @param {Array} objects - Array of objects with Key properties to delete.
  * @returns {Object} AWS S3 response.
  */
-export const deleteFiles = async (connection, bucketName, keys) => {
+export const deleteFiles = async (connection, bucketName, objects) => {
   try {
     const s3Client = getS3Client(connection);
-    const objects = keys.map((key) => ({ Key: key }));
     const command = new DeleteObjectsCommand({
       Bucket: bucketName,
       Delete: {
@@ -156,7 +155,7 @@ export const deleteFiles = async (connection, bucketName, keys) => {
     const response = await s3Client.send(command);
     return response;
   } catch (error) {
-    console.error("Error deleting files:", error);
+    console.error('Error deleting files:', error);
     throw error;
   }
 };

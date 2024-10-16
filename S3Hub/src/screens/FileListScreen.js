@@ -177,6 +177,7 @@ export default function FileListScreen() {
       return (
         <TouchableOpacity
           onPress={() => handleFolderPress(item)}
+          onLongPress={() => toggleSelection(item.id)}
           style={[
             viewMode === 'grid' ? styles.itemContainer : styles.listItemContainer,
             {
@@ -191,6 +192,14 @@ export default function FileListScreen() {
         >
           <IconButton icon="folder" size={50} />
           <Text>{item.name}</Text>
+          {isSelected && (
+          <View style={styles.checkboxContainer}>
+            <Checkbox
+              status="checked"
+              style={styles.checkbox}
+            />
+          </View>
+        )}
         </TouchableOpacity>
       );
     }
@@ -348,8 +357,14 @@ export default function FileListScreen() {
   };
 
   const handleFolderPress = (folder) => {
-    setCurrentPath(folder.key);
-    setSelectedFiles([]); // Deseleccionar archivos al cambiar de carpeta
+    if (selectedFiles.length > 0) {
+      // Si estamos en modo selección, alternar selección
+      toggleSelection(folder.id);
+    }
+    else {
+      setCurrentPath(currentPath + folder.name + '/');
+      setSelectedFiles([]); // Deseleccionar archivos al cambiar de carpeta
+    }
   };
 
   const toggleSelection = (id) => {
@@ -559,25 +574,30 @@ export default function FileListScreen() {
       for (const fileId of selectedFiles) {
         const file = files.find((f) => f.id === fileId);
         if (file.isFolder) {
-          // Obtain all objects from file
+          // Obtener todos los objetos dentro de la carpeta
           const response = await listObjects(currentConnection, currentBucket, file.key);
           if (response.Contents && response.Contents.length > 0) {
-            const keys = response.Contents.map((obj) => obj.Key);
-            await deleteFiles(currentConnection, currentBucket, keys);
+            const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
+            // Eliminar objetos en lotes de 1000
+            const chunkSize = 1000;
+            for (let i = 0; i < objects.length; i += chunkSize) {
+              const chunk = objects.slice(i, i + chunkSize);
+              await deleteFiles(currentConnection, currentBucket, chunk);
+            }
           }
         } else {
           await deleteFile(currentConnection, currentBucket, file.key);
         }
       }
   
-      Alert.alert("Éxito", "Elemento(s) borrado(s) exitosamente.");
+      Alert.alert('Éxito', 'Elemento(s) borrado(s) exitosamente.');
       setSelectedFiles([]);
-      fetchFiles(); // Update the file list
+      fetchFiles(); // Actualizar la lista de archivos
     } catch (error) {
-      console.error("Error al borrar los elementos:", error);
-      Alert.alert("Error", "No se pudieron borrar los elementos.");
+      console.error('Error al borrar los elementos:', error);
+      Alert.alert('Error', 'No se pudieron borrar los elementos.');
     }
-  };
+  };  
 
   const handleCreateFolder = async () => {
     if (newFolderName.trim() === '') {
