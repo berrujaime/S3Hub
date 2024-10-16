@@ -14,7 +14,7 @@ import {
 import { Image } from "expo-image";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
-import { listObjects, getSignedUrl, uploadFile } from "../services/s3Service";
+import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles } from "../services/s3Service";
 import { FAB, Button, Checkbox, IconButton } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
@@ -501,6 +501,44 @@ export default function FileListScreen() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    try {
+      const confirm = await new Promise((resolve) => {
+        Alert.alert(
+          'Confirmar borrado',
+          `¿Estás seguro de que deseas borrar ${selectedFiles.length} elemento(s)?`,
+          [
+            { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Borrar', style: 'destructive', onPress: () => resolve(true) },
+          ]
+        );
+      });
+  
+      if (!confirm) return;
+  
+      for (const fileId of selectedFiles) {
+        const file = files.find((f) => f.id === fileId);
+        if (file.isFolder) {
+          // Obtain all objects from file
+          const response = await listObjects(currentConnection, currentBucket, file.key);
+          if (response.Contents && response.Contents.length > 0) {
+            const keys = response.Contents.map((obj) => obj.Key);
+            await deleteFiles(currentConnection, currentBucket, keys);
+          }
+        } else {
+          await deleteFile(currentConnection, currentBucket, file.key);
+        }
+      }
+  
+      Alert.alert("Éxito", "Elemento(s) borrado(s) exitosamente.");
+      setSelectedFiles([]);
+      fetchFiles(); // Update the file list
+    } catch (error) {
+      console.error("Error al borrar los elementos:", error);
+      Alert.alert("Error", "No se pudieron borrar los elementos.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -535,33 +573,40 @@ export default function FileListScreen() {
 
       {selectedFiles.length > 0 && (
         <View style={styles.selectionActionContainer}>
-          {selectedFiles.length === 1 ? (
-            <Button
-              mode="contained"
-              onPress={() => {
-                const file = files.find((f) => f.id === selectedFiles[0]);
-                if (file && !file.isFolder) {
-                  setModalImageUrl(file.url);
-                  setModalImageInfo({
-                    name: file.name,
-                    size: file.size,
-                  });
-                  setIsModalVisible(true);
-                }
-              }}
-              style={styles.infoButton}
-            >
-              Ver Información
-            </Button>
-          ) : null}
+        {selectedFiles.length === 1 ? (
           <Button
             mode="contained"
-            onPress={handleDownloadSelected}
-            style={styles.downloadButton}
+            onPress={() => {
+              const file = files.find((f) => f.id === selectedFiles[0]);
+              if (file && !file.isFolder) {
+                setModalMediaUrl(file.url);
+                setModalMediaInfo({
+                  name: file.name,
+                  size: file.size,
+                });
+                setIsModalVisible(true);
+              }
+            }}
+            style={styles.infoButton}
           >
-            Descargar
+            Ver Información
           </Button>
-        </View>
+        ) : null}
+        <Button
+          mode="contained"
+          onPress={handleDownloadSelected}
+          style={styles.downloadButton}
+        >
+          Descargar
+        </Button>
+        <Button
+          mode="contained"
+          onPress={handleDeleteSelected}
+          style={styles.deleteButton}
+        >
+          Borrar
+        </Button>
+      </View>
       )}
 
       <FlatList
@@ -649,6 +694,11 @@ const styles = StyleSheet.create({
   downloadButton: {
     flex: 1,
     marginHorizontal: 8,
+  },
+  deleteButton: {
+    flex: 1,
+    marginHorizontal: 8,
+    backgroundColor: 'red',
   },
   infoButton: {
     flex: 1,

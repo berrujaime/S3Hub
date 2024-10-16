@@ -4,6 +4,8 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getS3Client } from "./s3Client";
@@ -106,6 +108,54 @@ export const getSignedUrl = async (connection, bucketName, key) => {
     return url;
   } catch (error) {
     console.error("Error obtaining the signed URL:", error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes a single file from an S3 bucket.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {string} key - Object key to delete.
+ * @returns {Object} AWS S3 response.
+ */
+export const deleteFile = async (connection, bucketName, key) => {
+  try {
+    const s3Client = getS3Client(connection);
+    const command = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+    const response = await s3Client.send(command);
+    return response;
+  } catch (error) {
+    console.error("Error deleting the file:", error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes multiple files from an S3 bucket.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucketName - Bucket name.
+ * @param {Array} keys - Array of object keys to delete.
+ * @returns {Object} AWS S3 response.
+ */
+export const deleteFiles = async (connection, bucketName, keys) => {
+  try {
+    const s3Client = getS3Client(connection);
+    const objects = keys.map((key) => ({ Key: key }));
+    const command = new DeleteObjectsCommand({
+      Bucket: bucketName,
+      Delete: {
+        Objects: objects,
+        Quiet: false,
+      },
+    });
+    const response = await s3Client.send(command);
+    return response;
+  } catch (error) {
+    console.error("Error deleting files:", error);
     throw error;
   }
 };
