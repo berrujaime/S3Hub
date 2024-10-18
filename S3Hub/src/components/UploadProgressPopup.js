@@ -4,10 +4,10 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { ProgressBar } from 'react-native-paper';
 
-const UploadProgressPopup = ({ progress }) => {
+const UploadProgressPopup = ({ progress, operation = 'Procesando' }) => {
   return (
     <View style={styles.popupContainer}>
-      <Text style={styles.popupText}>Uploading Files: {Math.round(progress * 100)}%</Text>
+      <Text style={styles.popupText}>{operation}: {Math.round(progress * 100)}%</Text>
       <ProgressBar progress={progress} color="#6200ee" style={styles.progressBar} />
     </View>
   );

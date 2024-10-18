@@ -11,11 +11,10 @@ import {
   Image as RNImage,
   Text,
 } from "react-native";
-import { Image } from "expo-image";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
 import { listObjects, getSignedUrl, deleteFile, deleteFiles, getPresignedUploadUrl, uploadEmptyFolder } from "../services/s3Service";
-import { FAB, Button, Checkbox, IconButton, Dialog, Portal, TextInput } from 'react-native-paper';
+import { FAB, Button, Checkbox, IconButton, Dialog, Portal, TextInput, useTheme } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -23,15 +22,12 @@ import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 
-
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [modalMediaUrl, setModalMediaUrl] = useState('');
-  const [modalMediaInfo, setModalMediaInfo] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [currentPath, setCurrentPath] = useState('');
   const isMounted = useRef(true); // Avoid state updates on unmounted components
@@ -39,9 +35,13 @@ export default function FileListScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const SWIPE_THRESHOLD = 50;
-
+  const flatListRef = useRef(null);
+  const theme = useTheme(); // Access the theme
 
   useEffect(() => {
     isMounted.current = true;
@@ -55,6 +55,7 @@ export default function FileListScreen() {
       } else {
         // Clear files if the connection or bucket is not valid
         setFiles([]);
+        setMediaFiles([]);
         setLoading(false);
       }
     };
@@ -157,12 +158,13 @@ export default function FileListScreen() {
 
       if (isMounted.current) {
         setFiles(items);
+        setMediaFiles(items.filter(f => !f.isFolder));
         setLoading(false);
       }
     } catch (error) {
       console.error("Error fetching the file list:", error);
       if (isMounted.current) {
-        Alert.alert("Error", "Error fetching the file list.");
+        Alert.alert("Error", "Error al obtener la lista de archivos.");
         setLoading(false);
       }
     }
@@ -195,13 +197,13 @@ export default function FileListScreen() {
           <IconButton icon="folder" size={50} />
           <Text>{item.name}</Text>
           {isSelected && (
-          <View style={styles.checkboxContainer}>
-            <Checkbox
-              status="checked"
-              style={styles.checkbox}
-            />
-          </View>
-        )}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status="checked"
+                style={styles.checkbox}
+              />
+            </View>
+          )}
         </TouchableOpacity>
       );
     }
@@ -299,7 +301,7 @@ export default function FileListScreen() {
             ]}
           >
             {item.url ? (
-              <Image
+              <RNImage
                 style={[
                   styles.image,
                   {
@@ -310,7 +312,7 @@ export default function FileListScreen() {
                   },
                 ]}
                 source={{ uri: item.url }}
-                contentFit="cover"
+                resizeMode="cover"
               />
             ) : (
               <ActivityIndicator style={{ flex: 1 }} />
@@ -334,10 +336,10 @@ export default function FileListScreen() {
             style={styles.listItemContainer}
           >
             {item.url ? (
-              <Image
+              <RNImage
                 style={styles.listImage}
-                source={{ uri: item.url }}
-                contentFit="cover"
+                source={{ uri: item.url, cache: 'force-cache' }}
+                resizeMode="cover"
               />
             ) : (
               <ActivityIndicator style={styles.listImage} />
@@ -383,18 +385,13 @@ export default function FileListScreen() {
     if (selectedFiles.length > 0) {
       toggleSelection(id);
     } else {
-      const file = files.find((f) => f.id === id);
-      if (file) {
-        setModalMediaUrl(file.url);
-        setModalMediaInfo({
-          name: file.name,
-          size: file.size,
-          isVideo: file.isVideo,
-        });
+      const mediaIndex = mediaFiles.findIndex(f => f.id === id);
+      if (mediaIndex !== -1) {
+        setCurrentMediaIndex(mediaIndex);
         setIsModalVisible(true);
       }
     }
-  };  
+  };
 
   const handleUpload = async () => {
     try {
@@ -412,8 +409,8 @@ export default function FileListScreen() {
         // Send notification at the start of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'File Upload',
-            body: 'File upload has started.',
+            title: 'Carga de Archivos',
+            body: 'La carga de archivos ha comenzado.',
           },
           trigger: null,
         });
@@ -450,8 +447,8 @@ export default function FileListScreen() {
         // Send notification upon completion of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'File Upload',
-            body: 'File upload has completed.',
+            title: 'Carga de Archivos',
+            body: 'La carga de archivos ha finalizado.',
           },
           trigger: null,
         });
@@ -459,7 +456,7 @@ export default function FileListScreen() {
     } catch (error) {
       console.error('Error uploading files:', error);
       setIsUploading(false);
-      Alert.alert('Error', 'Error uploading files.');
+      Alert.alert('Error', 'Error al subir los archivos.');
     }
   };
   
@@ -467,7 +464,7 @@ export default function FileListScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert("Permiso denegado", "No se puede acceder al almacenamiento.");
+        Alert.alert("Permiso Denegado", "No se puede acceder al almacenamiento.");
         return;
       }
 
@@ -562,16 +559,21 @@ export default function FileListScreen() {
     try {
       const confirm = await new Promise((resolve) => {
         Alert.alert(
-          'Confirmar borrado',
-          `¿Estás seguro de que deseas borrar ${selectedFiles.length} elemento(s)?`,
+          'Confirmar Eliminación',
+          `¿Estás seguro de que deseas eliminar ${selectedFiles.length} elemento(s)?`,
           [
             { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Borrar', style: 'destructive', onPress: () => resolve(true) },
+            { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
           ]
         );
       });
   
       if (!confirm) return;
+
+      const totalItems = selectedFiles.length;
+      let deletedItems = 0;
+      setIsDeleting(true);
+      setDeleteProgress(0);
   
       for (const fileId of selectedFiles) {
         const file = files.find((f) => f.id === fileId);
@@ -590,14 +592,20 @@ export default function FileListScreen() {
         } else {
           await deleteFile(currentConnection, currentBucket, file.key);
         }
+        deletedItems += 1;
+        const progress = deletedItems / totalItems;
+        setDeleteProgress(progress);
       }
   
-      Alert.alert('Éxito', 'Elemento(s) borrado(s) exitosamente.');
+      setIsDeleting(false);
+      setDeleteProgress(1);
+      Alert.alert('Éxito', 'Elemento(s) eliminados exitosamente.');
       setSelectedFiles([]);
       fetchFiles(); // Update the file list
     } catch (error) {
       console.error('Error deleting items:', error);
-      Alert.alert('Error', 'No se pudieron borrar los elementos.');
+      setIsDeleting(false);
+      Alert.alert('Error', 'No se pudieron eliminar los elementos.');
     }
   };  
 
@@ -623,36 +631,40 @@ export default function FileListScreen() {
 
   const handleModalShare = async () => {
     try {
-      if (modalMediaUrl) {
-        const localUri = FileSystem.cacheDirectory + modalMediaInfo.name;
-        const downloadObject = FileSystem.createDownloadResumable(
-          modalMediaUrl,
-          localUri
-        );
-        const response = await downloadObject.downloadAsync();
+      const currentMedia = mediaFiles[currentMediaIndex];
+      if (!currentMedia) return;
   
-        if (response && response.status === 200) {
-          await Sharing.shareAsync(response.uri);
-        } else {
-          Alert.alert('Error', 'No se pudo descargar el archivo para compartir.');
-        }
+      const localUri = FileSystem.cacheDirectory + currentMedia.name;
+      const downloadObject = FileSystem.createDownloadResumable(
+        currentMedia.url,
+        localUri
+      );
+      const response = await downloadObject.downloadAsync();
+  
+      if (response && response.status === 200) {
+        await Sharing.shareAsync(response.uri);
+      } else {
+        Alert.alert('Error', 'No se pudo descargar el archivo para compartir.');
       }
     } catch (error) {
       console.error('Error sharing file:', error);
       Alert.alert('Error', 'No se pudo compartir el archivo.');
     }
-  };
+  };  
   
   const handleModalDownload = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'No se puede acceder al almacenamiento.');
+        Alert.alert('Permiso Denegado', 'No se puede acceder al almacenamiento.');
         return;
       }
   
-      const uri = modalMediaUrl;
-      const fileName = modalMediaInfo.name;
+      const currentMedia = mediaFiles[currentMediaIndex];
+      if (!currentMedia) return;
+  
+      const uri = currentMedia.url;
+      const fileName = currentMedia.name;
       const fileUri = FileSystem.documentDirectory + fileName;
   
       const downloadObject = FileSystem.createDownloadResumable(uri, fileUri);
@@ -666,7 +678,13 @@ export default function FileListScreen() {
       console.error('Error downloading file:', error);
       Alert.alert('Error', 'No se pudo descargar el archivo.');
     }
-  };
+  };  
+
+  useEffect(() => {
+    if (isModalVisible && flatListRef.current) {
+      flatListRef.current.scrollToIndex({ index: currentMediaIndex, animated: false });
+    }
+  }, [isModalVisible, currentMediaIndex]);
 
   if (loading) {
     return (
@@ -678,8 +696,10 @@ export default function FileListScreen() {
 
   return (
     <View style={styles.container}>
-      {isUploading && (
-        <UploadProgressPopup progress={uploadProgress} />
+      {(isUploading || isDeleting) && (
+        <UploadProgressPopup progress={isUploading ? uploadProgress : deleteProgress}
+        operation={isUploading ? 'Subiendo Archivos' : 'Borrando Archivos'} 
+        />
       )}
       <Text style={styles.title}>Archivos en {currentBucket}</Text>
 
@@ -689,37 +709,40 @@ export default function FileListScreen() {
             icon="arrow-left"
             onPress={handleGoBack}
             style={styles.goBackButton}
+            accessibilityLabel="Regresar"
           />
         ) : null}
         <IconButton
           icon={viewMode === 'grid' ? 'view-list' : 'view-grid'}
           onPress={handleSwitchView}
           style={styles.viewToggleButton}
+          accessibilityLabel={viewMode === 'grid' ? "Cambiar a vista de lista" : "Cambiar a vista de cuadrícula"}
         />
         <IconButton
           icon="select-all"
           onPress={handleSelectAll}
           style={styles.selectAllButton}
+          accessibilityLabel="Seleccionar todo"
         />
       </View>
 
       {selectedFiles.length > 0 && (
         <View style={styles.selectionActionContainer}>
-        <Button
-          mode="contained"
-          onPress={handleDownloadSelected}
-          style={styles.downloadButton}
-        >
-          Descargar
-        </Button>
-        <Button
-          mode="contained"
-          onPress={handleDeleteSelected}
-          style={styles.deleteButton}
-        >
-          Borrar
-        </Button>
-      </View>
+          <Button
+            mode="contained"
+            onPress={handleDownloadSelected}
+            style={styles.downloadButton}
+          >
+            Descargar
+          </Button>
+          <Button
+            mode="contained"
+            onPress={handleDeleteSelected}
+            style={styles.deleteButton}
+          >
+            Eliminar
+          </Button>
+        </View>
       )}
 
       <FlatList
@@ -735,6 +758,7 @@ export default function FileListScreen() {
         style={styles.createFolderFab}
         icon="folder-plus"
         onPress={() => setIsDialogVisible(true)}
+        accessibilityLabel="Crear carpeta"
       />
 
       <Portal>
@@ -742,7 +766,7 @@ export default function FileListScreen() {
           <Dialog.Title>Crear Nueva Carpeta</Dialog.Title>
           <Dialog.Content>
             <TextInput
-              label="Nombre de la Carpeta"
+              label="Nombre de Carpeta"
               value={newFolderName}
               onChangeText={setNewFolderName}
               mode="outlined"
@@ -759,19 +783,18 @@ export default function FileListScreen() {
         style={styles.fab}
         icon="upload"
         onPress={handleUpload}
+        accessibilityLabel="Subir archivos"
       />
-
+      
       {/* Modal to show the full picture with its information */}
-      <Modal
-        visible={isModalVisible}
-        transparent={true}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalBackground} />
-          <View
-            style={styles.modalContent}
-          >
+      {isModalVisible && mediaFiles.length > 0 && (
+        <Modal
+          visible={isModalVisible}
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <IconButton
                 icon="close"
@@ -779,6 +802,7 @@ export default function FileListScreen() {
                 size={24}
                 onPress={() => setIsModalVisible(false)}
                 style={styles.modalCloseButton}
+                accessibilityLabel="Cerrar"
               />
               <View style={styles.modalRightButtons}>
                 <IconButton
@@ -787,6 +811,7 @@ export default function FileListScreen() {
                   size={24}
                   onPress={handleModalDownload}
                   style={styles.modalDownloadButton}
+                  accessibilityLabel="Descargar"
                 />
                 <IconButton
                   icon="share-variant"
@@ -794,38 +819,67 @@ export default function FileListScreen() {
                   size={24}
                   onPress={handleModalShare}
                   style={styles.modalShareButton}
+                  accessibilityLabel="Compartir"
                 />
               </View>
             </View>
-            {modalMediaInfo && modalMediaInfo.isVideo ? (
-              <Video
-                source={{ uri: modalMediaUrl }}
-                rate={1.0}
-                volume={1.0}
-                isMuted={false}
-                resizeMode="contain"
-                shouldPlay
-                useNativeControls={true}
-                style={styles.fullMedia}
-              />
-            ) : modalMediaInfo ? (
-              <RNImage
-                source={{ uri: modalMediaUrl }}
-                style={styles.fullMedia}
-                resizeMode="contain"
-              />
-            ) : null}
-            {modalMediaInfo && (
-              <View style={styles.infoContainer}>
-                <Text style={styles.infoText}>Nombre: {modalMediaInfo.name}</Text>
+
+            {/* FlatList to Display Media */}
+            <FlatList
+              ref={flatListRef}
+              data={mediaFiles}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              initialScrollIndex={currentMediaIndex}
+              getItemLayout={(data, index) => (
+                {length: Dimensions.get('window').width, offset: Dimensions.get('window').width * index, index}
+              )}
+              renderItem={({ item }) => (
+                <View style={styles.modalMediaContainer}>
+                  {item.isVideo ? (
+                    <Video
+                      source={{ uri: item.url }}
+                      rate={1.0}
+                      volume={1.0}
+                      isMuted={false}
+                      resizeMode="contain"
+                      shouldPlay={false} // Change to true if you want autoplay
+                      useNativeControls={true}
+                      style={styles.fullMedia}
+                    />
+                  ) : (
+                    <RNImage
+                      source={{ uri: item.url }}
+                      style={styles.fullMedia}
+                      resizeMode="contain"
+                    />
+                  )}
+                </View>
+              )}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(
+                  event.nativeEvent.contentOffset.x / Dimensions.get('window').width
+                );
+                setCurrentMediaIndex(index);
+                console.log('Scrolled to index:', index);
+              }}
+              style={{ flex: 1 }}
+            />
+            
+            {/* Information Box */}
+            {mediaFiles[currentMediaIndex] && (
+              <View style={[styles.infoContainer, { backgroundColor: theme.colors.accent }]}>
+                <Text style={styles.infoText}>Nombre: {mediaFiles[currentMediaIndex].name}</Text>
                 <Text style={styles.infoText}>
-                  Tamaño: {(modalMediaInfo.size / (1024 * 1024)).toFixed(2)} MB
+                  Tamaño: {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
                 </Text>
               </View>
             )}
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -868,10 +922,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     backgroundColor: 'red',
   },
-  infoButton: {
-    flex: 1,
-    marginHorizontal: 8,
-  },
   itemContainer: {
     position: 'relative',
   },
@@ -907,70 +957,9 @@ const styles = StyleSheet.create({
     left: '50%',
     transform: [{ translateX: -15 }, { translateY: -15 }],
   },
-  modalContainer: {
-    flex: 1,
-  },
-  modalBackground: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-  },
-  modalContent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  modalHeader: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  modalCloseButton: {
-    marginRight: 16,
-  },
-  modalRightButtons: {
-    flexDirection: 'row',
-  },
-  modalDownloadButton: {
-    marginRight: 16,
-  },
-  modalShareButton: {},
-  fullMedia: {
-    flex: 1,
-    marginTop: 60, // Space for the header
-  },
-  infoContainer: {
-    marginTop: 16,
-    marginBottom: 16, // Space from the bottom
-    marginHorizontal: 16, // Left and right margins
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 8,
-  },
-  infoText: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  closeButton: {
-    marginTop: 16,
-  },
   image: {
     borderWidth: 1,
     borderColor: '#ccc',
-  },
-  checkboxContainer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-  },
-  checkbox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   listItemContainer: {
     flexDirection: 'row',
@@ -1012,5 +1001,64 @@ const styles = StyleSheet.create({
   },
   flatListContent: {
     paddingBottom: 80,
+  },
+  checkboxContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+  },
+  checkbox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+  },
+  modalHeader: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 8,
+  },
+  modalCloseButton: {
+    // Adjust margins if needed
+  },
+  modalRightButtons: {
+    flexDirection: 'row',
+  },
+  modalDownloadButton: {
+    marginRight: 16,
+  },
+  modalShareButton: {},
+  fullMedia: {
+    width: Dimensions.get('window').width * 0.9,
+    height: Dimensions.get('window').height * 0.6,
+  },
+  modalMediaContainer: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // This will be overridden by the accent color
+    padding: 16,
+    borderRadius: 8,
+  },
+  infoText: {
+    color: 'white',
+    fontSize: 16,
+    marginBottom: 8,
   },
 });
