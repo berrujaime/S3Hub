@@ -805,7 +805,7 @@ export default function FileListScreen() {
                 isMuted={false}
                 resizeMode="contain"
                 shouldPlay
-                useNativeControls={false} // Temporarily disable
+                useNativeControls={true}
                 style={styles.fullMedia}
               />
             ) : modalMediaInfo ? (
