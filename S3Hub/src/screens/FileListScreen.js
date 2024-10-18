@@ -14,13 +14,13 @@ import {
 import { Image } from "expo-image";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
-import { listObjects, getSignedUrl, uploadFile, deleteFile, deleteFiles, getPresignedUploadUrl, uploadEmptyFolder } from "../services/s3Service";
-import { FAB, Button, Checkbox, IconButton } from 'react-native-paper';
+import { listObjects, getSignedUrl, deleteFile, deleteFiles, getPresignedUploadUrl, uploadEmptyFolder } from "../services/s3Service";
+import { FAB, Button, Checkbox, IconButton, Dialog, Portal, TextInput } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
-import { ProgressBar, Dialog, Portal, TextInput } from 'react-native-paper';
+import * as Sharing from 'expo-sharing';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 
 
@@ -40,6 +40,8 @@ export default function FileListScreen() {
   const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
+  const SWIPE_THRESHOLD = 50;
+
 
   useEffect(() => {
     isMounted.current = true;
@@ -48,10 +50,10 @@ export default function FileListScreen() {
       if (currentConnection && currentBucket) {
         setLoading(true);
         await fetchFiles();
-        // Deseleccionar archivos al cambiar de conexión, bucket o carpeta
+        // Deselect files when changing connection, bucket, or folder
         setSelectedFiles([]);
       } else {
-        // Limpiar archivos si la conexión o el bucket no son válidos
+        // Clear files if the connection or bucket is not valid
         setFiles([]);
         setLoading(false);
       }
@@ -60,14 +62,14 @@ export default function FileListScreen() {
     fetchData();
 
     return () => {
-      // Función de limpieza para establecer isMounted en false
+      // Cleanup function to set isMounted to false
       isMounted.current = false;
     };
   }, [currentConnection, currentBucket, currentPath]);
 
   const fetchFiles = async () => {
     try {
-      // Verificar nuevamente que currentConnection y currentBucket son válidos
+      // Re-verify that currentConnection and currentBucket are valid
       if (!currentConnection || !currentBucket) {
         setLoading(false);
         return;
@@ -80,7 +82,7 @@ export default function FileListScreen() {
       );
 
       if (!isMounted.current) {
-        return; // El componente se desmontó, cancelar actualización de estado
+        return; // The component has unmounted, cancel state update
       }
 
       let items = [];
@@ -91,20 +93,20 @@ export default function FileListScreen() {
         response.Contents.forEach(object => {
           const key = object.Key;
 
-          // Eliminar el prefijo 'currentPath' de la key para obtener el path relativo
+          // Remove the 'currentPath' prefix from the key to get the relative path
           const relativeKey = key.substring(currentPath.length);
 
-          // Ignorar el propio 'currentPath'
+          // Ignore the 'currentPath' itself
           if (relativeKey === '') return;
 
-          // Verificar si es un directorio o un archivo
+          // Check if it is a directory or a file
           const index = relativeKey.indexOf('/');
           if (index !== -1) {
-            // Es un directorio
+            // It is a directory
             const dirName = relativeKey.substring(0, index);
             directories.add(dirName);
           } else {
-            // Es un archivo
+            // It is a file
             const isMedia = key.match(/\.(jpg|jpeg|png|gif|mp4|mov|avi|mkv)$/i);
             if (isMedia) {
               const isVideo = key.match(/\.(mp4|mov|avi|mkv)$/i) ? true : false;
@@ -115,16 +117,16 @@ export default function FileListScreen() {
                 size: object.Size,
                 isFolder: false,
                 isVideo: isVideo,
-                url: null, // Inicialmente null
+                url: null, // Initially null
               };
-              // Obtener la URL firmada
+              // Get the signed URL
               filePromises.push(
                 getSignedUrl(currentConnection, currentBucket, key)
                   .then(url => {
                     fileItem.url = url;
                   })
                   .catch(error => {
-                    console.error("Error al obtener la URL firmada:", error);
+                    console.error("Error getting the signed URL:", error);
                   })
               );
               items.push(fileItem);
@@ -132,7 +134,7 @@ export default function FileListScreen() {
           }
         });
 
-        // Agregar carpetas a la lista
+        // Add folders to the list
         directories.forEach(dir => {
           items.push({
             id: currentPath + dir + '/',
@@ -142,10 +144,10 @@ export default function FileListScreen() {
           });
         });
 
-        // Esperar a que se obtengan todas las URLs firmadas
+        // Wait for all signed URLs to be obtained
         await Promise.all(filePromises);
 
-        // Ordenar carpetas primero
+        // Sort folders first
         items.sort((a, b) => {
           if (a.isFolder && !b.isFolder) return -1;
           if (!a.isFolder && b.isFolder) return 1;
@@ -158,9 +160,9 @@ export default function FileListScreen() {
         setLoading(false);
       }
     } catch (error) {
-      console.error("Error al obtener la lista de archivos:", error);
+      console.error("Error fetching the file list:", error);
       if (isMounted.current) {
-        Alert.alert("Error", "Error al obtener la lista de archivos.");
+        Alert.alert("Error", "Error fetching the file list.");
         setLoading(false);
       }
     }
@@ -173,7 +175,7 @@ export default function FileListScreen() {
     const isSelected = selectedFiles.includes(item.id);
 
     if (item.isFolder) {
-      // Renderizar carpeta
+      // Render folder
       return (
         <TouchableOpacity
           onPress={() => handleFolderPress(item)}
@@ -204,7 +206,7 @@ export default function FileListScreen() {
       );
     }
     if (item.isVideo) {
-      // Vista en cuadrícula
+      // Grid view
       if (viewMode === 'grid') {
         return (
           <TouchableOpacity
@@ -245,7 +247,7 @@ export default function FileListScreen() {
           </TouchableOpacity>
         );
       } else {
-        // Vista en lista
+        // List view
         return (
           <TouchableOpacity
             onPress={() => handleItemPress(item.id)}
@@ -281,7 +283,7 @@ export default function FileListScreen() {
         );
       }
     } else {
-      // Renderizar archivo
+      // Render file
       if (viewMode === 'grid') {
         return (
           <TouchableOpacity
@@ -324,7 +326,7 @@ export default function FileListScreen() {
           </TouchableOpacity>
         );
       } else {
-        // Vista de lista
+        // List view
         return (
           <TouchableOpacity
             onPress={() => handleItemPress(item.id)}
@@ -358,12 +360,12 @@ export default function FileListScreen() {
 
   const handleFolderPress = (folder) => {
     if (selectedFiles.length > 0) {
-      // Si estamos en modo selección, alternar selección
+      // If in selection mode, toggle selection
       toggleSelection(folder.id);
     }
     else {
       setCurrentPath(currentPath + folder.name + '/');
-      setSelectedFiles([]); // Deseleccionar archivos al cambiar de carpeta
+      setSelectedFiles([]); // Deselect files when changing folder
     }
   };
 
@@ -397,7 +399,7 @@ export default function FileListScreen() {
   const handleUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        multiple: true, // Permitir selección múltiple
+        multiple: true, // Allow multiple selection
         copyToCacheDirectory: true,
       });
   
@@ -405,13 +407,13 @@ export default function FileListScreen() {
         const totalFiles = result.assets.length;
         let uploadedFiles = 0;
   
-        setIsUploading(true); // Mostrar el popup de progreso
+        setIsUploading(true); // Show the progress popup
   
-        // Enviar notificación al inicio de la subida
+        // Send notification at the start of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Subida de Archivos',
-            body: 'La subida de archivos ha comenzado.',
+            title: 'File Upload',
+            body: 'File upload has started.',
           },
           trigger: null,
         });
@@ -423,10 +425,10 @@ export default function FileListScreen() {
   
           const key = currentPath + fileName;
   
-          // Obtener la URL firmada para subir
+          // Get the signed URL for upload
           const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
   
-          // Subir el archivo usando uploadAsync para permitir subida en segundo plano
+          // Upload the file using uploadAsync to allow background upload
           await FileSystem.uploadAsync(uploadUrl, fileUri, {
             httpMethod: 'PUT',
             uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -440,24 +442,24 @@ export default function FileListScreen() {
           setUploadProgress(progress);
         }
   
-        setIsUploading(false); // Ocultar el popup de progreso
+        setIsUploading(false); // Hide the progress popup
         setUploadProgress(1);
         Alert.alert('Éxito', 'Archivos subidos exitosamente.');
-        fetchFiles(); // Actualizar la lista de archivos
+        fetchFiles(); // Update the file list
   
-        // Enviar notificación al finalizar la subida
+        // Send notification upon completion of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Subida de Archivos',
-            body: 'La subida de archivos ha finalizado.',
+            title: 'File Upload',
+            body: 'File upload has completed.',
           },
           trigger: null,
         });
       }
     } catch (error) {
-      console.error('Error al subir los archivos:', error);
+      console.error('Error uploading files:', error);
       setIsUploading(false);
-      Alert.alert('Error', 'Error al subir los archivos.');
+      Alert.alert('Error', 'Error uploading files.');
     }
   };
   
@@ -472,17 +474,17 @@ export default function FileListScreen() {
       for (const fileId of selectedFiles) {
         const file = files.find((f) => f.id === fileId);
         if (file.isFolder) {
-          // Descargar carpeta
+          // Download folder
           await downloadFolder(file.key);
         } else {
-          // Descargar archivo
+          // Download file
           await downloadFile(file);
         }
       }
       Alert.alert("Éxito", "Descarga completada.");
       setSelectedFiles([]);
     } catch (error) {
-      console.error("Error al descargar los archivos:", error);
+      console.error("Error downloading files:", error);
       Alert.alert("Error", "No se pudieron descargar los archivos.");
     }
   };
@@ -499,10 +501,10 @@ export default function FileListScreen() {
       );
       const response = await downloadObject.downloadAsync();
 
-      // Guardar en la galería
+      // Save to gallery
       await MediaLibrary.saveToLibraryAsync(response.uri);
     } catch (error) {
-      console.error("Error al descargar el archivo:", error);
+      console.error("Error downloading file:", error);
     }
   };
 
@@ -518,7 +520,7 @@ export default function FileListScreen() {
         for (const object of response.Contents) {
           const key = object.Key;
           if (!key.endsWith('/')) {
-            // Es un archivo
+            // It is a file
             const url = await getSignedUrl(currentConnection, currentBucket, key);
             const fileName = key.substring(key.lastIndexOf('/') + 1);
             const file = {
@@ -530,7 +532,7 @@ export default function FileListScreen() {
         }
       }
     } catch (error) {
-      console.error("Error al descargar la carpeta:", error);
+      console.error("Error downloading folder:", error);
     }
   };
 
@@ -574,11 +576,11 @@ export default function FileListScreen() {
       for (const fileId of selectedFiles) {
         const file = files.find((f) => f.id === fileId);
         if (file.isFolder) {
-          // Obtener todos los objetos dentro de la carpeta
+          // Get all objects within the folder
           const response = await listObjects(currentConnection, currentBucket, file.key);
           if (response.Contents && response.Contents.length > 0) {
             const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
-            // Eliminar objetos en lotes de 1000
+            // Delete objects in batches of 1000
             const chunkSize = 1000;
             for (let i = 0; i < objects.length; i += chunkSize) {
               const chunk = objects.slice(i, i + chunkSize);
@@ -592,9 +594,9 @@ export default function FileListScreen() {
   
       Alert.alert('Éxito', 'Elemento(s) borrado(s) exitosamente.');
       setSelectedFiles([]);
-      fetchFiles(); // Actualizar la lista de archivos
+      fetchFiles(); // Update the file list
     } catch (error) {
-      console.error('Error al borrar los elementos:', error);
+      console.error('Error deleting items:', error);
       Alert.alert('Error', 'No se pudieron borrar los elementos.');
     }
   };  
@@ -611,14 +613,60 @@ export default function FileListScreen() {
       await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
       setIsDialogVisible(false);
       setNewFolderName('');
-      fetchFiles(); // Actualizar la lista de archivos
+      fetchFiles(); // Update the file list
       Alert.alert('Éxito', 'Carpeta creada exitosamente.');
     } catch (error) {
-      console.error('Error al crear la carpeta:', error);
+      console.error('Error creating folder:', error);
       Alert.alert('Error', 'No se pudo crear la carpeta.');
     }
   };
+
+  const handleModalShare = async () => {
+    try {
+      if (modalMediaUrl) {
+        const localUri = FileSystem.cacheDirectory + modalMediaInfo.name;
+        const downloadObject = FileSystem.createDownloadResumable(
+          modalMediaUrl,
+          localUri
+        );
+        const response = await downloadObject.downloadAsync();
   
+        if (response && response.status === 200) {
+          await Sharing.shareAsync(response.uri);
+        } else {
+          Alert.alert('Error', 'No se pudo descargar el archivo para compartir.');
+        }
+      }
+    } catch (error) {
+      console.error('Error sharing file:', error);
+      Alert.alert('Error', 'No se pudo compartir el archivo.');
+    }
+  };
+  
+  const handleModalDownload = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'No se puede acceder al almacenamiento.');
+        return;
+      }
+  
+      const uri = modalMediaUrl;
+      const fileName = modalMediaInfo.name;
+      const fileUri = FileSystem.documentDirectory + fileName;
+  
+      const downloadObject = FileSystem.createDownloadResumable(uri, fileUri);
+      const response = await downloadObject.downloadAsync();
+  
+      // Save to gallery
+      await MediaLibrary.saveToLibraryAsync(response.uri);
+  
+      Alert.alert('Éxito', 'Archivo descargado exitosamente.');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      Alert.alert('Error', 'No se pudo descargar el archivo.');
+    }
+  };
 
   if (loading) {
     return (
@@ -657,25 +705,6 @@ export default function FileListScreen() {
 
       {selectedFiles.length > 0 && (
         <View style={styles.selectionActionContainer}>
-        {selectedFiles.length === 1 ? (
-          <Button
-            mode="contained"
-            onPress={() => {
-              const file = files.find((f) => f.id === selectedFiles[0]);
-              if (file && !file.isFolder) {
-                setModalMediaUrl(file.url);
-                setModalMediaInfo({
-                  name: file.name,
-                  size: file.size,
-                });
-                setIsModalVisible(true);
-              }
-            }}
-            style={styles.infoButton}
-          >
-            Ver Información
-          </Button>
-        ) : null}
         <Button
           mode="contained"
           onPress={handleDownloadSelected}
@@ -698,7 +727,7 @@ export default function FileListScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={numColumns}
-        key={viewMode} // Forzar redibujado al cambiar de vista
+        key={viewMode} // Forcing re-render on view change
         contentContainerStyle={styles.flatListContent}
       />
 
@@ -732,38 +761,69 @@ export default function FileListScreen() {
         onPress={handleUpload}
       />
 
-      {/* Modal para mostrar la imagen completa y la información */}
+      {/* Modal to show the full picture with its information */}
       <Modal
         visible={isModalVisible}
         transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          {modalMediaInfo && modalMediaInfo.isVideo ? (
-            <Video
-              source={{ uri: modalMediaUrl }}
-              rate={1.0}
-              volume={1.0}
-              isMuted={false}
-              resizeMode="contain"
-              shouldPlay
-              useNativeControls
-              style={styles.fullMedia}
-            />
-          ) : modalMediaInfo ? (
-            <RNImage
-              source={{ uri: modalMediaUrl }}
-              style={styles.fullMedia}
-              resizeMode="contain"
-            />
-          ) : null}
-          {modalMediaInfo && (
-            <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>Nombre: {modalMediaInfo.name}</Text>
-              <Text style={styles.infoText}>Tamaño: {(modalMediaInfo.size / (1024 * 1024)).toFixed(2)} MB</Text>
+          <View style={styles.modalBackground} />
+          <View
+            style={styles.modalContent}
+          >
+            <View style={styles.modalHeader}>
+              <IconButton
+                icon="close"
+                iconColor="white"
+                size={24}
+                onPress={() => setIsModalVisible(false)}
+                style={styles.modalCloseButton}
+              />
+              <View style={styles.modalRightButtons}>
+                <IconButton
+                  icon="download"
+                  iconColor="white"
+                  size={24}
+                  onPress={handleModalDownload}
+                  style={styles.modalDownloadButton}
+                />
+                <IconButton
+                  icon="share-variant"
+                  iconColor="white"
+                  size={24}
+                  onPress={handleModalShare}
+                  style={styles.modalShareButton}
+                />
+              </View>
             </View>
-          )}
-          <Button onPress={() => setIsModalVisible(false)} style={styles.closeButton}>Cerrar</Button>
+            {modalMediaInfo && modalMediaInfo.isVideo ? (
+              <Video
+                source={{ uri: modalMediaUrl }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode="contain"
+                shouldPlay
+                useNativeControls={false} // Temporarily disable
+                style={styles.fullMedia}
+              />
+            ) : modalMediaInfo ? (
+              <RNImage
+                source={{ uri: modalMediaUrl }}
+                style={styles.fullMedia}
+                resizeMode="contain"
+              />
+            ) : null}
+            {modalMediaInfo && (
+              <View style={styles.infoContainer}>
+                <Text style={styles.infoText}>Nombre: {modalMediaInfo.name}</Text>
+                <Text style={styles.infoText}>
+                  Tamaño: {(modalMediaInfo.size / (1024 * 1024)).toFixed(2)} MB
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </Modal>
     </View>
@@ -773,7 +833,7 @@ export default function FileListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: 40, // Espacio superior
+    marginTop: 40,
   },
   loader: {
     flex: 1,
@@ -828,7 +888,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -40 }],
+    transform: [{ translateX: -25 }, { translateY: -25 }],
   },
   listVideoContainer: {
     width: 50,
@@ -847,13 +907,59 @@ const styles = StyleSheet.create({
     left: '50%',
     transform: [{ translateX: -15 }, { translateY: -15 }],
   },
+  modalContainer: {
+    flex: 1,
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+  },
+  modalContent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalHeader: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  modalCloseButton: {
+    marginRight: 16,
+  },
+  modalRightButtons: {
+    flexDirection: 'row',
+  },
+  modalDownloadButton: {
+    marginRight: 16,
+  },
+  modalShareButton: {},
   fullMedia: {
-    width: '100%',
-    height: '80%',
+    flex: 1,
+    marginTop: 60, // Space for the header
+  },
+  infoContainer: {
+    marginTop: 16,
+    marginBottom: 16, // Space from the bottom
+    marginHorizontal: 16, // Left and right margins
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 8,
+  },
+  infoText: {
+    fontSize: 16,
+    marginBottom: 8,
   },
   closeButton: {
     marginTop: 16,
-  },  
+  },
   image: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -892,28 +998,6 @@ const styles = StyleSheet.create({
   listCheckbox: {
     marginLeft: 8,
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  fullImage: {
-    width: '100%',
-    height: '80%',
-  },
-  infoContainer: {
-    marginTop: 16,
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 8,
-    width: '100%',
-  },
-  infoText: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
   fab: {
     position: 'absolute',
     margin: 16,
@@ -926,7 +1010,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 140,
   },
-  
   flatListContent: {
     paddingBottom: 80,
   },
