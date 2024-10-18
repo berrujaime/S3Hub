@@ -1,7 +1,7 @@
 // src/screens/LoginScreen.js
 import React, { useState, useContext } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { Text, TextInput, Button, RadioButton, Menu, Checkbox } from 'react-native-paper';
+import { View, StyleSheet, Alert, Image } from 'react-native';
+import { Text, TextInput, Button, RadioButton, Menu } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { validateCredentials } from '../services/authService';
 
@@ -99,11 +99,13 @@ export default function LoginScreen({ navigation }) {
       <RadioButton.Group onValueChange={handleServiceChange} value={service}>
         <View style={styles.radioButtonContainer}>
           <RadioButton value="storj" />
-          <Text>Storj</Text>
+          <Image source={require('../../assets/logos/storj.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.radioText}>Storj</Text>
         </View>
         <View style={styles.radioButtonContainer}>
           <RadioButton value="aws" />
-          <Text>AWS S3</Text>
+          <Image source={require('../../assets/logos/aws.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.radioText}>AWS S3</Text>
         </View>
       </RadioButton.Group>
 
@@ -157,6 +159,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  logo: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
+  radioText: {
+    fontSize: 16,
   },
   menuButton: {
     marginBottom: 16,

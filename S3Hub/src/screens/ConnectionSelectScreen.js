@@ -1,7 +1,7 @@
 // src/screens/ConnectionSelectScreen.js
 
 import React, { useContext } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
 import { Text, List, FAB, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 
@@ -10,7 +10,6 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   const handleConnectionSelect = async (connection) => {
     await setActiveConnection(connection);
-    // Navegar a la pestaña de Buckets para seleccionar un bucket de la nueva conexión
     navigation.navigate('BucketsTab');
   };
 
@@ -37,13 +36,17 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   const renderConnectionItem = ({ item }) => {
     const isActive = currentConnection && currentConnection.id === item.id;
+    const logoSource =
+      item.service === 'storj'
+        ? require('../../assets/logos/storj.png')
+        : require('../../assets/logos/aws.png');
 
     return (
       <List.Item
         title={item.service}
         description={`Access Key: ${item.accessKey}`}
         onPress={() => handleConnectionSelect(item)}
-        left={(props) => <List.Icon {...props} icon="server" />}
+        left={() => <Image source={logoSource} style={styles.logo} resizeMode="contain" />}
         right={(props) => (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
@@ -84,10 +87,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  logo: {
+    width: 32,
+    height: 32,
+    marginRight: 8,
+  },
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
-    bottom: 64, // Ajuste para el menú inferior
+    bottom: 64,
   },
 });
