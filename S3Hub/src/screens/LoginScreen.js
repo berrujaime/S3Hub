@@ -4,7 +4,7 @@ import { View, StyleSheet, Alert, Image } from 'react-native';
 import { Text, TextInput, Button, RadioButton, Menu } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { validateCredentials } from '../services/authService';
-import i18n from '../locales/translations';  // Import i18n
+import i18n from '../locales/translations';
 
 export default function LoginScreen({ navigation }) {
   const [accessKey, setAccessKey] = useState('');

@@ -1,6 +1,6 @@
 // App.js
 
-// Imoprt at startup to add polyfill for web streams globally
+// Import at startup to add polyfill for web streams globally
 import 'react-native-get-random-values';
 import { ReadableStream } from 'web-streams-polyfill/ponyfill';
 global.ReadableStream = ReadableStream;

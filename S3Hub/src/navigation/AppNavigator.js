@@ -3,12 +3,15 @@
 import React, { useContext } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import LoginScreen from '../screens/LoginScreen';
 import ConnectionSelectScreen from '../screens/ConnectionSelectScreen';
 import BucketSelectScreen from '../screens/BucketSelectScreen';
 import FileListScreen from '../screens/FileListScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import { AuthContext } from '../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import i18n from '../locales/translations';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -38,8 +41,16 @@ function FilesStack() {
   );
 }
 
+function SettingsStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainTabs() {
-  const { currentConnection, currentBucket } = useContext(AuthContext);
+  const { currentConnection, currentBucket, language } = useContext(AuthContext);
 
   return (
     <Tab.Navigator
@@ -53,7 +64,7 @@ function MainTabs() {
         name="ConnectionsTab"
         component={ConnectionsStack}
         options={{
-          tabBarLabel: 'Conexiones',
+          tabBarLabel: i18n.t('connections'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="server" color={color} size={size} />
           ),
@@ -64,7 +75,7 @@ function MainTabs() {
           name="BucketsTab"
           component={BucketsStack}
           options={{
-            tabBarLabel: 'Buckets',
+            tabBarLabel: i18n.t('buckets'),
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name="bucket" color={color} size={size} />
             ),
@@ -76,19 +87,41 @@ function MainTabs() {
           name="FilesTab"
           component={FilesStack}
           options={{
-            tabBarLabel: 'Archivos',
+            tabBarLabel: i18n.t('files'),
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name="folder-image" color={color} size={size} />
             ),
           }}
         />
       )}
+      <Tab.Screen
+        name="SettingsTab"
+        component={SettingsStack}
+        options={{
+          tabBarLabel: i18n.t('settings'),
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="cog" color={color} size={size} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
-  const { currentConnection } = useContext(AuthContext);
+  const { currentConnection, language, isLoading } = useContext(AuthContext);
+
+  if (isLoading) {
+    // Render a loading screen while loading data
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  // Update the i18n locale before rendering the app
+  i18n.locale = language;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -100,3 +133,11 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex:1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

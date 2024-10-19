@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import i18n from '../locales/translations';
 
 export const AuthContext = createContext();
 
@@ -9,6 +10,8 @@ export const AuthProvider = ({ children }) => {
   const [connections, setConnections] = useState([]);
   const [currentConnection, setCurrentConnection] = useState(null);
   const [currentBucket, setCurrentBucket] = useState(null);
+  const [language, setLanguage] = useState(i18n.locale || 'en');
+  const [isLoading, setIsLoading] = useState(true);
 
   const addConnection = async (connection) => {
     const newConnections = [...connections, connection];
@@ -50,21 +53,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const changeLanguage = async (newLanguage) => {
+    setLanguage(newLanguage);
+    i18n.locale = newLanguage;
+    await SecureStore.setItemAsync('appLanguage', newLanguage);
+  };
+
   useEffect(() => {
     const loadStoredData = async () => {
-      const storedConnections = await SecureStore.getItemAsync('connections');
-      if (storedConnections) {
-        setConnections(JSON.parse(storedConnections));
-      }
+      try {
+        const storedConnections = await SecureStore.getItemAsync('connections');
+        if (storedConnections) {
+          setConnections(JSON.parse(storedConnections));
+        }
 
-      const storedCurrentConnection = await SecureStore.getItemAsync('currentConnection');
-      if (storedCurrentConnection) {
-        setCurrentConnection(JSON.parse(storedCurrentConnection));
-      }
+        const storedCurrentConnection = await SecureStore.getItemAsync('currentConnection');
+        if (storedCurrentConnection) {
+          setCurrentConnection(JSON.parse(storedCurrentConnection));
+        }
 
-      const storedCurrentBucket = await SecureStore.getItemAsync('currentBucket');
-      if (storedCurrentBucket) {
-        setCurrentBucket(storedCurrentBucket);
+        const storedCurrentBucket = await SecureStore.getItemAsync('currentBucket');
+        if (storedCurrentBucket) {
+          setCurrentBucket(storedCurrentBucket);
+        }
+
+        const storedLanguage = await SecureStore.getItemAsync('appLanguage');
+        if (storedLanguage) {
+          setLanguage(storedLanguage);
+          i18n.locale = storedLanguage;
+        } else {
+          // Set default language
+          setLanguage(i18n.locale || 'en');
+          i18n.locale = i18n.locale || 'en';
+          await SecureStore.setItemAsync('appLanguage', i18n.locale || 'en');
+        }
+      } catch (error) {
+        console.error("Error cargando datos almacenados:", error);
+      } finally {
+        setIsLoading(false); // Finalizar la carga
       }
     };
 
@@ -76,10 +102,13 @@ export const AuthProvider = ({ children }) => {
       connections,
       currentConnection,
       currentBucket,
+      language,
+      isLoading,
       addConnection,
       setActiveConnection,
       setCurrentBucket: setCurrentBucketFunction,
       deleteConnection,
+      changeLanguage,
     }}>
       {children}
     </AuthContext.Provider>

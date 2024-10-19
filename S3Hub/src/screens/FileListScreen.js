@@ -21,7 +21,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
 import UploadProgressPopup from '../components/UploadProgressPopup';
-import i18n from '../locales/translations';  // Import i18n
+import i18n from '../locales/translations';
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);

@@ -4,7 +4,7 @@ import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
 import { Text, List, FAB, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
-import i18n from '../locales/translations';  // Import i18n
+import i18n from '../locales/translations';
 
 export default function ConnectionSelectScreen({ navigation }) {
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);

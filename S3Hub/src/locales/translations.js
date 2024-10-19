@@ -40,6 +40,11 @@ en = {
     back: 'Back',
     items: 'Items',
     deleteConnection: 'Delete Connection',
+    connections: 'Connections',
+    buckets: 'Buckets',
+    files: 'Files',
+    settings: 'Settings',
+    selectLanguage: 'Select language',
   }
 
 es = {
@@ -80,12 +85,17 @@ es = {
     back: 'Regresar',
     items: 'Elementos',
     deleteConnection: 'Eliminar Conexión',
+    connections: 'Conexiones',
+    buckets: 'Buckets',
+    files: 'Archivos',
+    settings: 'Ajustes',
+    selectLanguage: 'Selecciona el idioma',
   }
 
 const i18n = new I18n({en, es});
 
 // Detect and configure the language
 i18n.fallbacks = true;
-i18n.locale = Localization.languageCode || 'en';
+//i18n.locale = Localization.languageCode || 'en';
 
 export default i18n;
