@@ -79,6 +79,12 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text variant="headlineLarge" style={styles.title}>S3Hub</Text>
+
+      <Image 
+        source={require('../../assets/logos/S3HubLogo_bg.png')} 
+        style={styles.centeredImage}
+        resizeMode="contain"
+      />
       
       <TextInput
         label={i18n.t('accessKey')}
@@ -146,7 +152,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 0,
+  },
+  centeredImage: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginBottom: 10,
   },
   input: {
     marginBottom: 16,
