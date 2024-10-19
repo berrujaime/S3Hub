@@ -5,19 +5,20 @@ import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-nati
 import { Text, List } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { listBuckets } from '../services/s3Service';
+import i18n from '../locales/translations';
 
 export default function BucketSelectScreen({ navigation }) {
   const { currentConnection, setCurrentBucket } = useContext(AuthContext);
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedBucket, setSelectedBucket] = useState(null); // Nuevo estado
+  const [selectedBucket, setSelectedBucket] = useState(null);
 
   useEffect(() => {
     if (currentConnection) {
       fetchBuckets();
     } else {
       setBuckets([]);
-      setSelectedBucket(null); // Resetear la selección
+      setSelectedBucket(null); // Reset the selection
     }
   }, [currentConnection]);
 
@@ -27,16 +28,16 @@ export default function BucketSelectScreen({ navigation }) {
       const bucketsList = await listBuckets(currentConnection);
       setBuckets(bucketsList);
 
-      // Si solo hay un bucket, seleccionarlo automáticamente
+      // If there is only one bucket, select it automatically
       if (bucketsList.length === 1) {
         const singleBucket = bucketsList[0];
-        setSelectedBucket(singleBucket.Name); // Actualizar el estado de selección
+        setSelectedBucket(singleBucket.Name);
         await setCurrentBucket(singleBucket.Name);
-        navigation.navigate('FilesTab'); // Navegar a la pestaña de archivos
+        navigation.navigate('FilesTab');
       }
     } catch (error) {
-      console.error("Error al obtener los buckets:", error);
-      Alert.alert("Error", "Error al obtener la lista de buckets.");
+      console.error("Error fetching the buckets:", error);
+      Alert.alert(i18n.t('error'), i18n.t('chooseConnection'));
     } finally {
       setLoading(false);
     }
@@ -44,12 +45,12 @@ export default function BucketSelectScreen({ navigation }) {
 
   const handleBucketSelect = async (bucket) => {
     try {
-      setSelectedBucket(bucket.Name); // Actualizar el estado de selección
+      setSelectedBucket(bucket.Name);
       await setCurrentBucket(bucket.Name);
-      navigation.navigate('FilesTab'); // Navegar a la pestaña de archivos
+      navigation.navigate('FilesTab');
     } catch (error) {
-      console.error("Error al seleccionar el bucket:", error);
-      Alert.alert("Error", "No se pudo seleccionar el bucket.");
+      console.error("Error selecting the bucket:", error);
+      Alert.alert(i18n.t('error'), i18n.t('error'));
     }
   };
 
@@ -76,14 +77,14 @@ export default function BucketSelectScreen({ navigation }) {
   if (!currentConnection) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Por favor, selecciona una conexión primero.</Text>
+        <Text style={styles.message}>{i18n.t('chooseConnection')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Selecciona un Bucket</Text>
+      <Text style={styles.title}>{i18n.t('selectBucket')}</Text>
       <FlatList
         data={buckets}
         keyExtractor={(item) => item.Name}
@@ -115,6 +116,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   selectedItem: {
-    backgroundColor: '#e0f7fa', // Color de fondo para el ítem seleccionado
+    backgroundColor: '#e0f7fa',
   },
 });

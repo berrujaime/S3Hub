@@ -4,6 +4,7 @@ import { View, StyleSheet, Alert, Image } from 'react-native';
 import { Text, TextInput, Button, RadioButton, Menu } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { validateCredentials } from '../services/authService';
+import i18n from '../locales/translations';  // Import i18n
 
 export default function LoginScreen({ navigation }) {
   const [accessKey, setAccessKey] = useState('');
@@ -45,14 +46,14 @@ export default function LoginScreen({ navigation }) {
           await setActiveConnection(newConnection);
           navigation.navigate('Connections');
         } else {
-          Alert.alert('Error', 'Credenciales inválidas o acceso denegado.');
+          Alert.alert(i18n.t('error'), i18n.t('error'));
         }
       } catch (error) {
         console.error(error);
-        Alert.alert('Error', 'No se pudo validar las credenciales.');
+        Alert.alert(i18n.t('error'), i18n.t('error'));
       }
     } else {
-      Alert.alert('Error', 'Por favor, completa todos los campos.');
+      Alert.alert(i18n.t('error'), i18n.t('error'));
     }
   };
 
@@ -72,7 +73,7 @@ export default function LoginScreen({ navigation }) {
    */
   const handleServiceChange = (value) => {
     setService(value);
-    setRegion(regionsByService[value][0]); // Set the first region as default
+    setRegion(regionsByService[value][0]);
   };
 
   return (
@@ -80,14 +81,14 @@ export default function LoginScreen({ navigation }) {
       <Text variant="headlineLarge" style={styles.title}>S3Hub</Text>
       
       <TextInput
-        label="Access Key"
+        label={i18n.t('accessKey')}
         value={accessKey}
         onChangeText={setAccessKey}
         mode="outlined"
         style={styles.input}
       />
       <TextInput
-        label="Secret Key"
+        label={i18n.t('secretKey')}
         value={secretKey}
         onChangeText={setSecretKey}
         mode="outlined"
@@ -95,7 +96,7 @@ export default function LoginScreen({ navigation }) {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Selecciona el servicio:</Text>
+      <Text style={styles.label}>{i18n.t('selectService')}</Text>
       <RadioButton.Group onValueChange={handleServiceChange} value={service}>
         <View style={styles.radioButtonContainer}>
           <RadioButton value="storj" />
@@ -109,7 +110,7 @@ export default function LoginScreen({ navigation }) {
         </View>
       </RadioButton.Group>
 
-      <Text style={styles.label}>Selecciona la región:</Text>
+      <Text style={styles.label}>{i18n.t('selectRegion')}</Text>
       <Menu
         visible={regionMenuVisible}
         onDismiss={closeRegionMenu}
@@ -129,7 +130,7 @@ export default function LoginScreen({ navigation }) {
         onPress={handleLogin}
         style={styles.button}
       >
-        Login
+        {i18n.t('login')}
       </Button>
     </View>
   );

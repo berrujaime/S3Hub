@@ -1,0 +1,91 @@
+// src/locales/translations.js
+import * as Localization from 'expo-localization';
+import {I18n} from 'i18n-js';
+
+en = {
+    selectBucket: 'Select a Bucket',
+    selectConnection: 'Select a Connection',
+    accessKey: 'Access Key',
+    secretKey: 'Secret Key',
+    login: 'Login',
+    selectService: 'Select Service:',
+    selectRegion: 'Select Region:',
+    error: 'Error',
+    loading: 'Loading...',
+    chooseConnection: 'Please select a connection first.',
+    buckets: 'Buckets',
+    upload: 'Upload Files',
+    delete: 'Delete',
+    download: 'Download',
+    folderCreated: 'Folder created successfully.',
+    folderError: 'Error creating folder.',
+    filesIn: 'Files in',
+    uploadProgress: 'Uploading Files',
+    deleteProgress: 'Deleting Files',
+    uploadSuccess: 'Files uploaded successfully.',
+    uploadError: 'Error uploading files.',
+    deleteSuccess: 'Items deleted successfully.',
+    deleteError: 'Error deleting items.',
+    downloadSuccess: 'Download completed.',
+    downloadError: 'Error downloading files.',
+    fileName: 'Name',
+    fileSize: 'Size',
+    success: 'Success',
+    createFolder: 'Create Folder',
+    folderName: 'Folder Name',
+    cancel: 'Cancel',
+    create: 'Create',
+    listView: 'List View',
+    gridView: 'Grid View',
+    back: 'Back',
+    items: 'Items',
+    deleteConnection: 'Delete Connection',
+  }
+
+es = {
+    selectBucket: 'Selecciona un Bucket',
+    selectConnection: 'Selecciona una Conexión',
+    accessKey: 'Clave de Acceso',
+    secretKey: 'Clave Secreta',
+    login: 'Iniciar sesión',
+    selectService: 'Selecciona el servicio:',
+    selectRegion: 'Selecciona la región:',
+    error: 'Error',
+    loading: 'Cargando...',
+    chooseConnection: 'Por favor, selecciona una conexión primero.',
+    buckets: 'Buckets',
+    upload: 'Subir Archivos',
+    delete: 'Eliminar',
+    download: 'Descargar',
+    folderCreated: 'Carpeta creada exitosamente.',
+    folderError: 'Error al crear la carpeta.',
+    filesIn: 'Archivos en',
+    uploadProgress: 'Subiendo Archivos',
+    deleteProgress: 'Borrando Archivos',
+    uploadSuccess: 'Archivos subidos exitosamente.',
+    uploadError: 'Error al subir los archivos.',
+    deleteSuccess: 'Elementos eliminados exitosamente.',
+    deleteError: 'Error al eliminar los elementos.',
+    downloadSuccess: 'Descarga completada.',
+    downloadError: 'Error al descargar archivos.',
+    fileName: 'Nombre',
+    fileSize: 'Tamaño',
+    success: 'Éxito',
+    createFolder: 'Crear Carpeta',
+    folderName: 'Nombre de Carpeta',
+    cancel: 'Cancelar',
+    create: 'Crear',
+    listView: 'Vista de Lista',
+    gridView: 'Vista de Cuadrícula',
+    back: 'Regresar',
+    items: 'Elementos',
+    deleteConnection: 'Eliminar Conexión',
+  }
+
+const i18n = new I18n({en, es});
+
+// Detect and configure the language
+i18n.fallbacks = true;
+i18n.locale = Localization.languageCode || 'en';
+
+export default i18n;

@@ -21,6 +21,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
 import UploadProgressPopup from '../components/UploadProgressPopup';
+import i18n from '../locales/translations';  // Import i18n
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
@@ -63,7 +64,6 @@ export default function FileListScreen() {
     fetchData();
 
     return () => {
-      // Cleanup function to set isMounted to false
       isMounted.current = false;
     };
   }, [currentConnection, currentBucket, currentPath]);
@@ -118,7 +118,7 @@ export default function FileListScreen() {
                 size: object.Size,
                 isFolder: false,
                 isVideo: isVideo,
-                url: null, // Initially null
+                url: null,
               };
               // Get the signed URL
               filePromises.push(
@@ -164,7 +164,7 @@ export default function FileListScreen() {
     } catch (error) {
       console.error("Error fetching the file list:", error);
       if (isMounted.current) {
-        Alert.alert("Error", "Error al obtener la lista de archivos.");
+        Alert.alert(i18n.t('error'), i18n.t('error'));
         setLoading(false);
       }
     }
@@ -396,7 +396,7 @@ export default function FileListScreen() {
   const handleUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        multiple: true, // Allow multiple selection
+        multiple: true,
         copyToCacheDirectory: true,
       });
   
@@ -404,13 +404,12 @@ export default function FileListScreen() {
         const totalFiles = result.assets.length;
         let uploadedFiles = 0;
   
-        setIsUploading(true); // Show the progress popup
+        setIsUploading(true);
   
-        // Send notification at the start of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Carga de Archivos',
-            body: 'La carga de archivos ha comenzado.',
+            title: i18n.t('uploadProgress'),
+            body: i18n.t('uploadSuccess'),
           },
           trigger: null,
         });
@@ -422,7 +421,6 @@ export default function FileListScreen() {
   
           const key = currentPath + fileName;
   
-          // Get the signed URL for upload
           const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
   
           // Upload the file using uploadAsync to allow background upload
@@ -439,16 +437,16 @@ export default function FileListScreen() {
           setUploadProgress(progress);
         }
   
-        setIsUploading(false); // Hide the progress popup
+        setIsUploading(false);
         setUploadProgress(1);
-        Alert.alert('Éxito', 'Archivos subidos exitosamente.');
-        fetchFiles(); // Update the file list
+        Alert.alert(i18n.t('success'), i18n.t('uploadSuccess'));
+        fetchFiles();
   
         // Send notification upon completion of the upload
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Carga de Archivos',
-            body: 'La carga de archivos ha finalizado.',
+            title: i18n.t('upload'),
+            body: i18n.t('uploadSuccess'),
           },
           trigger: null,
         });
@@ -456,7 +454,7 @@ export default function FileListScreen() {
     } catch (error) {
       console.error('Error uploading files:', error);
       setIsUploading(false);
-      Alert.alert('Error', 'Error al subir los archivos.');
+      Alert.alert(i18n.t('error'), i18n.t('uploadError'));
     }
   };
   
@@ -464,25 +462,23 @@ export default function FileListScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert("Permiso Denegado", "No se puede acceder al almacenamiento.");
+        Alert.alert(i18n.t('error'), i18n.t('downloadError'));
         return;
       }
 
       for (const fileId of selectedFiles) {
         const file = files.find((f) => f.id === fileId);
         if (file.isFolder) {
-          // Download folder
           await downloadFolder(file.key);
         } else {
-          // Download file
           await downloadFile(file);
         }
       }
-      Alert.alert("Éxito", "Descarga completada.");
+      Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
       setSelectedFiles([]);
     } catch (error) {
       console.error("Error downloading files:", error);
-      Alert.alert("Error", "No se pudieron descargar los archivos.");
+      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
     }
   };
 
@@ -559,11 +555,11 @@ export default function FileListScreen() {
     try {
       const confirm = await new Promise((resolve) => {
         Alert.alert(
-          'Confirmar Eliminación',
-          `¿Estás seguro de que deseas eliminar ${selectedFiles.length} elemento(s)?`,
+          i18n.t('delete'),
+          `${i18n.t('delete')} ${selectedFiles.length} ${i18n.t('items')}`,
           [
-            { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
+            { text: i18n.t('cancel'), style: 'cancel', onPress: () => resolve(false) },
+            { text: i18n.t('delete'), style: 'destructive', onPress: () => resolve(true) },
           ]
         );
       });
@@ -599,19 +595,19 @@ export default function FileListScreen() {
   
       setIsDeleting(false);
       setDeleteProgress(1);
-      Alert.alert('Éxito', 'Elemento(s) eliminados exitosamente.');
+      Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
       setSelectedFiles([]);
-      fetchFiles(); // Update the file list
+      fetchFiles();
     } catch (error) {
       console.error('Error deleting items:', error);
       setIsDeleting(false);
-      Alert.alert('Error', 'No se pudieron eliminar los elementos.');
+      Alert.alert(i18n.t('error'), i18n.t('deleteError'));
     }
   };  
 
   const handleCreateFolder = async () => {
     if (newFolderName.trim() === '') {
-      Alert.alert('Error', 'El nombre de la carpeta no puede estar vacío.');
+      Alert.alert(i18n.t('error'), i18n.t('folderError'));
       return;
     }
   
@@ -621,11 +617,11 @@ export default function FileListScreen() {
       await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
       setIsDialogVisible(false);
       setNewFolderName('');
-      fetchFiles(); // Update the file list
-      Alert.alert('Éxito', 'Carpeta creada exitosamente.');
+      fetchFiles();
+      Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
       console.error('Error creating folder:', error);
-      Alert.alert('Error', 'No se pudo crear la carpeta.');
+      Alert.alert(i18n.t('error'), i18n.t('folderError'));
     }
   };
 
@@ -644,11 +640,11 @@ export default function FileListScreen() {
       if (response && response.status === 200) {
         await Sharing.shareAsync(response.uri);
       } else {
-        Alert.alert('Error', 'No se pudo descargar el archivo para compartir.');
+        Alert.alert(i18n.t('error'), i18n.t('downloadError'));
       }
     } catch (error) {
       console.error('Error sharing file:', error);
-      Alert.alert('Error', 'No se pudo compartir el archivo.');
+      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
     }
   };  
   
@@ -656,7 +652,7 @@ export default function FileListScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso Denegado', 'No se puede acceder al almacenamiento.');
+        Alert.alert(i18n.t('error'), i18n.t('downloadError'));
         return;
       }
   
@@ -670,13 +666,12 @@ export default function FileListScreen() {
       const downloadObject = FileSystem.createDownloadResumable(uri, fileUri);
       const response = await downloadObject.downloadAsync();
   
-      // Save to gallery
       await MediaLibrary.saveToLibraryAsync(response.uri);
   
-      Alert.alert('Éxito', 'Archivo descargado exitosamente.');
+      Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
     } catch (error) {
-      console.error('Error downloading file:', error);
-      Alert.alert('Error', 'No se pudo descargar el archivo.');
+      console.error(i18n.t('error'), error);
+      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
     }
   };  
 
@@ -698,10 +693,10 @@ export default function FileListScreen() {
     <View style={styles.container}>
       {(isUploading || isDeleting) && (
         <UploadProgressPopup progress={isUploading ? uploadProgress : deleteProgress}
-        operation={isUploading ? 'Subiendo Archivos' : 'Borrando Archivos'} 
+        operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')} 
         />
       )}
-      <Text style={styles.title}>Archivos en {currentBucket}</Text>
+      <Text style={styles.title}>{i18n.t('filesIn')} {currentBucket}</Text>
 
       <View style={styles.actionContainer}>
         {currentPath ? (
@@ -709,20 +704,20 @@ export default function FileListScreen() {
             icon="arrow-left"
             onPress={handleGoBack}
             style={styles.goBackButton}
-            accessibilityLabel="Regresar"
+            accessibilityLabel={i18n.t('back')}
           />
         ) : null}
         <IconButton
           icon={viewMode === 'grid' ? 'view-list' : 'view-grid'}
           onPress={handleSwitchView}
           style={styles.viewToggleButton}
-          accessibilityLabel={viewMode === 'grid' ? "Cambiar a vista de lista" : "Cambiar a vista de cuadrícula"}
+          accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : i18n.t('gridView')}
         />
         <IconButton
           icon="select-all"
           onPress={handleSelectAll}
           style={styles.selectAllButton}
-          accessibilityLabel="Seleccionar todo"
+          accessibilityLabel={i18n.t('selectAll')}
         />
       </View>
 
@@ -733,14 +728,14 @@ export default function FileListScreen() {
             onPress={handleDownloadSelected}
             style={styles.downloadButton}
           >
-            Descargar
+            {i18n.t('download')}
           </Button>
           <Button
             mode="contained"
             onPress={handleDeleteSelected}
             style={styles.deleteButton}
           >
-            Eliminar
+            {i18n.t('delete')}
           </Button>
         </View>
       )}
@@ -750,7 +745,7 @@ export default function FileListScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={numColumns}
-        key={viewMode} // Forcing re-render on view change
+        key={viewMode}
         contentContainerStyle={styles.flatListContent}
       />
 
@@ -758,23 +753,23 @@ export default function FileListScreen() {
         style={styles.createFolderFab}
         icon="folder-plus"
         onPress={() => setIsDialogVisible(true)}
-        accessibilityLabel="Crear carpeta"
+        accessibilityLabel={i18n.t('createFolder')}
       />
 
       <Portal>
         <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
-          <Dialog.Title>Crear Nueva Carpeta</Dialog.Title>
+          <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
           <Dialog.Content>
             <TextInput
-              label="Nombre de Carpeta"
+              label={i18n.t('folderName')}
               value={newFolderName}
               onChangeText={setNewFolderName}
               mode="outlined"
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setIsDialogVisible(false)}>Cancelar</Button>
-            <Button onPress={handleCreateFolder}>Crear</Button>
+            <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
+            <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -783,7 +778,7 @@ export default function FileListScreen() {
         style={styles.fab}
         icon="upload"
         onPress={handleUpload}
-        accessibilityLabel="Subir archivos"
+        accessibilityLabel={i18n.t('upload')}
       />
       
       {/* Modal to show the full picture with its information */}
@@ -794,7 +789,6 @@ export default function FileListScreen() {
           onRequestClose={() => setIsModalVisible(false)}
         >
           <View style={styles.modalContainer}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <IconButton
                 icon="close"
@@ -802,7 +796,7 @@ export default function FileListScreen() {
                 size={24}
                 onPress={() => setIsModalVisible(false)}
                 style={styles.modalCloseButton}
-                accessibilityLabel="Cerrar"
+                accessibilityLabel={i18n.t('close')}
               />
               <View style={styles.modalRightButtons}>
                 <IconButton
@@ -811,7 +805,7 @@ export default function FileListScreen() {
                   size={24}
                   onPress={handleModalDownload}
                   style={styles.modalDownloadButton}
-                  accessibilityLabel="Descargar"
+                  accessibilityLabel={i18n.t('download')}
                 />
                 <IconButton
                   icon="share-variant"
@@ -819,7 +813,7 @@ export default function FileListScreen() {
                   size={24}
                   onPress={handleModalShare}
                   style={styles.modalShareButton}
-                  accessibilityLabel="Compartir"
+                  accessibilityLabel={i18n.t('share')}
                 />
               </View>
             </View>
@@ -845,7 +839,7 @@ export default function FileListScreen() {
                       volume={1.0}
                       isMuted={false}
                       resizeMode="contain"
-                      shouldPlay={false} // Change to true if you want autoplay
+                      shouldPlay={true} // Autoplay activated
                       useNativeControls={true}
                       style={styles.fullMedia}
                     />
@@ -863,17 +857,15 @@ export default function FileListScreen() {
                   event.nativeEvent.contentOffset.x / Dimensions.get('window').width
                 );
                 setCurrentMediaIndex(index);
-                console.log('Scrolled to index:', index);
               }}
               style={{ flex: 1 }}
             />
             
-            {/* Information Box */}
             {mediaFiles[currentMediaIndex] && (
               <View style={[styles.infoContainer, { backgroundColor: theme.colors.accent }]}>
-                <Text style={styles.infoText}>Nombre: {mediaFiles[currentMediaIndex].name}</Text>
+                <Text style={styles.infoText}>{i18n.t('fileName')}: {mediaFiles[currentMediaIndex].name}</Text>
                 <Text style={styles.infoText}>
-                  Tamaño: {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
+                  {i18n.t('fileSize')}: {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
                 </Text>
               </View>
             )}
@@ -1028,7 +1020,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   modalCloseButton: {
-    // Adjust margins if needed
   },
   modalRightButtons: {
     flexDirection: 'row',
@@ -1052,7 +1043,7 @@ const styles = StyleSheet.create({
     bottom: 16,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // This will be overridden by the accent color
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 16,
     borderRadius: 8,
   },

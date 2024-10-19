@@ -4,6 +4,7 @@ import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
 import { Text, List, FAB, IconButton } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
+import i18n from '../locales/translations';  // Import i18n
 
 export default function ConnectionSelectScreen({ navigation }) {
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
@@ -19,12 +20,12 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   const handleDeleteConnection = (connection) => {
     Alert.alert(
-      'Eliminar conexión',
-      `¿Estás seguro de que deseas eliminar la conexión ${connection.service}?`,
+      i18n.t('deleteConnection'),
+      `${i18n.t('deleteConnection')} ${connection.service}?`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: i18n.t('cancel'), style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: i18n.t('delete'),
           style: 'destructive',
           onPress: () => {
             deleteConnection(connection.id);
@@ -62,7 +63,7 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text variant="headlineLarge" style={styles.title}>Selecciona una Conexión</Text>
+      <Text variant="headlineLarge" style={styles.title}>{i18n.t('selectConnection')}</Text>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
