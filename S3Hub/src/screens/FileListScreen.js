@@ -10,6 +10,7 @@ import {
   Modal,
   Image as RNImage,
   Text,
+  AppState,
 } from "react-native";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
@@ -24,7 +25,115 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 import i18n from '../locales/translations';
 
-const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
+// Define the cache directory
+const CACHE_DIR = `${FileSystem.cacheDirectory}S3HubCache/`;
+
+// Cache expiration set to 1 week
+const CACHE_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+// Helper function to ensure a directory exists
+const ensureDirectoryExists = async (filePath) => {
+  const directory = filePath.substring(0, filePath.lastIndexOf('/'));
+  const dirInfo = await FileSystem.getInfoAsync(directory);
+  if (!dirInfo.exists) {
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+  }
+};
+
+// Helper function to generate a unique cache key
+const getCacheKey = (connection, bucket, path) => {
+  return `files_${connection}_${bucket}_${path}`;
+};
+
+// CachedImage component to handle image caching
+const CachedImage = ({ source, style, cacheKey }) => {
+  const [imgUri, setImgUri] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadImage = async () => {
+      const path = `${CACHE_DIR}${cacheKey}`;
+      try {
+        // Ensure the directory exists
+        await ensureDirectoryExists(path);
+
+        const pathInfo = await FileSystem.getInfoAsync(path);
+
+        if (pathInfo.exists) {
+          // Image is cached
+          if (isMounted) setImgUri(path);
+        } else {
+          // Download image to cache
+          const result = await FileSystem.downloadAsync(source.uri, path);
+          if (isMounted) setImgUri(result.uri);
+        }
+      } catch (error) {
+        console.error('Error caching image:', error);
+        if (isMounted) setImgUri(source.uri); // Fallback to remote URI
+      }
+    };
+
+    loadImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [source.uri, cacheKey]);
+
+  if (!imgUri) {
+    return <ActivityIndicator style={{ flex: 1 }} />;
+  } else {
+    return <RNImage style={style} source={{ uri: imgUri }} />;
+  }
+};
+
+// CachedVideo component to handle video caching
+const CachedVideo = ({ source, style, cacheKey, ...props }) => {
+  const [videoUri, setVideoUri] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadVideo = async () => {
+      const path = `${CACHE_DIR}${cacheKey}`;
+      try {
+        // Ensure the directory exists
+        await ensureDirectoryExists(path);
+
+        const pathInfo = await FileSystem.getInfoAsync(path);
+
+        if (pathInfo.exists) {
+          // Video is cached
+          if (isMounted) setVideoUri(path);
+        } else {
+          // Download video to cache
+          const result = await FileSystem.downloadAsync(source.uri, path);
+          if (isMounted) setVideoUri(result.uri);
+        }
+      } catch (error) {
+        console.error('Error caching video:', error);
+        if (isMounted) setVideoUri(source.uri); // Fallback to remote URI
+      }
+    };
+
+    loadVideo();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [source.uri, cacheKey]);
+
+  if (!videoUri) {
+    return <ActivityIndicator style={{ flex: 1 }} />;
+  } else {
+    return (
+      <Video
+        source={{ uri: videoUri }}
+        style={style}
+        {...props}
+      />
+    );
+  }
+};
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
@@ -46,11 +155,7 @@ export default function FileListScreen() {
 
   const flatListRef = useRef(null);
   const theme = useTheme(); // Access the theme
-
-  // Helper function to generate a unique cache key
-  const getCacheKey = () => {
-    return `files_${currentConnection}_${currentBucket}_${currentPath}`;
-  };
+  const appState = useRef(AppState.currentState);
 
   // Helper function to sort files: folders first, then images, then videos
   const sortFiles = (filesArray) => {
@@ -64,6 +169,102 @@ export default function FileListScreen() {
     });
   };
 
+  // Helper function to clear the entire cache
+  const clearEntireCache = async () => {
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
+      if (dirInfo.exists) {
+        await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
+      }
+      await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
+      await AsyncStorage.clear();
+    } catch (error) {
+      console.error('Error clearing entire cache:', error);
+    }
+  };
+
+  // Helper function to clear cache for the current path
+  const clearCurrentPathCache = async () => {
+    try {
+      const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
+      await AsyncStorage.removeItem(cacheKey);
+    } catch (error) {
+      console.error('Error clearing current path cache:', error);
+    }
+  };
+
+  // Helper function to update cache incrementally
+  const updateCacheIncrementally = async (newFile) => {
+    const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
+    try {
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      let items = cachedData ? JSON.parse(cachedData).items : [];
+      items.push(newFile);
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items }));
+    } catch (error) {
+      console.error("Error updating cache incrementally:", error);
+    }
+  };
+
+  // Helper function to update cache after deletion
+  const updateCacheAfterDeletion = async (updatedFiles) => {
+    const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
+    try {
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: updatedFiles }));
+    } catch (error) {
+      console.error("Error updating cache after deletion:", error);
+    }
+  };
+
+  // useEffect to initialize cache directory and clean old cache files
+  useEffect(() => {
+    const initializeCache = async () => {
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
+        }
+
+        // Clean old cache files based on expiration time
+        const filesInCache = await FileSystem.readDirectoryAsync(CACHE_DIR);
+        const now = Date.now();
+
+        for (const file of filesInCache) {
+          const filePath = `${CACHE_DIR}${file}`;
+          const fileInfo = await FileSystem.getInfoAsync(filePath);
+          if (fileInfo.exists) {
+            const fileModifiedTime = fileInfo.modificationTime * 1000; // Convert to ms
+            if (now - fileModifiedTime > CACHE_EXPIRATION) {
+              await FileSystem.deleteAsync(filePath);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing cache:', error);
+      }
+    };
+
+    initializeCache();
+
+    // Listener for app state changes to clear cache on exit
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+
+    return () => {
+      isMounted.current = false;
+      subscription.remove();
+    };
+  }, []);
+
+  // Handler for app state changes to clear cache on exit
+  const handleAppStateChange = async (nextAppState) => {
+    if (appState.current.match(/active/) && nextAppState === "background") {
+      // App is going to the background, clear cache
+      await clearEntireCache();
+    }
+    appState.current = nextAppState;
+  };
+
+  // useEffect to fetch files when currentConnection, currentBucket, or currentPath changes
   useEffect(() => {
     isMounted.current = true;
 
@@ -88,8 +289,20 @@ export default function FileListScreen() {
     };
   }, [currentConnection, currentBucket, currentPath]);
 
+  // useEffect to clear cache and fetch new files when bucket or connection changes
+  useEffect(() => {
+    const handleBucketChange = async () => {
+      if (currentConnection && currentBucket) {
+        await clearEntireCache();
+        await fetchFiles();
+      }
+    };
+
+    handleBucketChange();
+  }, [currentConnection, currentBucket]);
+
   const fetchFiles = async () => {
-    const cacheKey = getCacheKey();
+    const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
     try {
       // Attempt to retrieve cached data
       const cachedData = await AsyncStorage.getItem(cacheKey);
@@ -276,13 +489,14 @@ export default function FileListScreen() {
           >
             {item.url ? (
               <View style={styles.videoContainer}>
-                <Video
+                <CachedVideo
                   source={{ uri: item.url }}
                   style={styles.videoThumbnail}
                   resizeMode="cover"
                   isMuted
                   shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
                   useNativeControls={false}
+                  cacheKey={item.key}
                 />
                 <View style={styles.playIconContainer}>
                   <IconButton icon="play-circle-outline" size={50} color="#fff" />
@@ -311,13 +525,14 @@ export default function FileListScreen() {
           >
             {item.url ? (
               <View style={styles.listVideoContainer}>
-                <Video
+                <CachedVideo
                   source={{ uri: item.url }}
                   style={styles.listVideo}
                   resizeMode="cover"
                   isMuted
                   shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
                   useNativeControls={false}
+                  cacheKey={item.key}
                 />
                 <View style={styles.playIconContainerList}>
                   <IconButton icon="play-circle-outline" size={30} color="#fff" />
@@ -356,7 +571,7 @@ export default function FileListScreen() {
             ]}
           >
             {item.url ? (
-              <RNImage
+              <CachedImage
                 style={[
                   styles.image,
                   {
@@ -367,7 +582,7 @@ export default function FileListScreen() {
                   },
                 ]}
                 source={{ uri: item.url }}
-                resizeMode="cover"
+                cacheKey={item.key}
               />
             ) : (
               <ActivityIndicator style={{ flex: 1 }} />
@@ -391,10 +606,10 @@ export default function FileListScreen() {
             style={styles.listItemContainer}
           >
             {item.url ? (
-              <RNImage
+              <CachedImage
                 style={styles.listImage}
-                source={{ uri: item.url, cache: 'force-cache' }}
-                resizeMode="cover"
+                source={{ uri: item.url }}
+                cacheKey={item.key}
               />
             ) : (
               <ActivityIndicator style={styles.listImage} />
@@ -455,19 +670,12 @@ export default function FileListScreen() {
         copyToCacheDirectory: true,
       });
   
-      if (result.canceled === false && result.assets.length > 0) {
+      if (result.type !== 'cancel' && result.assets.length > 0) {
         const totalFiles = result.assets.length;
         let uploadedFiles = 0;
   
         setIsUploading(true);
-  
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: i18n.t('uploadProgress'),
-            body: i18n.t('uploadSuccess'),
-          },
-          trigger: null,
-        });
+        setUploadProgress(0);
   
         for (const asset of result.assets) {
           const fileUri = asset.uri;
@@ -497,24 +705,10 @@ export default function FileListScreen() {
           uploadedFiles += 1;
           const progress = uploadedFiles / totalFiles;
           setUploadProgress(progress);
-  
-          // After each successful upload, update the state and cache
-          const newFile = {
-            id: key, // Ensure unique ID
-            key: key,
-            name: fileName,
-            size: asset.fileSize || 0, // Assuming fileSize is available
-            isFolder: false,
-            isVideo: /\.(mp4|mov|avi|mkv)$/i.test(fileName),
-            url: await getSignedUrl(currentConnection, currentBucket, key),
-          };
-          setFiles(prevFiles => {
-            const updatedFiles = sortFiles([...prevFiles, newFile]);
-            updateCache(updatedFiles);
-            setMediaFiles(updatedFiles.filter(f => !f.isFolder));
-            return updatedFiles;
-          });
         }
+  
+        // After all uploads are complete, refetch the file list to ensure synchronization
+        await fetchFiles();
   
         setIsUploading(false);
         setUploadProgress(1);
@@ -534,7 +728,7 @@ export default function FileListScreen() {
       setIsUploading(false);
       Alert.alert(i18n.t('error'), i18n.t('uploadError'));
     }
-  };
+  };  
 
   const handleDownloadSelected = async () => {
     try {
@@ -565,6 +759,9 @@ export default function FileListScreen() {
       const uri = file.url;
       const fileName = file.name;
       const fileUri = FileSystem.documentDirectory + fileName;
+
+      // Ensure directory exists before downloading
+      await ensureDirectoryExists(fileUri);
 
       const downloadObject = FileSystem.createDownloadResumable(
         uri,
@@ -643,7 +840,7 @@ export default function FileListScreen() {
       });
   
       if (!confirm) return;
-
+  
       const totalItems = selectedFiles.length;
       let deletedItems = 0;
       setIsDeleting(true);
@@ -656,6 +853,7 @@ export default function FileListScreen() {
           const response = await listObjects(currentConnection, currentBucket, file.key);
           if (response.Contents && response.Contents.length > 0) {
             const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
+  
             // Delete objects in batches of 1000
             const chunkSize = 1000;
             for (let i = 0; i < objects.length; i += chunkSize) {
@@ -669,15 +867,13 @@ export default function FileListScreen() {
         deletedItems += 1;
         const progress = deletedItems / totalItems;
         setDeleteProgress(progress);
-
-        // Update local state and cache incrementally
-        setFiles(prevFiles => {
-          const updatedFiles = prevFiles.filter(f => f.id !== fileId);
-          updateCache(updatedFiles);
-          setMediaFiles(updatedFiles.filter(f => !f.isFolder));
-          return updatedFiles;
-        });
       }
+  
+      // **Clear the cache for the current path to ensure fetchFiles retrieves fresh data**
+      await clearCurrentPathCache();
+  
+      // Fetch the updated file list from the server
+      await fetchFiles();
   
       setIsDeleting(false);
       setDeleteProgress(1);
@@ -688,16 +884,17 @@ export default function FileListScreen() {
       setIsDeleting(false);
       Alert.alert(i18n.t('error'), i18n.t('deleteError'));
     }
-  };  
+  };
+  
 
   const handleCreateFolder = async () => {
     if (newFolderName.trim() === '') {
       Alert.alert(i18n.t('error'), i18n.t('folderError'));
       return;
     }
-  
+
     const folderKey = currentPath + newFolderName.trim() + '/';
-  
+
     try {
       await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
       setIsDialogVisible(false);
@@ -712,10 +909,10 @@ export default function FileListScreen() {
       };
       setFiles(prevFiles => {
         const updatedFiles = sortFiles([...prevFiles, newFolder]);
-        updateCache(updatedFiles);
+        setMediaFiles(updatedFiles.filter(f => !f.isFolder));
+        updateCacheIncrementally(newFolder);
         return updatedFiles;
       });
-      setMediaFiles(sortFiles([...files, newFolder]).filter(f => !f.isFolder));
       
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
@@ -728,16 +925,11 @@ export default function FileListScreen() {
     try {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
-  
-      const localUri = FileSystem.cacheDirectory + currentMedia.name;
-      const downloadObject = FileSystem.createDownloadResumable(
-        currentMedia.url,
-        localUri
-      );
-      const response = await downloadObject.downloadAsync();
-  
-      if (response && response.status === 200) {
-        await Sharing.shareAsync(response.uri);
+
+      const localUri = await getCachedFileUri(currentMedia.key, currentMedia.url);
+
+      if (localUri) {
+        await Sharing.shareAsync(localUri);
       } else {
         Alert.alert(i18n.t('error'), i18n.t('downloadError'));
       }
@@ -754,34 +946,36 @@ export default function FileListScreen() {
         Alert.alert(i18n.t('error'), i18n.t('downloadError'));
         return;
       }
-  
+
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
-  
-      const uri = currentMedia.url;
-      const fileName = currentMedia.name;
-      const fileUri = FileSystem.documentDirectory + fileName;
-  
-      const downloadObject = FileSystem.createDownloadResumable(uri, fileUri);
-      const response = await downloadObject.downloadAsync();
-  
-      await MediaLibrary.saveToLibraryAsync(response.uri);
-  
+
+      const localUri = await getCachedFileUri(currentMedia.key, currentMedia.url);
+
+      await MediaLibrary.saveToLibraryAsync(localUri);
+
       Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
     } catch (error) {
-      console.error(i18n.t('error'), error);
+      console.error('Error downloading file:', error);
       Alert.alert(i18n.t('error'), i18n.t('downloadError'));
     }
-  };  
+  };
 
-  // Helper function to update cache
-  const updateCache = async (updatedFiles) => {
-    const cacheKey = getCacheKey();
-    const now = Date.now();
-    try {
-      await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items: updatedFiles }));
-    } catch (error) {
-      console.error("Error updating cache:", error);
+  // Helper function to get cached file URI
+  const getCachedFileUri = async (cacheKey, remoteUri) => {
+    const path = `${CACHE_DIR}${cacheKey}`;
+    const pathInfo = await FileSystem.getInfoAsync(path);
+    if (pathInfo.exists) {
+      return path;
+    } else {
+      try {
+        await ensureDirectoryExists(path);
+        const result = await FileSystem.downloadAsync(remoteUri, path);
+        return result.uri;
+      } catch (error) {
+        console.error('Error caching file:', error);
+        return null;
+      }
     }
   };
 
@@ -944,21 +1138,20 @@ export default function FileListScreen() {
               renderItem={({ item, index }) => (
                 <View style={styles.modalMediaContainer}>
                   {item.isVideo ? (
-                    <Video
+                    <CachedVideo
                       source={{ uri: item.url }}
-                      rate={1.0}
-                      volume={1.0}
-                      isMuted={false}
+                      style={styles.fullMedia}
                       resizeMode="contain"
                       shouldPlay={currentMediaIndex === index && isModalVisible}
                       useNativeControls={true}
-                      style={styles.fullMedia}
+                      cacheKey={item.key}
                     />
                   ) : (
-                    <RNImage
+                    <CachedImage
                       source={{ uri: item.url }}
                       style={styles.fullMedia}
                       resizeMode="contain"
+                      cacheKey={item.key}
                     />
                   )}
                 </View>
