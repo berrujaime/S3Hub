@@ -20,8 +20,11 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 import i18n from '../locales/translations';
+
+const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
@@ -43,6 +46,23 @@ export default function FileListScreen() {
 
   const flatListRef = useRef(null);
   const theme = useTheme(); // Access the theme
+
+  // Helper function to generate a unique cache key
+  const getCacheKey = () => {
+    return `files_${currentConnection}_${currentBucket}_${currentPath}`;
+  };
+
+  // Helper function to sort files: folders first, then images, then videos
+  const sortFiles = (filesArray) => {
+    return [...filesArray].sort((a, b) => {
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
+      if (a.isFolder && b.isFolder) return a.name.localeCompare(b.name);
+      if (a.isVideo && !b.isVideo) return 1;
+      if (!a.isVideo && b.isVideo) return -1;
+      return a.name.localeCompare(b.name);
+    });
+  };
 
   useEffect(() => {
     isMounted.current = true;
@@ -69,13 +89,23 @@ export default function FileListScreen() {
   }, [currentConnection, currentBucket, currentPath]);
 
   const fetchFiles = async () => {
+    const cacheKey = getCacheKey();
     try {
-      // Re-verify that currentConnection and currentBucket are valid
-      if (!currentConnection || !currentBucket) {
-        setLoading(false);
-        return;
+      // Attempt to retrieve cached data
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      const now = Date.now();
+
+      if (cachedData) {
+        const { timestamp, items } = JSON.parse(cachedData);
+        if (now - timestamp < CACHE_EXPIRATION) {
+          setFiles(sortFiles(items));
+          setMediaFiles(sortFiles(items).filter(f => !f.isFolder));
+          setLoading(false);
+          return; // Exit early to avoid fetching from server
+        }
       }
 
+      // Fetch fresh data from the server
       const response = await listObjects(
         currentConnection,
         currentBucket,
@@ -112,7 +142,7 @@ export default function FileListScreen() {
             if (isMedia) {
               const isVideo = key.match(/\.(mp4|mov|avi|mkv)$/i) ? true : false;
               const fileItem = {
-                id: key,
+                id: key, // Unique identifier based on S3 key
                 key: key,
                 name: relativeKey,
                 size: object.Size,
@@ -137,9 +167,10 @@ export default function FileListScreen() {
 
         // Add folders to the list
         directories.forEach(dir => {
+          const folderKey = currentPath + dir + '/';
           items.push({
-            id: currentPath + dir + '/',
-            key: currentPath + dir + '/',
+            id: folderKey, // Unique identifier for folder
+            key: folderKey,
             name: dir,
             isFolder: true,
           });
@@ -148,18 +179,38 @@ export default function FileListScreen() {
         // Wait for all signed URLs to be obtained
         await Promise.all(filePromises);
 
-        // Sort folders first
-        items.sort((a, b) => {
-          if (a.isFolder && !b.isFolder) return -1;
-          if (!a.isFolder && b.isFolder) return 1;
-          return a.name.localeCompare(b.name);
-        });
-      }
+        // Sort files using the helper function
+        items = sortFiles(items);
 
-      if (isMounted.current) {
-        setFiles(items);
-        setMediaFiles(items.filter(f => !f.isFolder));
-        setLoading(false);
+        // Handle duplicate keys by ensuring unique IDs
+        const uniqueItemsMap = new Map();
+        items.forEach(item => {
+          if (!uniqueItemsMap.has(item.id)) {
+            uniqueItemsMap.set(item.id, item);
+          } else {
+            // If duplicate key found, append a unique suffix
+            let uniqueId = `${item.id}_${Date.now()}`;
+            uniqueItemsMap.set(uniqueId, { ...item, id: uniqueId });
+          }
+        });
+
+        items = Array.from(uniqueItemsMap.values());
+
+        // Update state and cache
+        if (isMounted.current) {
+          setFiles(items);
+          setMediaFiles(items.filter(f => !f.isFolder));
+          setLoading(false);
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items }));
+        }
+      } else {
+        // If no contents, clear the list
+        if (isMounted.current) {
+          setFiles([]);
+          setMediaFiles([]);
+          setLoading(false);
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items: [] }));
+        }
       }
     } catch (error) {
       console.error("Error fetching the file list:", error);
@@ -173,7 +224,7 @@ export default function FileListScreen() {
   const numColumns = viewMode === 'grid' ? 2 : 1;
   const itemSize = Dimensions.get('window').width / numColumns;
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item, index }) => {
     const isSelected = selectedFiles.includes(item.id);
 
     if (item.isFolder) {
@@ -230,6 +281,8 @@ export default function FileListScreen() {
                   style={styles.videoThumbnail}
                   resizeMode="cover"
                   isMuted
+                  shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
+                  useNativeControls={false}
                 />
                 <View style={styles.playIconContainer}>
                   <IconButton icon="play-circle-outline" size={50} color="#fff" />
@@ -263,6 +316,8 @@ export default function FileListScreen() {
                   style={styles.listVideo}
                   resizeMode="cover"
                   isMuted
+                  shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
+                  useNativeControls={false}
                 />
                 <View style={styles.playIconContainerList}>
                   <IconButton icon="play-circle-outline" size={30} color="#fff" />
@@ -419,7 +474,14 @@ export default function FileListScreen() {
           const fileName = asset.name;
           const mimeType = asset.mimeType || 'application/octet-stream';
   
-          const key = currentPath + fileName;
+          let key = currentPath + fileName;
+  
+          // Handle duplicate file names by appending a timestamp
+          const existingFile = files.find(f => f.key === key);
+          if (existingFile) {
+            const timestamp = Date.now();
+            key = `${currentPath}${fileName}_${timestamp}`;
+          }
   
           const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
   
@@ -435,12 +497,28 @@ export default function FileListScreen() {
           uploadedFiles += 1;
           const progress = uploadedFiles / totalFiles;
           setUploadProgress(progress);
+  
+          // After each successful upload, update the state and cache
+          const newFile = {
+            id: key, // Ensure unique ID
+            key: key,
+            name: fileName,
+            size: asset.fileSize || 0, // Assuming fileSize is available
+            isFolder: false,
+            isVideo: /\.(mp4|mov|avi|mkv)$/i.test(fileName),
+            url: await getSignedUrl(currentConnection, currentBucket, key),
+          };
+          setFiles(prevFiles => {
+            const updatedFiles = sortFiles([...prevFiles, newFile]);
+            updateCache(updatedFiles);
+            setMediaFiles(updatedFiles.filter(f => !f.isFolder));
+            return updatedFiles;
+          });
         }
   
         setIsUploading(false);
         setUploadProgress(1);
         Alert.alert(i18n.t('success'), i18n.t('uploadSuccess'));
-        fetchFiles();
   
         // Send notification upon completion of the upload
         await Notifications.scheduleNotificationAsync({
@@ -457,7 +535,7 @@ export default function FileListScreen() {
       Alert.alert(i18n.t('error'), i18n.t('uploadError'));
     }
   };
-  
+
   const handleDownloadSelected = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -591,13 +669,20 @@ export default function FileListScreen() {
         deletedItems += 1;
         const progress = deletedItems / totalItems;
         setDeleteProgress(progress);
+
+        // Update local state and cache incrementally
+        setFiles(prevFiles => {
+          const updatedFiles = prevFiles.filter(f => f.id !== fileId);
+          updateCache(updatedFiles);
+          setMediaFiles(updatedFiles.filter(f => !f.isFolder));
+          return updatedFiles;
+        });
       }
   
       setIsDeleting(false);
       setDeleteProgress(1);
       Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
       setSelectedFiles([]);
-      fetchFiles();
     } catch (error) {
       console.error('Error deleting items:', error);
       setIsDeleting(false);
@@ -617,7 +702,21 @@ export default function FileListScreen() {
       await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
       setIsDialogVisible(false);
       setNewFolderName('');
-      fetchFiles();
+      
+      // Update local state and cache incrementally
+      const newFolder = {
+        id: folderKey, // Unique identifier for folder
+        key: folderKey,
+        name: newFolderName.trim(),
+        isFolder: true,
+      };
+      setFiles(prevFiles => {
+        const updatedFiles = sortFiles([...prevFiles, newFolder]);
+        updateCache(updatedFiles);
+        return updatedFiles;
+      });
+      setMediaFiles(sortFiles([...files, newFolder]).filter(f => !f.isFolder));
+      
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
       console.error('Error creating folder:', error);
@@ -675,6 +774,17 @@ export default function FileListScreen() {
     }
   };  
 
+  // Helper function to update cache
+  const updateCache = async (updatedFiles) => {
+    const cacheKey = getCacheKey();
+    const now = Date.now();
+    try {
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items: updatedFiles }));
+    } catch (error) {
+      console.error("Error updating cache:", error);
+    }
+  };
+
   useEffect(() => {
     if (isModalVisible && flatListRef.current) {
       flatListRef.current.scrollToIndex({ index: currentMediaIndex, animated: false });
@@ -692,8 +802,9 @@ export default function FileListScreen() {
   return (
     <View style={styles.container}>
       {(isUploading || isDeleting) && (
-        <UploadProgressPopup progress={isUploading ? uploadProgress : deleteProgress}
-        operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')} 
+        <UploadProgressPopup 
+          progress={isUploading ? uploadProgress : deleteProgress}
+          operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')} 
         />
       )}
       <Text style={styles.title}>{i18n.t('filesIn')} {currentBucket}</Text>
@@ -711,7 +822,7 @@ export default function FileListScreen() {
           icon={viewMode === 'grid' ? 'view-list' : 'view-grid'}
           onPress={handleSwitchView}
           style={styles.viewToggleButton}
-          accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : i18n.t('gridView')}
+          accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : 'gridView'}
         />
         <IconButton
           icon="select-all"
@@ -830,7 +941,7 @@ export default function FileListScreen() {
               getItemLayout={(data, index) => (
                 {length: Dimensions.get('window').width, offset: Dimensions.get('window').width * index, index}
               )}
-              renderItem={({ item }) => (
+              renderItem={({ item, index }) => (
                 <View style={styles.modalMediaContainer}>
                   {item.isVideo ? (
                     <Video
@@ -839,7 +950,7 @@ export default function FileListScreen() {
                       volume={1.0}
                       isMuted={false}
                       resizeMode="contain"
-                      shouldPlay={true} // Autoplay activated
+                      shouldPlay={currentMediaIndex === index && isModalVisible}
                       useNativeControls={true}
                       style={styles.fullMedia}
                     />
