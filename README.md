@@ -1,6 +1,6 @@
 # S3Hub
 
-![S3Hub Logo](https://github.com/berrujaime/S3Hub/blob/test/S3Hub/assets/logos/S3HubLogo.png)
+![S3Hub Logo](https://github.com/berrujaime/S3Hub/blob/main/S3Hub/assets/logos/S3HubLogo.png)
 
 ## Overview
 
@@ -19,7 +19,7 @@ You can download the APK for the app using the link or QR code below:
 
 [**Download S3Hub APK**](https://expo.dev/accounts/berrujaime/projects/S3Hub/builds/907f0dfb-eb39-4617-9215-5a7276893888)
 
-![Download QR Code](https://github.com/berrujaime/S3Hub/blob/test/S3Hub/assets/apk/apkQR.png)
+![Download QR Code](https://github.com/berrujaime/S3Hub/blob/main/S3Hub/assets/apk/apkQR.png)
 
 ## Installation
 
