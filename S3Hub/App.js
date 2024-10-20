@@ -13,7 +13,6 @@ import theme from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
-import i18n from './src/locales/translations';
 
 export default function App() {
   useEffect(() => {

@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.S3Hub"
+      "package": "com.S3Hub.S3Hub"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,6 +27,11 @@
     "plugins": [
       "expo-secure-store",
       "expo-localization"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "85a3d172-215c-4058-b009-7d104bbe58ba"
+      }
+    }
   }
 }
