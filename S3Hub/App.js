@@ -13,6 +13,8 @@ import theme from './src/theme/theme';
 import { AuthProvider } from './src/context/AuthContext';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
+import { SafeAreaView, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
   useEffect(() => {
@@ -25,10 +27,20 @@ export default function App() {
   return (
     <AuthProvider>
       <PaperProvider theme={theme}>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="dark" backgroundColor="#ffffff" />
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </SafeAreaView>
       </PaperProvider>
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+});

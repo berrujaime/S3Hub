@@ -853,7 +853,7 @@ export default function FileListScreen() {
           const response = await listObjects(currentConnection, currentBucket, file.key);
           if (response.Contents && response.Contents.length > 0) {
             const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
-  
+
             // Delete objects in batches of 1000
             const chunkSize = 1000;
             for (let i = 0; i < objects.length; i += chunkSize) {
@@ -886,7 +886,6 @@ export default function FileListScreen() {
     }
   };
   
-
   const handleCreateFolder = async () => {
     if (newFolderName.trim() === '') {
       Alert.alert(i18n.t('error'), i18n.t('folderError'));
@@ -958,6 +957,59 @@ export default function FileListScreen() {
     } catch (error) {
       console.error('Error downloading file:', error);
       Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+    }
+  };
+
+  const handleModalDelete = async () => {
+    try {
+      const currentMedia = mediaFiles[currentMediaIndex];
+      if (!currentMedia) return;
+
+      const confirm = await new Promise((resolve) => {
+        Alert.alert(
+          i18n.t('delete'),
+          `${i18n.t('delete')} "${currentMedia.name}"?`,
+          [
+            { text: i18n.t('cancel'), style: 'cancel', onPress: () => resolve(false) },
+            { text: i18n.t('delete'), style: 'destructive', onPress: () => resolve(true) },
+          ]
+        );
+      });
+
+      if (!confirm) return;
+
+      setIsDeleting(true);
+      setDeleteProgress(0);
+
+      if (currentMedia.isFolder) {
+        // Obtain and delete all objects within the folder
+        const response = await listObjects(currentConnection, currentBucket, currentMedia.key);
+        if (response.Contents && response.Contents.length > 0) {
+          const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
+
+          // Delete objects in batches of 1000
+          const chunkSize = 1000;
+          for (let i = 0; i < objects.length; i += chunkSize) {
+            const chunk = objects.slice(i, i + chunkSize);
+            await deleteFiles(currentConnection, currentBucket, chunk);
+          }
+        }
+      } else {
+        await deleteFile(currentConnection, currentBucket, currentMedia.key);
+      }
+
+      // Update local state and cache incrementally
+      await clearCurrentPathCache();
+      await fetchFiles();
+
+      setIsDeleting(false);
+      setDeleteProgress(1);
+      Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      setIsModalVisible(false);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      setIsDeleting(false);
+      Alert.alert(i18n.t('error'), i18n.t('deleteError'));
     }
   };
 
@@ -1105,6 +1157,14 @@ export default function FileListScreen() {
               />
               <View style={styles.modalRightButtons}>
                 <IconButton
+                  icon="trash-can-outline"
+                  iconColor="white"
+                  size={24}
+                  onPress={handleModalDelete}
+                  style={styles.modalDeleteButton}
+                  accessibilityLabel={i18n.t('delete')}
+                />
+                <IconButton
                   icon="download"
                   iconColor="white"
                   size={24}
@@ -1232,9 +1292,12 @@ const styles = StyleSheet.create({
   },
   playIconContainer: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -25 }, { translateY: -25 }],
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listVideoContainer: {
     width: 50,
@@ -1249,9 +1312,12 @@ const styles = StyleSheet.create({
   },
   playIconContainerList: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -15 }, { translateY: -15 }],
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   image: {
     borderWidth: 1,
@@ -1327,6 +1393,9 @@ const styles = StyleSheet.create({
   },
   modalRightButtons: {
     flexDirection: 'row',
+  },
+  modalDeleteButton: {
+    marginRight: 16,
   },
   modalDownloadButton: {
     marginRight: 16,
