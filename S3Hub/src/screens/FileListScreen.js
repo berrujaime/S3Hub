@@ -1049,6 +1049,16 @@ export default function FileListScreen() {
     }
   };
 
+  const onViewableItemsChanged = ({ viewableItems }) => {
+    if (viewableItems.length) {
+      const lastIndex = viewableItems[viewableItems.length - 1].index;
+      if (lastIndex >= displayedFiles.length - 1) {
+        loadMoreFiles();
+      }
+    }
+  };
+  
+
   useEffect(() => {
     if (isModalVisible && flatListRef.current) {
       flatListRef.current.scrollToIndex({ index: currentMediaIndex, animated: false });
@@ -1211,6 +1221,8 @@ export default function FileListScreen() {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.id}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
               initialScrollIndex={currentMediaIndex}
               getItemLayout={(data, index) => (
                 {length: Dimensions.get('window').width, offset: Dimensions.get('window').width * index, index}
