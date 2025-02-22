@@ -31,6 +31,9 @@ const CACHE_DIR = `${FileSystem.cacheDirectory}S3HubCache/`;
 // Cache expiration set to 1 week
 const CACHE_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 1 week
 
+// Page size for fetching files
+const PAGE_SIZE = 10;
+
 // Helper function to ensure a directory exists
 const ensureDirectoryExists = async (filePath) => {
   const directory = filePath.substring(0, filePath.lastIndexOf('/'));
@@ -137,7 +140,9 @@ const CachedVideo = ({ source, style, cacheKey, ...props }) => {
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
-  const [files, setFiles] = useState([]);
+  const [fullFiles, setFullFiles] = useState([]);
+  const [displayedFiles, setDisplayedFiles] = useState([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -276,7 +281,8 @@ export default function FileListScreen() {
         setSelectedFiles([]);
       } else {
         // Clear files if the connection or bucket is not valid
-        setFiles([]);
+        setFullFiles([]);
+        setDisplayedFiles([]);
         setMediaFiles([]);
         setLoading(false);
       }
@@ -311,9 +317,12 @@ export default function FileListScreen() {
       if (cachedData) {
         const { timestamp, items } = JSON.parse(cachedData);
         if (now - timestamp < CACHE_EXPIRATION) {
-          setFiles(sortFiles(items));
-          setMediaFiles(sortFiles(items).filter(f => !f.isFolder));
+          const sortedItems = sortFiles(items);
+          setFullFiles(sortedItems);
+          setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
+          setMediaFiles(sortedItems.filter(f => !f.isFolder));
           setLoading(false);
+          setPage(1);
           return; // Exit early to avoid fetching from server
         }
       }
@@ -411,15 +420,18 @@ export default function FileListScreen() {
 
         // Update state and cache
         if (isMounted.current) {
-          setFiles(items);
+          setFullFiles(items);
+          setDisplayedFiles(items.slice(0, PAGE_SIZE));
           setMediaFiles(items.filter(f => !f.isFolder));
           setLoading(false);
+          setPage(1);
           await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items }));
         }
       } else {
         // If no contents, clear the list
         if (isMounted.current) {
-          setFiles([]);
+          setFullFiles([]);
+          setDisplayedFiles([]);
           setMediaFiles([]);
           setLoading(false);
           await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, items: [] }));
@@ -431,6 +443,15 @@ export default function FileListScreen() {
         Alert.alert(i18n.t('error'), i18n.t('error'));
         setLoading(false);
       }
+    }
+  };
+
+  const loadMoreFiles = () => {
+    const nextPage = page + 1;
+    const nextItems = fullFiles.slice(0, nextPage * PAGE_SIZE);
+    if (nextItems.length > displayedFiles.length) {
+      setDisplayedFiles(nextItems);
+      setPage(nextPage);
     }
   };
 
@@ -685,7 +706,7 @@ export default function FileListScreen() {
           let key = currentPath + fileName;
   
           // Handle duplicate file names by appending a timestamp
-          const existingFile = files.find(f => f.key === key);
+          const existingFile = fullFiles.find(f => f.key === key);
           if (existingFile) {
             const timestamp = Date.now();
             key = `${currentPath}${fileName}_${timestamp}`;
@@ -739,7 +760,7 @@ export default function FileListScreen() {
       }
 
       for (const fileId of selectedFiles) {
-        const file = files.find((f) => f.id === fileId);
+        const file = displayedFiles.find((f) => f.id === fileId);
         if (file.isFolder) {
           await downloadFolder(file.key);
         } else {
@@ -805,11 +826,11 @@ export default function FileListScreen() {
   };
 
   const handleSelectAll = () => {
-    if (selectedFiles.length === files.length) {
+    if (selectedFiles.length === displayedFiles.length) {
       setSelectedFiles([]);
     } else {
       // Select all
-      const allFileIds = files.map(file => file.id);
+      const allFileIds = displayedFiles.map(file => file.id);
       setSelectedFiles(allFileIds);
     }
   };
@@ -847,7 +868,7 @@ export default function FileListScreen() {
       setDeleteProgress(0);
   
       for (const fileId of selectedFiles) {
-        const file = files.find((f) => f.id === fileId);
+        const file = displayedFiles.find((f) => f.id === fileId);
         if (file.isFolder) {
           // Get all objects within the folder
           const response = await listObjects(currentConnection, currentBucket, file.key);
@@ -906,12 +927,9 @@ export default function FileListScreen() {
         name: newFolderName.trim(),
         isFolder: true,
       };
-      setFiles(prevFiles => {
-        const updatedFiles = sortFiles([...prevFiles, newFolder]);
-        setMediaFiles(updatedFiles.filter(f => !f.isFolder));
-        updateCacheIncrementally(newFolder);
-        return updatedFiles;
-      });
+      const updatedFullFiles = sortFiles([...fullFiles, newFolder]);
+      setFullFiles(updatedFullFiles);
+      setDisplayedFiles(updatedFullFiles.slice(0, page * PAGE_SIZE));
       
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
@@ -1098,12 +1116,14 @@ export default function FileListScreen() {
       )}
 
       <FlatList
-        data={files}
+        data={displayedFiles}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={numColumns}
         key={viewMode}
         contentContainerStyle={styles.flatListContent}
+        onEndReached={loadMoreFiles}
+        onEndReachedThreshold={0.5}
       />
 
       <FAB
