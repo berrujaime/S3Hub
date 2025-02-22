@@ -472,8 +472,8 @@ export default function FileListScreen() {
             {
               width: viewMode === 'grid' ? itemSize - 16 : '100%',
               height: viewMode === 'grid' ? itemSize - 16 : 60,
-              margin: 8,
-              justifyContent: 'center',
+              margin: viewMode === 'grid' ? 8 : 0,
+              justifyContent: viewMode === 'grid' ? 'center' : 'flex-start',
               alignItems: 'center',
               flexDirection: viewMode === 'grid' ? 'column' : 'row',
             },
