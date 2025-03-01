@@ -11,6 +11,7 @@ import {
   Image as RNImage,
   Text,
   AppState,
+  useWindowDimensions,
 } from "react-native";
 import { Video } from 'expo-av';
 import { AuthContext } from "../context/AuthContext";
@@ -157,6 +158,7 @@ export default function FileListScreen() {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { width } = useWindowDimensions();
 
   const flatListRef = useRef(null);
   const theme = useTheme(); // Access the theme
@@ -455,8 +457,8 @@ export default function FileListScreen() {
     }
   };
 
-  const numColumns = viewMode === 'grid' ? 2 : 1;
-  const itemSize = Dimensions.get('window').width / numColumns;
+  const numColumns = viewMode === 'grid' ? width >= 1024 ? 4 : width >= 768 ? 3 : 2 : 1;
+  const itemSize = width / numColumns;
 
   const renderItem = ({ item, index }) => {
     const isSelected = selectedFiles.includes(item.id);
@@ -1148,7 +1150,7 @@ export default function FileListScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={numColumns}
-        key={viewMode}
+        key={`${viewMode}-${numColumns}`}
         contentContainerStyle={styles.flatListContent}
         onEndReached={loadMoreFiles}
         onEndReachedThreshold={0.5}

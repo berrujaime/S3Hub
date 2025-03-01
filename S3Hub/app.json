@@ -3,7 +3,6 @@
     "name": "S3Hub",
     "slug": "S3Hub",
     "version": "1.0.0",
-    "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
