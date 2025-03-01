@@ -17,7 +17,7 @@
 
 You can download the APK for the app using the link or QR code below:
 
-[**Download S3Hub APK**](https://expo.dev/accounts/berrujaime/projects/S3Hub/builds/907f0dfb-eb39-4617-9215-5a7276893888)
+[**Download S3Hub APK**](https://expo.dev/accounts/berrujaime/projects/S3Hub/builds/70ec3038-5773-4970-8406-71eec7562413)
 
 ![Download QR Code](https://github.com/berrujaime/S3Hub/blob/main/S3Hub/assets/apk/apkQR.png)
 
