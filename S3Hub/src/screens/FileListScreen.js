@@ -139,7 +139,7 @@ const CachedVideo = ({ source, style, cacheKey, ...props }) => {
 };
 
 export default function FileListScreen() {
-  const { currentConnection, currentBucket } = useContext(AuthContext);
+  const { currentConnection, currentBucket, preview } = useContext(AuthContext);
   const [fullFiles, setFullFiles] = useState([]);
   const [displayedFiles, setDisplayedFiles] = useState([]);
   const [page, setPage] = useState(1);
@@ -493,7 +493,6 @@ export default function FileListScreen() {
       );
     }
     if (item.isVideo) {
-      // Grid view
       if (viewMode === 'grid') {
         return (
           <TouchableOpacity
@@ -501,80 +500,85 @@ export default function FileListScreen() {
             onLongPress={() => toggleSelection(item.id)}
             style={[
               styles.itemContainer,
-              {
-                width: itemSize - 16,
-                height: itemSize - 16,
-                margin: 8,
-              },
+              { width: itemSize - 16, height: itemSize - 16, margin: 8 },
             ]}
           >
-            {item.url ? (
-              <View style={styles.videoContainer}>
-                <CachedVideo
-                  source={{ uri: item.url }}
-                  style={styles.videoThumbnail}
-                  resizeMode="cover"
-                  isMuted
-                  shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
-                  useNativeControls={false}
-                  cacheKey={item.key}
-                />
-                <View style={styles.playIconContainer}>
-                  <IconButton icon="play-circle-outline" size={50} color="#fff" />
+            {(preview === 'true') ? (
+              item.url ? (
+                <View style={styles.videoContainer}>
+                  <CachedVideo
+                    source={{ uri: item.url }}
+                    style={styles.videoThumbnail}
+                    resizeMode="cover"
+                    isMuted
+                    shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
+                    useNativeControls={false}
+                    cacheKey={item.key}
+                  />
+                  <View style={styles.playIconContainer}>
+                    <IconButton icon="play-circle-outline" size={50} color="#fff" />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <ActivityIndicator style={{ flex: 1 }} />
+              )
             ) : (
-              <ActivityIndicator style={{ flex: 1 }} />
+              // When preview is off: show placeholder icon + file name (grid only)
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <IconButton icon="video-outline" size={50} />
+                <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+              </View>
             )}
             {isSelected && (
               <View style={styles.checkboxContainer}>
-                <Checkbox
-                  status="checked"
-                  style={styles.checkbox}
-                />
+                <Checkbox status="checked" style={styles.checkbox} />
               </View>
             )}
           </TouchableOpacity>
         );
       } else {
-        // List view
+        // List view for video items
         return (
           <TouchableOpacity
             onPress={() => handleItemPress(item.id)}
             onLongPress={() => toggleSelection(item.id)}
             style={styles.listItemContainer}
           >
-            {item.url ? (
-              <View style={styles.listVideoContainer}>
-                <CachedVideo
-                  source={{ uri: item.url }}
-                  style={styles.listVideo}
-                  resizeMode="cover"
-                  isMuted
-                  shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
-                  useNativeControls={false}
-                  cacheKey={item.key}
-                />
-                <View style={styles.playIconContainerList}>
-                  <IconButton icon="play-circle-outline" size={30} color="#fff" />
+            {(preview === 'true') ? (
+              item.url ? (
+                <View style={styles.listVideoContainer}>
+                  <CachedVideo
+                    source={{ uri: item.url }}
+                    style={styles.listVideo}
+                    resizeMode="cover"
+                    isMuted
+                    shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
+                    useNativeControls={false}
+                    cacheKey={item.key}
+                  />
+                  <View style={styles.playIconContainerList}>
+                    <IconButton icon="play-circle-outline" size={30} color="#fff" />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <ActivityIndicator style={styles.listVideo} />
+              )
             ) : (
-              <ActivityIndicator style={styles.listVideo} />
+              // In list view, only the placeholder icon is shown
+              <View style={[styles.listVideoContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+                <IconButton icon="video-outline" size={30} />
+              </View>
             )}
             <View style={styles.listTextContainer}>
               <Text style={styles.listText}>{item.name}</Text>
-              <Text style={styles.listSubText}>{(item.size / (1024 * 1024)).toFixed(2)} MB</Text>
+              <Text style={styles.listSubText}>
+                {(item.size / (1024 * 1024)).toFixed(2)} MB
+              </Text>
             </View>
-            {isSelected && (
-              <Checkbox
-                status="checked"
-                style={styles.listCheckbox}
-              />
-            )}
+            {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
           </TouchableOpacity>
         );
-      }
+      }  
     } else {
       // Render file
       if (viewMode === 'grid') {
@@ -584,67 +588,72 @@ export default function FileListScreen() {
             onLongPress={() => toggleSelection(item.id)}
             style={[
               styles.itemContainer,
-              {
-                width: itemSize - 16,
-                height: itemSize - 16,
-                margin: 8,
-              },
+              { width: itemSize - 16, height: itemSize - 16, margin: 8 },
             ]}
           >
-            {item.url ? (
-              <CachedImage
-                style={[
-                  styles.image,
-                  {
-                    width: '100%',
-                    height: '100%',
-                    opacity: isSelected ? 0.5 : 1,
-                    borderRadius: 10,
-                  },
-                ]}
-                source={{ uri: item.url }}
-                cacheKey={item.key}
-              />
+            {(preview === 'true') ? (
+              item.url ? (
+                <CachedImage
+                  style={[
+                    styles.image,
+                    {
+                      width: '100%',
+                      height: '100%',
+                      opacity: isSelected ? 0.5 : 1,
+                      borderRadius: 10,
+                    },
+                  ]}
+                  source={{ uri: item.url }}
+                  cacheKey={item.key}
+                />
+              ) : (
+                <ActivityIndicator style={{ flex: 1 }} />
+              )
             ) : (
-              <ActivityIndicator style={{ flex: 1 }} />
+              // When preview is off: show placeholder icon + file name (grid only)
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <IconButton icon="image-outline" size={50} />
+                <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+              </View>
             )}
             {isSelected && (
               <View style={styles.checkboxContainer}>
-                <Checkbox
-                  status="checked"
-                  style={styles.checkbox}
-                />
+                <Checkbox status="checked" style={styles.checkbox} />
               </View>
             )}
           </TouchableOpacity>
         );
       } else {
-        // List view
+        // List view for image items
         return (
           <TouchableOpacity
             onPress={() => handleItemPress(item.id)}
             onLongPress={() => toggleSelection(item.id)}
             style={styles.listItemContainer}
           >
-            {item.url ? (
-              <CachedImage
-                style={styles.listImage}
-                source={{ uri: item.url }}
-                cacheKey={item.key}
-              />
+            {(preview === 'true') ? (
+              item.url ? (
+                <CachedImage
+                  style={styles.listImage}
+                  source={{ uri: item.url }}
+                  cacheKey={item.key}
+                />
+              ) : (
+                <ActivityIndicator style={styles.listImage} />
+              )
             ) : (
-              <ActivityIndicator style={styles.listImage} />
+              // In list view, only the placeholder icon is shown
+              <View style={[styles.listImage, { justifyContent: 'center', alignItems: 'center' }]}>
+                <IconButton icon="image-outline" size={30} />
+              </View>
             )}
             <View style={styles.listTextContainer}>
               <Text style={styles.listText}>{item.name}</Text>
-              <Text style={styles.listSubText}>{(item.size / (1024 * 1024)).toFixed(2)} MB</Text>
+              <Text style={styles.listSubText}>
+                {(item.size / (1024 * 1024)).toFixed(2)} MB
+              </Text>
             </View>
-            {isSelected && (
-              <Checkbox
-                status="checked"
-                style={styles.listCheckbox}
-              />
-            )}
+            {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
           </TouchableOpacity>
         );
       }
@@ -672,17 +681,26 @@ export default function FileListScreen() {
     });
   };
 
-  const handleItemPress = (id) => {
+  const handleItemPress = async (id) => {
     if (selectedFiles.length > 0) {
       toggleSelection(id);
     } else {
       const mediaIndex = mediaFiles.findIndex(f => f.id === id);
       if (mediaIndex !== -1) {
+        // If URL is not preloaded because preview is off, load it now
+        if (!mediaFiles[mediaIndex].url) {
+          try {
+            const url = await getSignedUrl(currentConnection, currentBucket, mediaFiles[mediaIndex].key);
+            mediaFiles[mediaIndex].url = url;
+          } catch (error) {
+            console.error("Error loading media URL on demand:", error);
+          }
+        }
         setCurrentMediaIndex(mediaIndex);
         setIsModalVisible(true);
       }
     }
-  };
+  };  
 
   const handleUpload = async () => {
     try {

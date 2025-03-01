@@ -45,6 +45,9 @@ en = {
     files: 'Files',
     settings: 'Settings',
     selectLanguage: 'Select language',
+    selectPreview: 'Enable items preview',
+    optionYes: 'Yes',
+    optionNo: 'No',
   }
 
 es = {
@@ -90,6 +93,9 @@ es = {
     files: 'Archivos',
     settings: 'Ajustes',
     selectLanguage: 'Selecciona el idioma',
+    selectPreview: 'Habilitar vista previa de elementos',
+    optionYes: 'Sí',
+    optionNo: 'No',
   }
 
 const i18n = new I18n({en, es});

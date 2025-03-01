@@ -13,9 +13,14 @@ export default function SettingsScreen() {
     ];
 
     const { language, changeLanguage } = useContext(AuthContext);
+    const { preview, changePreview } = useContext(AuthContext);
 
     const handleLanguageChange = (value) => {
         changeLanguage(value);
+    };
+
+    const handlePreviewChange = (value) => {
+        changePreview(value);
     };
 
     return (
@@ -31,6 +36,17 @@ export default function SettingsScreen() {
                     {languages.map(lang => (
                         <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
                     ))}
+                </Picker>
+            </View>
+            <Text style={styles.label}>{i18n.t('selectPreview')}</Text>
+            <View style={styles.pickerContainer}>
+            <Picker
+                    selectedValue={preview}
+                    onValueChange={(itemValue) => handlePreviewChange(itemValue)}
+                    style={styles.picker}
+                >
+                        <Picker.Item key={i18n.t('optionYes')} label={i18n.t('optionYes')} value={"true"} />
+                        <Picker.Item key={i18n.t('optionNo')} label={i18n.t('optionNo')} value={"false"} />
                 </Picker>
             </View>
         </View>
@@ -57,6 +73,7 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 4,
         overflow: 'hidden',
+        marginBottom: 16,
     },
     picker: {
         height: 50,

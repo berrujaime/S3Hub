@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [currentBucket, setCurrentBucket] = useState(null);
   const [language, setLanguage] = useState(i18n.locale || 'en');
   const [isLoading, setIsLoading] = useState(true);
+  const [preview, setPreview] = useState("false");
 
   const addConnection = async (connection) => {
     const newConnections = [...connections, connection];
@@ -59,6 +60,12 @@ export const AuthProvider = ({ children }) => {
     await SecureStore.setItemAsync('appLanguage', newLanguage);
   };
 
+  const changePreview = async (newPreview) => {
+    setPreview(newPreview);
+    await SecureStore.setItemAsync('preview', newPreview);
+    console.log('preview', newPreview);
+  };
+
   useEffect(() => {
     const loadStoredData = async () => {
       try {
@@ -87,6 +94,11 @@ export const AuthProvider = ({ children }) => {
           i18n.locale = i18n.locale || 'en';
           await SecureStore.setItemAsync('appLanguage', i18n.locale || 'en');
         }
+
+        const storedPreview = await SecureStore.getItemAsync('preview');
+        if (storedPreview) {
+          setPreview(storedPreview);
+        }
       } catch (error) {
         console.error("Error cargando datos almacenados:", error);
       } finally {
@@ -104,11 +116,13 @@ export const AuthProvider = ({ children }) => {
       currentBucket,
       language,
       isLoading,
+      preview,
       addConnection,
       setActiveConnection,
       setCurrentBucket: setCurrentBucketFunction,
       deleteConnection,
       changeLanguage,
+      changePreview,
     }}>
       {children}
     </AuthContext.Provider>
