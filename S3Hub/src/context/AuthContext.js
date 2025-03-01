@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [currentBucket, setCurrentBucket] = useState(null);
   const [language, setLanguage] = useState(i18n.locale || 'en');
   const [isLoading, setIsLoading] = useState(true);
-  const [preview, setPreview] = useState("false");
+  const [preview, setPreview] = useState("true");
 
   const addConnection = async (connection) => {
     const newConnections = [...connections, connection];
