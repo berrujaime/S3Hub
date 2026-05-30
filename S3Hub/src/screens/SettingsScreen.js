@@ -1,10 +1,11 @@
 // src/screens/SettingsScreen.js
 import React, { useContext } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Linking, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import i18n from '../locales/translations';
 import { Picker } from '@react-native-picker/picker';
+import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
     const languages = [
@@ -15,12 +16,20 @@ export default function SettingsScreen() {
     const { language, changeLanguage } = useContext(AuthContext);
     const { preview, changePreview } = useContext(AuthContext);
 
+    const privacyPolicyUrl = Constants.expoConfig?.extra?.privacyPolicyUrl;
+
     const handleLanguageChange = (value) => {
         changeLanguage(value);
     };
 
     const handlePreviewChange = (value) => {
         changePreview(value);
+    };
+
+    const handlePrivacyPolicy = () => {
+        if (privacyPolicyUrl) {
+            Linking.openURL(privacyPolicyUrl);
+        }
     };
 
     return (
@@ -49,6 +58,11 @@ export default function SettingsScreen() {
                         <Picker.Item key={i18n.t('optionNo')} label={i18n.t('optionNo')} value={"false"} />
                 </Picker>
             </View>
+            {privacyPolicyUrl ? (
+                <TouchableOpacity onPress={handlePrivacyPolicy} style={styles.privacyLink}>
+                    <Text style={styles.privacyText}>{i18n.t('privacyPolicy')}</Text>
+                </TouchableOpacity>
+            ) : null}
         </View>
     );
 }
@@ -78,5 +92,15 @@ const styles = StyleSheet.create({
     picker: {
         height: 50,
         width: '100%',
+    },
+    privacyLink: {
+        marginTop: 24,
+        alignItems: 'center',
+        padding: 12,
+    },
+    privacyText: {
+        fontSize: 14,
+        color: '#1a73e8',
+        textDecorationLine: 'underline',
     },
 });

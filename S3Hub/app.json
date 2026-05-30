@@ -2,7 +2,7 @@
   "expo": {
     "name": "S3Hub",
     "slug": "S3Hub",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -30,7 +30,8 @@
     "extra": {
       "eas": {
         "projectId": "85a3d172-215c-4058-b009-7d104bbe58ba"
-      }
+      },
+      "privacyPolicyUrl": "https://berrujaime.github.io/S3Hub/privacy.html"
     }
   }
 }

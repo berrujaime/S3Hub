@@ -48,6 +48,7 @@ en = {
     selectPreview: 'Enable items preview',
     optionYes: 'Yes',
     optionNo: 'No',
+    privacyPolicy: 'Privacy Policy',
   }
 
 es = {
@@ -96,6 +97,7 @@ es = {
     selectPreview: 'Habilitar vista previa de elementos',
     optionYes: 'Sí',
     optionNo: 'No',
+    privacyPolicy: 'Política de Privacidad',
   }
 
 const i18n = new I18n({en, es});
