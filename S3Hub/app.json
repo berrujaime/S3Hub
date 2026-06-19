@@ -25,6 +25,7 @@
     },
     "plugins": [
       "./plugin/with16KPageSize",
+      "./plugin/withAndroidPageSize",
       "expo-secure-store",
       "expo-localization",
       [
