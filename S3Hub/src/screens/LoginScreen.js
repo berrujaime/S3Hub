@@ -50,7 +50,7 @@ export default function LoginScreen({ navigation }) {
         }
       } catch (error) {
         console.error(error);
-        Alert.alert(i18n.t('error'), i18n.t('error'));
+        Alert.alert(i18n.t('error'), error.message || i18n.t('error'));
       }
     } else {
       Alert.alert(i18n.t('error'), i18n.t('error'));
