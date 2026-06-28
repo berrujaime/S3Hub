@@ -1,13 +1,27 @@
 // src/theme/theme.js
-import { MD3LightTheme as DefaultTheme } from 'react-native-paper';
+import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 
-const theme = {
-  ...DefaultTheme,
+// Shared brand colors applied on top of both Paper base themes.
+const brandColors = {
+  primary: '#6200ee', // Primary color
+  accent: '#03dac4',  // Secondary color
+};
+
+export const lightTheme = {
+  ...MD3LightTheme,
   colors: {
-    ...DefaultTheme.colors,
-    primary: '#6200ee', // Primary color
-    accent: '#03dac4',  // Secondary color
+    ...MD3LightTheme.colors,
+    ...brandColors,
   },
 };
 
-export default theme;
+export const darkTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    ...brandColors,
+  },
+};
+
+// Default export kept equal to the light theme for safety / backward compatibility.
+export default lightTheme;

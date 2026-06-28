@@ -1,61 +1,80 @@
 // src/screens/LoginScreen.js
 import React, { useState, useContext } from 'react';
 import { View, StyleSheet, Alert, Image } from 'react-native';
-import { Text, TextInput, Button, RadioButton, Menu } from 'react-native-paper';
+import { Text, TextInput, Button, Menu, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { validateCredentials } from '../services/authService';
+import { PROVIDER_LIST, getProvider } from '../domain/providers';
+import { mapS3Error } from '../domain/errors';
 import i18n from '../locales/translations';
 
 export default function LoginScreen({ navigation }) {
+  const theme = useTheme();
+
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [service, setService] = useState('storj');
-  const [region, setRegion] = useState('eu1');
+  const [region, setRegion] = useState(getProvider('storj').defaultRegion);
+  const [accountId, setAccountId] = useState('');
+  const [endpoint, setEndpoint] = useState('');
+  const [providerMenuVisible, setProviderMenuVisible] = useState(false);
   const [regionMenuVisible, setRegionMenuVisible] = useState(false);
 
   const { addConnection, setActiveConnection } = useContext(AuthContext);
 
-  // Region list depending on the service
-  const regionsByService = {
-    storj: ['us1', 'eu1', 'ap1'],
-    aws: ['us-east-1', 'us-west-1', 'eu-west-1', 'ap-southeast-1'],
-  };
+  const provider = getProvider(service);
+
+  /**
+   * Builds the connection object, including the extra fields only when present.
+   * @returns {Object} The connection descriptor.
+   */
+  const buildConnection = () => ({
+    id: Date.now().toString(),
+    accessKey,
+    secretKey,
+    service: provider.id,
+    region,
+    ...(accountId ? { accountId } : {}),
+    ...(endpoint ? { endpoint } : {}),
+  });
 
   /**
    * Handles the login process.
    */
   const handleLogin = async () => {
-    if (accessKey && secretKey) {
-      try {
-        const isValid = await validateCredentials({
-          accessKey,
-          secretKey,
-          service,
-          region,
-        });
+    if (!accessKey || !secretKey) {
+      Alert.alert(i18n.t('error'), i18n.t('errorInvalidCredentials'));
+      return;
+    }
 
-        if (isValid) {
-          const newConnection = {
-            id: Date.now().toString(),
-            accessKey,
-            secretKey,
-            service,
-            region,
-          };
-          await addConnection(newConnection);
-          await setActiveConnection(newConnection);
-          navigation.navigate('Connections');
-        } else {
-          Alert.alert(i18n.t('error'), i18n.t('error'));
-        }
-      } catch (error) {
-        console.error(error);
-        Alert.alert(i18n.t('error'), error.message || i18n.t('error'));
+    const connection = buildConnection();
+
+    try {
+      const isValid = await validateCredentials(connection);
+
+      if (isValid) {
+        await addConnection(connection);
+        await setActiveConnection(connection);
+        navigation.navigate('Connections');
+      } else {
+        Alert.alert(i18n.t('error'), i18n.t('errorInvalidCredentials'));
       }
-    } else {
-      Alert.alert(i18n.t('error'), i18n.t('error'));
+    } catch (error) {
+      console.error(error);
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
+
+  /**
+   * Handles the opening of the provider menu.
+   */
+  const openProviderMenu = () => setProviderMenuVisible(true);
+
+  /**
+   * Handles the closing of the provider menu.
+   */
+  const closeProviderMenu = () => setProviderMenuVisible(false);
 
   /**
    * Handles the opening of the region menu.
@@ -68,29 +87,131 @@ export default function LoginScreen({ navigation }) {
   const closeRegionMenu = () => setRegionMenuVisible(false);
 
   /**
-   * Handles the service change and updates the default region.
-   * @param {string} value - Service selected.
+   * Handles the provider change: resets the region to the provider's default
+   * and clears the extra fields.
+   * @param {string} id - The selected provider id.
    */
-  const handleServiceChange = (value) => {
-    setService(value);
-    setRegion(regionsByService[value][0]);
+  const handleProviderChange = (id) => {
+    const next = getProvider(id);
+    setService(next.id);
+    setRegion(next.defaultRegion);
+    setAccountId('');
+    setEndpoint('');
+    closeProviderMenu();
+  };
+
+  /**
+   * Renders the brand mark (logo image or icon) for a provider.
+   * @param {Object} item - The provider descriptor.
+   * @returns {React.ReactElement} The brand mark element.
+   */
+  const renderProviderMark = (item) =>
+    item.logo ? (
+      <Image source={item.logo} style={styles.logo} resizeMode="contain" />
+    ) : (
+      <MaterialCommunityIcons
+        name={item.icon}
+        size={24}
+        color={theme.colors.onSurface}
+        style={styles.logo}
+      />
+    );
+
+  /**
+   * Renders the extra fields required by the selected provider.
+   * @returns {React.ReactElement[]} The extra field inputs.
+   */
+  const renderExtraFields = () =>
+    provider.fields.map((field) => {
+      if (field === 'accountId') {
+        return (
+          <TextInput
+            key={field}
+            label={i18n.t('accountId')}
+            value={accountId}
+            onChangeText={setAccountId}
+            mode="outlined"
+            autoCapitalize="none"
+            style={styles.input}
+          />
+        );
+      }
+      if (field === 'endpoint') {
+        return (
+          <TextInput
+            key={field}
+            label={i18n.t('endpoint')}
+            value={endpoint}
+            onChangeText={setEndpoint}
+            mode="outlined"
+            autoCapitalize="none"
+            keyboardType="url"
+            style={styles.input}
+          />
+        );
+      }
+      return null;
+    });
+
+  /**
+   * Renders the region input: a Menu picker when the provider exposes a fixed
+   * region list, or a free-text input when it does not.
+   * @returns {React.ReactElement} The region input element.
+   */
+  const renderRegionInput = () => {
+    if (provider.regions) {
+      return (
+        <Menu
+          visible={regionMenuVisible}
+          onDismiss={closeRegionMenu}
+          anchor={
+            <Button mode="outlined" onPress={openRegionMenu} style={styles.menuButton}>
+              {region}
+            </Button>
+          }
+        >
+          {provider.regions.map((reg) => (
+            <Menu.Item
+              key={reg}
+              onPress={() => {
+                setRegion(reg);
+                closeRegionMenu();
+              }}
+              title={reg}
+            />
+          ))}
+        </Menu>
+      );
+    }
+
+    return (
+      <TextInput
+        label={i18n.t('selectRegion')}
+        value={region}
+        onChangeText={setRegion}
+        mode="outlined"
+        autoCapitalize="none"
+        style={styles.input}
+      />
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text variant="headlineLarge" style={styles.title}>S3Hub</Text>
 
-      <Image 
-        source={require('../../assets/logos/S3HubLogo_bg.png')} 
+      <Image
+        source={require('../../assets/logos/S3HubLogo_bg.png')}
         style={styles.centeredImage}
         resizeMode="contain"
       />
-      
+
       <TextInput
         label={i18n.t('accessKey')}
         value={accessKey}
         onChangeText={setAccessKey}
         mode="outlined"
+        autoCapitalize="none"
         style={styles.input}
       />
       <TextInput
@@ -99,43 +220,45 @@ export default function LoginScreen({ navigation }) {
         onChangeText={setSecretKey}
         mode="outlined"
         secureTextEntry
+        autoCapitalize="none"
         style={styles.input}
       />
 
-      <Text style={styles.label}>{i18n.t('selectService')}</Text>
-      <RadioButton.Group onValueChange={handleServiceChange} value={service}>
-        <View style={styles.radioButtonContainer}>
-          <RadioButton value="storj" />
-          <Image source={require('../../assets/logos/storj.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.radioText}>Storj</Text>
-        </View>
-        <View style={styles.radioButtonContainer}>
-          <RadioButton value="aws" />
-          <Image source={require('../../assets/logos/aws.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.radioText}>AWS S3</Text>
-        </View>
-      </RadioButton.Group>
-
-      <Text style={styles.label}>{i18n.t('selectRegion')}</Text>
+      <Text style={[styles.label, { color: theme.colors.onBackground }]}>
+        {i18n.t('selectProvider')}
+      </Text>
       <Menu
-        visible={regionMenuVisible}
-        onDismiss={closeRegionMenu}
+        visible={providerMenuVisible}
+        onDismiss={closeProviderMenu}
         anchor={
-          <Button mode="outlined" onPress={openRegionMenu} style={styles.menuButton}>
-            {region}
+          <Button
+            mode="outlined"
+            onPress={openProviderMenu}
+            icon={() => renderProviderMark(provider)}
+            style={styles.menuButton}
+          >
+            {provider.name}
           </Button>
         }
       >
-        {regionsByService[service].map((reg) => (
-          <Menu.Item key={reg} onPress={() => { setRegion(reg); closeRegionMenu(); }} title={reg} />
+        {PROVIDER_LIST.map((item) => (
+          <Menu.Item
+            key={item.id}
+            onPress={() => handleProviderChange(item.id)}
+            title={item.name}
+            leadingIcon={() => renderProviderMark(item)}
+          />
         ))}
       </Menu>
 
-      <Button
-        mode="contained"
-        onPress={handleLogin}
-        style={styles.button}
-      >
+      {renderExtraFields()}
+
+      <Text style={[styles.label, { color: theme.colors.onBackground }]}>
+        {i18n.t('selectRegion')}
+      </Text>
+      {renderRegionInput()}
+
+      <Button mode="contained" onPress={handleLogin} style={styles.button}>
         {i18n.t('login')}
       </Button>
     </View>
@@ -168,21 +291,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 16,
   },
-  radioButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   logo: {
     width: 24,
     height: 24,
     marginRight: 8,
   },
-  radioText: {
-    fontSize: 16,
-  },
   menuButton: {
     marginBottom: 16,
+    alignSelf: 'flex-start',
   },
   button: {
     marginTop: 24,

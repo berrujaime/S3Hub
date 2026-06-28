@@ -8,7 +8,6 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createPresignedPost, S3RequestPresigner } from "@aws-sdk/s3-presigned-post";
 import { getS3Client } from "./s3Client";
 import { Buffer } from 'buffer';
 

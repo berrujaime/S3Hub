@@ -1,8 +1,7 @@
 // src/locales/translations.js
-import * as Localization from 'expo-localization';
 import {I18n} from 'i18n-js';
 
-en = {
+const en = {
     selectBucket: 'Select a Bucket',
     selectConnection: 'Select a Connection',
     accessKey: 'Access Key',
@@ -41,7 +40,6 @@ en = {
     items: 'Items',
     deleteConnection: 'Delete Connection',
     connections: 'Connections',
-    buckets: 'Buckets',
     files: 'Files',
     settings: 'Settings',
     selectLanguage: 'Select language',
@@ -49,9 +47,23 @@ en = {
     optionYes: 'Yes',
     optionNo: 'No',
     privacyPolicy: 'Privacy Policy',
+    selectProvider: 'Select Provider:',
+    accountId: 'Account ID',
+    endpoint: 'Endpoint URL',
+    search: 'Search',
+    noResults: 'No results found.',
+    selectTheme: 'Theme',
+    themeSystem: 'System',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    errorNetwork: 'Network error. Check your connection and try again.',
+    errorInvalidCredentials: 'Invalid credentials. Check your access and secret keys.',
+    errorAccessDenied: 'Access denied. Your keys lack the required permissions.',
+    errorBucketNotFound: 'Bucket not found.',
+    errorGeneric: 'Something went wrong. Please try again.',
   }
 
-es = {
+const es = {
     selectBucket: 'Selecciona un Bucket',
     selectConnection: 'Selecciona una Conexión',
     accessKey: 'Clave de Acceso',
@@ -90,7 +102,6 @@ es = {
     items: 'Elementos',
     deleteConnection: 'Eliminar Conexión',
     connections: 'Conexiones',
-    buckets: 'Buckets',
     files: 'Archivos',
     settings: 'Ajustes',
     selectLanguage: 'Selecciona el idioma',
@@ -98,6 +109,20 @@ es = {
     optionYes: 'Sí',
     optionNo: 'No',
     privacyPolicy: 'Política de Privacidad',
+    selectProvider: 'Selecciona el proveedor:',
+    accountId: 'ID de Cuenta',
+    endpoint: 'URL del Endpoint',
+    search: 'Buscar',
+    noResults: 'No se encontraron resultados.',
+    selectTheme: 'Tema',
+    themeSystem: 'Sistema',
+    themeLight: 'Claro',
+    themeDark: 'Oscuro',
+    errorNetwork: 'Error de red. Comprueba tu conexión e inténtalo de nuevo.',
+    errorInvalidCredentials: 'Credenciales no válidas. Revisa tus claves de acceso y secreta.',
+    errorAccessDenied: 'Acceso denegado. Tus claves no tienen los permisos necesarios.',
+    errorBucketNotFound: 'Bucket no encontrado.',
+    errorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
   }
 
 const i18n = new I18n({en, es});

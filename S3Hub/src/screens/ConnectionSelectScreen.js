@@ -2,11 +2,14 @@
 
 import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
-import { Text, List, FAB, IconButton } from 'react-native-paper';
+import { Text, List, FAB, IconButton, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import { getProvider } from '../domain/providers';
 import i18n from '../locales/translations';
 
 export default function ConnectionSelectScreen({ navigation }) {
+  const theme = useTheme();
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
 
   const handleConnectionSelect = async (connection) => {
@@ -24,9 +27,10 @@ export default function ConnectionSelectScreen({ navigation }) {
   };
 
   const handleDeleteConnection = (connection) => {
+    const provider = getProvider(connection.service);
     Alert.alert(
       i18n.t('deleteConnection'),
-      `${i18n.t('deleteConnection')} ${connection.service}?`,
+      `${i18n.t('deleteConnection')} ${provider.name}?`,
       [
         { text: i18n.t('cancel'), style: 'cancel' },
         {
@@ -42,19 +46,28 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   const renderConnectionItem = ({ item }) => {
     const isActive = currentConnection && currentConnection.id === item.id;
-    const logoSource =
-      item.service === 'storj'
-        ? require('../../assets/logos/storj.png')
-        : require('../../assets/logos/aws.png');
+    const provider = getProvider(item.service);
+
+    const renderMark = () =>
+      provider.logo ? (
+        <Image source={provider.logo} style={styles.logo} resizeMode="contain" />
+      ) : (
+        <MaterialCommunityIcons
+          name={provider.icon}
+          size={32}
+          color={theme.colors.onSurface}
+          style={styles.logo}
+        />
+      );
 
     return (
       <List.Item
-        title={item.service}
+        title={provider.name}
         description={`Access Key: ${item.accessKey}`}
         onPress={() => handleConnectionSelect(item)}
-        left={() => <Image source={logoSource} style={styles.logo} resizeMode="contain" />}
+        left={renderMark}
         right={(props) => (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={styles.actions}>
             {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
             <IconButton
               icon="delete"
@@ -67,7 +80,7 @@ export default function ConnectionSelectScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text variant="headlineLarge" style={styles.title}>{i18n.t('selectConnection')}</Text>
       <FlatList
         data={connections}
@@ -97,6 +110,10 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     marginRight: 8,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',

@@ -2,16 +2,18 @@
 
 import React, { useEffect, useState, useContext } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
-import { Text, List } from 'react-native-paper';
+import { Text, List, useTheme } from 'react-native-paper';
 import { AuthContext } from '../context/AuthContext';
 import { listBuckets } from '../services/s3Service';
 import i18n from '../locales/translations';
+import { mapS3Error } from '../domain/errors';
 
 export default function BucketSelectScreen({ navigation }) {
   const { currentConnection, setCurrentBucket } = useContext(AuthContext);
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState(null);
+  const theme = useTheme();
 
   useEffect(() => {
     if (currentConnection) {
@@ -37,7 +39,7 @@ export default function BucketSelectScreen({ navigation }) {
       }
     } catch (error) {
       console.error("Error fetching the buckets:", error);
-      Alert.alert(i18n.t('error'), i18n.t('chooseConnection'));
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     } finally {
       setLoading(false);
     }
@@ -50,7 +52,7 @@ export default function BucketSelectScreen({ navigation }) {
       navigation.navigate('FilesTab');
     } catch (error) {
       console.error("Error selecting the bucket:", error);
-      Alert.alert(i18n.t('error'), i18n.t('error'));
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -89,6 +91,13 @@ export default function BucketSelectScreen({ navigation }) {
         data={buckets}
         keyExtractor={(item) => item.Name}
         renderItem={renderBucketItem}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: theme.colors.onSurface }]}>
+              {i18n.t('noResults')}
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -117,5 +126,14 @@ const styles = StyleSheet.create({
   },
   selectedItem: {
     backgroundColor: '#e0f7fa',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
