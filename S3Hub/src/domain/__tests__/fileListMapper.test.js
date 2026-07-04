@@ -1,45 +1,79 @@
 import {
-  isVideoKey,
-  isMediaKey,
+  classifyKey,
+  isPreviewableMediaType,
   sortFiles,
   parseObjects,
   dedupeById,
 } from '../fileListMapper';
 
-describe('isVideoKey', () => {
-  it('returns true for video extensions (case-insensitive)', () => {
-    expect(isVideoKey('clip.mp4')).toBe(true);
-    expect(isVideoKey('clip.MOV')).toBe(true);
-    expect(isVideoKey('clip.avi')).toBe(true);
-    expect(isVideoKey('clip.MKV')).toBe(true);
-    expect(isVideoKey('path/to/clip.mov')).toBe(true);
+describe('classifyKey', () => {
+  it('classifies image extensions (case-insensitive)', () => {
+    expect(classifyKey('photo.jpg')).toBe('image');
+    expect(classifyKey('photo.JPEG')).toBe('image');
+    expect(classifyKey('photo.png')).toBe('image');
+    expect(classifyKey('photo.gif')).toBe('image');
+    expect(classifyKey('photo.webp')).toBe('image');
+    expect(classifyKey('path/to/photo.PNG')).toBe('image');
   });
 
-  it('returns false for non-video keys', () => {
-    expect(isVideoKey('photo.jpg')).toBe(false);
-    expect(isVideoKey('photo.png')).toBe(false);
-    expect(isVideoKey('document.txt')).toBe(false);
-    expect(isVideoKey('noextension')).toBe(false);
-    expect(isVideoKey('mp4notattheend.txt')).toBe(false);
+  it('classifies video extensions (case-insensitive)', () => {
+    expect(classifyKey('clip.mp4')).toBe('video');
+    expect(classifyKey('clip.MOV')).toBe('video');
+    expect(classifyKey('clip.avi')).toBe('video');
+    expect(classifyKey('clip.MKV')).toBe('video');
+    expect(classifyKey('path/to/clip.mov')).toBe('video');
+  });
+
+  it('classifies audio extensions (case-insensitive)', () => {
+    expect(classifyKey('song.mp3')).toBe('audio');
+    expect(classifyKey('song.WAV')).toBe('audio');
+    expect(classifyKey('song.flac')).toBe('audio');
+    expect(classifyKey('song.m4a')).toBe('audio');
+  });
+
+  it('classifies document extensions (case-insensitive)', () => {
+    expect(classifyKey('notes.txt')).toBe('document');
+    expect(classifyKey('report.PDF')).toBe('document');
+    expect(classifyKey('sheet.xlsx')).toBe('document');
+    expect(classifyKey('letter.docx')).toBe('document');
+  });
+
+  it('classifies archive extensions (case-insensitive)', () => {
+    expect(classifyKey('backup.zip')).toBe('archive');
+    expect(classifyKey('backup.RAR')).toBe('archive');
+    expect(classifyKey('backup.tar')).toBe('archive');
+    expect(classifyKey('backup.7z')).toBe('archive');
+  });
+
+  it('classifies unknown or missing extensions as other', () => {
+    expect(classifyKey('noextension')).toBe('other');
+    expect(classifyKey('archive.unknownext')).toBe('other');
+    expect(classifyKey('folder/')).toBe('other');
+  });
+
+  it('does not match an extension-like substring that is not at the end of the key', () => {
+    expect(classifyKey('mp4notattheend.txt')).toBe('document');
+  });
+
+  it('guards against non-string input by returning other', () => {
+    expect(classifyKey(null)).toBe('other');
+    expect(classifyKey(undefined)).toBe('other');
+    expect(classifyKey(123)).toBe('other');
+    expect(classifyKey({})).toBe('other');
   });
 });
 
-describe('isMediaKey', () => {
-  it('returns truthy for image and video extensions (case-insensitive)', () => {
-    expect(isMediaKey('photo.jpg')).toBeTruthy();
-    expect(isMediaKey('photo.JPEG')).toBeTruthy();
-    expect(isMediaKey('photo.png')).toBeTruthy();
-    expect(isMediaKey('photo.gif')).toBeTruthy();
-    expect(isMediaKey('clip.mp4')).toBeTruthy();
-    expect(isMediaKey('clip.MOV')).toBeTruthy();
-    expect(isMediaKey('clip.avi')).toBeTruthy();
-    expect(isMediaKey('clip.mkv')).toBeTruthy();
+describe('isPreviewableMediaType', () => {
+  it('returns true for image and video mediaTypes', () => {
+    expect(isPreviewableMediaType('image')).toBe(true);
+    expect(isPreviewableMediaType('video')).toBe(true);
   });
 
-  it('returns falsy for non-media keys', () => {
-    expect(isMediaKey('document.txt')).toBeFalsy();
-    expect(isMediaKey('archive.zip')).toBeFalsy();
-    expect(isMediaKey('noextension')).toBeFalsy();
+  it('returns false for audio, document, archive, and other mediaTypes', () => {
+    expect(isPreviewableMediaType('audio')).toBe(false);
+    expect(isPreviewableMediaType('document')).toBe(false);
+    expect(isPreviewableMediaType('archive')).toBe(false);
+    expect(isPreviewableMediaType('other')).toBe(false);
   });
 });
 
@@ -151,20 +185,36 @@ describe('parseObjects', () => {
     expect(result.every((i) => i.isFolder)).toBe(true);
   });
 
-  it('builds file rows only from contents (current level), including media files and skipping non-media files', () => {
+  it('builds file rows from contents (current level), including every object type instead of dropping non-media files', () => {
     const listing = {
       contents: [
         { Key: 'photo.jpg', Size: 100 },
         { Key: 'notes.txt', Size: 50 },
         { Key: 'clip.mp4', Size: 200 },
+        { Key: 'archive.zip', Size: 300 },
       ],
       commonPrefixes: [],
     };
     const result = parseObjects(listing, '');
     expect(result).toEqual([
-      { id: 'photo.jpg', key: 'photo.jpg', name: 'photo.jpg', size: 100, isFolder: false, isVideo: false, url: null },
-      { id: 'clip.mp4', key: 'clip.mp4', name: 'clip.mp4', size: 200, isFolder: false, isVideo: true, url: null },
+      { id: 'photo.jpg', key: 'photo.jpg', name: 'photo.jpg', size: 100, isFolder: false, isVideo: false, mediaType: 'image', url: null },
+      { id: 'notes.txt', key: 'notes.txt', name: 'notes.txt', size: 50, isFolder: false, isVideo: false, mediaType: 'document', url: null },
+      { id: 'clip.mp4', key: 'clip.mp4', name: 'clip.mp4', size: 200, isFolder: false, isVideo: true, mediaType: 'video', url: null },
+      { id: 'archive.zip', key: 'archive.zip', name: 'archive.zip', size: 300, isFolder: false, isVideo: false, mediaType: 'archive', url: null },
     ]);
+  });
+
+  it('tags each item with a mediaType derived from classifyKey, including non-media types', () => {
+    const listing = {
+      contents: [
+        { Key: 'song.mp3', Size: 1 },
+        { Key: 'report.pdf', Size: 2 },
+        { Key: 'weird.xyz', Size: 3 },
+      ],
+      commonPrefixes: [],
+    };
+    const result = parseObjects(listing, '');
+    expect(result.map((i) => i.mediaType)).toEqual(['audio', 'document', 'other']);
   });
 
   it('does not infer folders from contents (folders come only from commonPrefixes)', () => {
@@ -218,6 +268,7 @@ describe('parseObjects', () => {
         size: 10,
         isFolder: false,
         isVideo: false,
+        mediaType: 'image',
         url: null,
       },
     ]);

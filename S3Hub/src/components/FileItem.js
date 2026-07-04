@@ -1,12 +1,25 @@
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
-import { Checkbox, IconButton } from 'react-native-paper';
+import { Checkbox, IconButton, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
 
-// Renders a single file-list row/cell (folder, video, or image) in either grid
-// or list view. Extracted verbatim from FileListScreen's renderItem.
-// The parent decides folder-vs-item behavior: onPress(item) and onLongPress(item).
+// Generic glyph shown for file types that have no visual preview
+// (everything except image/video, which get thumbnails/playback instead).
+const GENERIC_FILE_ICONS = {
+  image: 'file-image',
+  video: 'movie',
+  audio: 'music',
+  document: 'file-document',
+  archive: 'folder-zip',
+  other: 'file',
+};
+
+// Renders a single file-list row/cell (folder, video, image, or generic file)
+// in either grid or list view. Extracted verbatim from FileListScreen's
+// renderItem. The parent decides folder-vs-item behavior: onPress(item) and
+// onLongPress(item).
 const FileItem = ({
   item,
   index,
@@ -19,6 +32,8 @@ const FileItem = ({
   onPress,
   onLongPress,
 }) => {
+  const theme = useTheme();
+
   if (item.isFolder) {
     // Render folder
     return (
@@ -137,8 +152,8 @@ const FileItem = ({
         </TouchableOpacity>
       );
     }
-  } else {
-    // Render file
+  } else if (item.mediaType === 'image') {
+    // Render image file
     if (viewMode === 'grid') {
       return (
         <TouchableOpacity
@@ -205,6 +220,53 @@ const FileItem = ({
               <IconButton icon="image-outline" size={30} />
             </View>
           )}
+          <View style={styles.listTextContainer}>
+            <Text style={styles.listText}>{item.name}</Text>
+            <Text style={styles.listSubText}>
+              {(item.size / (1024 * 1024)).toFixed(2)} MB
+            </Text>
+          </View>
+          {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
+        </TouchableOpacity>
+      );
+    }
+  } else {
+    // Render a non-previewable file (audio, document, archive, or other)
+    // with a generic icon instead of a thumbnail.
+    const genericIconName = GENERIC_FILE_ICONS[item.mediaType] || GENERIC_FILE_ICONS.other;
+
+    if (viewMode === 'grid') {
+      return (
+        <TouchableOpacity
+          onPress={() => onPress(item)}
+          onLongPress={() => onLongPress(item)}
+          style={[
+            styles.itemContainer,
+            { width: itemSize - 16, height: itemSize - 16, margin: 8 },
+          ]}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <MaterialCommunityIcons name={genericIconName} size={50} color={theme.colors.onSurface} />
+            <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+          </View>
+          {isSelected && (
+            <View style={styles.checkboxContainer}>
+              <Checkbox status="checked" style={styles.checkbox} />
+            </View>
+          )}
+        </TouchableOpacity>
+      );
+    } else {
+      // List view for generic (non-previewable) file items
+      return (
+        <TouchableOpacity
+          onPress={() => onPress(item)}
+          onLongPress={() => onLongPress(item)}
+          style={styles.listItemContainer}
+        >
+          <View style={[styles.listImage, { justifyContent: 'center', alignItems: 'center' }]}>
+            <MaterialCommunityIcons name={genericIconName} size={30} color={theme.colors.onSurface} />
+          </View>
           <View style={styles.listTextContainer}>
             <Text style={styles.listText}>{item.name}</Text>
             <Text style={styles.listSubText}>

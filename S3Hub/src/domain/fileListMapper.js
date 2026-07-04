@@ -1,14 +1,31 @@
 // Pure domain logic for mapping S3 listings into file/folder list items.
 // No React, AWS SDK, or Expo imports — fully unit-testable.
 
-// Returns true if the key points to a video file.
-export const isVideoKey = (key) => {
-  return key.match(/\.(mp4|mov|avi|mkv)$/i) ? true : false;
+// Extension patterns for each supported mediaType, checked in order.
+const MEDIA_TYPE_PATTERNS = [
+  ['image', /\.(jpg|jpeg|png|gif|bmp|webp|heic|svg)$/i],
+  ['video', /\.(mp4|mov|avi|mkv|webm|m4v)$/i],
+  ['audio', /\.(mp3|wav|aac|flac|ogg|m4a)$/i],
+  ['document', /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|md|rtf|odt)$/i],
+  ['archive', /\.(zip|rar|7z|tar|gz|bz2|tgz)$/i],
+];
+
+// Classifies an object key into a broad file-type category, based on its
+// extension. Returns 'other' for unrecognized extensions or non-string input.
+export const classifyKey = (key) => {
+  if (typeof key !== 'string') {
+    return 'other';
+  }
+
+  const match = MEDIA_TYPE_PATTERNS.find(([, pattern]) => pattern.test(key));
+  return match ? match[0] : 'other';
 };
 
-// Returns truthy if the key points to a supported media file (image or video).
-export const isMediaKey = (key) => {
-  return key.match(/\.(jpg|jpeg|png|gif|mp4|mov|avi|mkv)$/i);
+// Returns true when a mediaType supports on-demand preview (thumbnail/player).
+// Only image and video items get signed preview URLs; other file types are
+// rendered with a generic icon instead.
+export const isPreviewableMediaType = (mediaType) => {
+  return mediaType === 'image' || mediaType === 'video';
 };
 
 // Sorts a list of items: folders first, then images, then videos, alphabetically.
@@ -45,8 +62,7 @@ export const parseObjects = (listing, currentPath) => {
     // Ignore the S3 "folder marker" object that represents currentPath itself.
     if (key === currentPath) return;
 
-    // Only include supported media files (see Task 1.3 for full file-type support).
-    if (!isMediaKey(key)) return;
+    const mediaType = classifyKey(key);
 
     items.push({
       id: key, // Unique identifier based on S3 key.
@@ -54,7 +70,8 @@ export const parseObjects = (listing, currentPath) => {
       name: key.substring(currentPath.length),
       size: object.Size,
       isFolder: false,
-      isVideo: isVideoKey(key),
+      isVideo: mediaType === 'video',
+      mediaType,
       url: null,
     });
   });

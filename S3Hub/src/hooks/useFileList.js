@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Alert, AppState } from 'react-native';
 import { listAllObjects, getSignedUrl } from '../services/s3Service';
 import { PAGE_SIZE } from '../config/cacheConfig';
-import { sortFiles, parseObjects, dedupeById } from '../domain/fileListMapper';
+import { sortFiles, parseObjects, dedupeById, isPreviewableMediaType } from '../domain/fileListMapper';
 import { getCacheKey } from '../domain/cacheKeys';
 import {
   getCachedItems,
@@ -40,7 +40,7 @@ export default function useFileList(currentConnection, currentBucket) {
         const sortedItems = sortFiles(cachedItems);
         setFullFiles(sortedItems);
         setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
-        setMediaFiles(sortedItems.filter((f) => !f.isFolder));
+        setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
         setLoading(false);
         setPage(1);
         return; // Exit early to avoid fetching from server.
@@ -60,10 +60,12 @@ export default function useFileList(currentConnection, currentBucket) {
 
       let items = parseObjects(listing, currentPath);
 
-      // Fetch the signed URLs for file items in parallel.
+      // Fetch the signed URLs for previewable (image/video) items in parallel.
+      // Other file types don't need an upfront URL: they render a generic
+      // icon and only need a URL later, on demand (download/share).
       const filePromises = [];
       items.forEach((item) => {
-        if (!item.isFolder) {
+        if (!item.isFolder && isPreviewableMediaType(item.mediaType)) {
           filePromises.push(
             getSignedUrl(currentConnection, currentBucket, item.key)
               .then((url) => {
@@ -87,7 +89,7 @@ export default function useFileList(currentConnection, currentBucket) {
       if (isMounted.current) {
         setFullFiles(items);
         setDisplayedFiles(items.slice(0, PAGE_SIZE));
-        setMediaFiles(items.filter((f) => !f.isFolder));
+        setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
         setLoading(false);
         setPage(1);
         await setCachedItems(cacheKey, items);
