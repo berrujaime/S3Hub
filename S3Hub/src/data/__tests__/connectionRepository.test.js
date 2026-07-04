@@ -43,6 +43,11 @@ beforeEach(() => {
   secureStoreData = new Map();
   asyncStorageData = new Map();
 
+  // The repository caches "migration already completed" in module state so
+  // real app sessions stop re-reading the legacy keys. Reset it here so each
+  // test exercises the migration path against its own seeded storage.
+  repo.__resetMigrationStateForTests();
+
   SecureStore.getItemAsync.mockImplementation(async (key) =>
     secureStoreData.has(key) ? secureStoreData.get(key) : null
   );
@@ -236,6 +241,19 @@ describe('connectionRepository', () => {
       );
       expect(secretWrites).toHaveLength(1);
     });
+
+    it('skips the legacy-key reads entirely once migration has completed in this session', async () => {
+      await repo.getConnections(); // first call performs (and settles) the migration check
+
+      jest.clearAllMocks(); // clears recorded calls, keeps the fake implementations
+      await repo.getConnections();
+      await repo.getCurrentConnection();
+
+      const legacyReads = SecureStore.getItemAsync.mock.calls.filter(
+        ([key]) => key === LEGACY_CONNECTIONS_KEY || key === LEGACY_CURRENT_CONNECTION_KEY
+      );
+      expect(legacyReads).toHaveLength(0);
+    });
   });
 
   describe('saveConnections', () => {
@@ -283,6 +301,53 @@ describe('connectionRepository', () => {
       const [, storedMetaJson] = AsyncStorage.setItem.mock.calls.find(([k]) => k === META_KEY);
       expect(storedMetaJson).not.toContain('AK');
       expect(storedMetaJson).not.toContain('SK');
+    });
+
+    it('never overwrites a healthy on-disk secret with an empty one after a degraded hydration', async () => {
+      // Healthy split storage on disk.
+      asyncStorageData.set(
+        META_KEY,
+        JSON.stringify([{ id: 'good', service: 'aws', preview: false }])
+      );
+      secureStoreData.set(
+        SECRET_PREFIX + 'good',
+        JSON.stringify({ accessKey: 'AK', secretKey: 'SK' })
+      );
+
+      // Simulate a TRANSIENT keychain failure: the first read of this one
+      // secret key throws; the value on disk is still perfectly healthy.
+      let alreadyThrew = false;
+      SecureStore.getItemAsync.mockImplementation(async (key) => {
+        if (key === SECRET_PREFIX + 'good' && !alreadyThrew) {
+          alreadyThrew = true;
+          throw new Error('transient keychain failure');
+        }
+        return secureStoreData.has(key) ? secureStoreData.get(key) : null;
+      });
+
+      // Hydration degrades the secret to {} instead of throwing (by design)…
+      const degraded = await repo.getConnections();
+      expect(degraded[0].accessKey).toBeUndefined();
+
+      // …and the user then adds a connection, which re-saves the whole list
+      // (exactly what AuthContext.addConnection does).
+      await repo.saveConnections([
+        ...degraded,
+        { id: 'new', accessKey: 'AK2', secretKey: 'SK2' },
+      ]);
+
+      // The still-healthy on-disk secret must be UNTOUCHED — never clobbered
+      // with an empty value — while healthy connections are written normally.
+      expect(readSecret('good')).toEqual({ accessKey: 'AK', secretKey: 'SK' });
+      expect(readSecret('new')).toEqual({ accessKey: 'AK2', secretKey: 'SK2' });
+    });
+
+    it('skips the secret write entirely for a connection with neither accessKey nor secretKey', async () => {
+      await repo.saveConnections([{ id: 'nosecret', service: 'aws' }]);
+
+      expect(secureStoreData.has(SECRET_PREFIX + 'nosecret')).toBe(false);
+      // Its metadata is still persisted.
+      expect(readMetas()).toEqual([expect.objectContaining({ id: 'nosecret' })]);
     });
   });
 

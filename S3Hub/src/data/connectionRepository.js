@@ -107,13 +107,25 @@ async function hydrateFromMetas(metas) {
 // Backfills ids, then writes each connection's secret under its own
 // SecureStore key and the full metadata array to AsyncStorage. Returns the
 // written metas (with backfilled ids) so callers can reconcile against them.
+//
+// A connection carrying NO secret material at all (neither accessKey nor
+// secretKey) is almost always the product of a degraded hydration — a
+// transient SecureStore read failure that hydrateFromMetas absorbed as {}.
+// Its on-disk secret is most likely still healthy, so the secret write is
+// SKIPPED for such a connection: an existing stored secret must never be
+// clobbered with an empty one (that would be permanent credential loss the
+// next time any caller re-saves the full list, e.g. AuthContext.addConnection).
 async function writeSplit(connections) {
   const withIds = backfillConnectionIds(connections);
   const metas = [];
   for (const conn of withIds) {
     const { meta, secret } = toStorageEntry(conn);
     metas.push(meta);
-    await SecureStore.setItemAsync(SECRET_PREFIX + meta.id, JSON.stringify(secret));
+    const hasSecretMaterial =
+      secret.accessKey !== undefined || secret.secretKey !== undefined;
+    if (hasSecretMaterial) {
+      await SecureStore.setItemAsync(SECRET_PREFIX + meta.id, JSON.stringify(secret));
+    }
   }
   await AsyncStorage.setItem(META_KEY, JSON.stringify(metas));
   return metas;
@@ -121,22 +133,41 @@ async function writeSplit(connections) {
 
 // --- One-time migration from the legacy single-blob format ---
 //
-// Guarded by a module-level in-flight promise so that two concurrent
-// getConnections()/getCurrentConnection() calls (e.g. both fired from
-// AuthContext's startup load) never run the migration twice. The guard is
-// cleared once migration settles (success or failure), so a later
-// *sequential* call still invokes migrateIfNeeded() — but by then the legacy
-// keys are already gone, so it's a cheap couple of reads that immediately
-// return, i.e. idempotent: no writes happen on any call after the first.
+// Two module-level guards:
+// - `migrationInFlight`: an in-flight promise so that two concurrent
+//   getConnections()/getCurrentConnection() calls (e.g. both fired from
+//   AuthContext's startup load) never run the migration twice. Cleared once
+//   the run settles.
+// - `migrationCompleted`: set after a SUCCESSFUL run, so every later call in
+//   the session skips the legacy-key reads entirely (otherwise each
+//   repository call would keep paying two no-op SecureStore/keychain reads
+//   forever). Deliberately NOT set on failure: a transient storage error
+//   must not permanently skip the migration — the next call retries.
 let migrationInFlight = null;
+let migrationCompleted = false;
 
 function migrateIfNeeded() {
+  if (migrationCompleted) {
+    return Promise.resolve();
+  }
   if (!migrationInFlight) {
-    migrationInFlight = runMigration().finally(() => {
-      migrationInFlight = null;
-    });
+    migrationInFlight = runMigration()
+      .then(() => {
+        migrationCompleted = true;
+      })
+      .finally(() => {
+        migrationInFlight = null;
+      });
   }
   return migrationInFlight;
+}
+
+// Test-only: resets the module-level migration guards so unit tests can
+// exercise the migration path repeatedly within a single module instance.
+// Never call this from application code.
+export function __resetMigrationStateForTests() {
+  migrationInFlight = null;
+  migrationCompleted = false;
 }
 
 async function runMigration() {
