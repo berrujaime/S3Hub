@@ -35,7 +35,17 @@ export const getCachedFileUri = async (cacheKey, remoteUri) => {
   }
 };
 
-// Helper function to clear the entire cache
+// Prefix shared with domain/cacheKeys.getCacheKey: every file-list cache
+// entry is stored under a `files_...` key. Scoping the clear to this prefix
+// (via getAllKeys + multiRemove) instead of AsyncStorage.clear() is
+// intentional: AsyncStorage also holds unrelated app data — connection
+// metadata, the current-connection pointer, and the one-time
+// migrateLegacyCacheLayout flag below — that must survive a cache clear.
+const FILE_LIST_CACHE_KEY_PREFIX = 'files_';
+
+// Helper function to clear the entire cache: on-disk media files plus the
+// file-list AsyncStorage entries, WITHOUT touching any other AsyncStorage
+// data (see FILE_LIST_CACHE_KEY_PREFIX above).
 export const clearEntireCache = async () => {
   try {
     const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
@@ -43,7 +53,14 @@ export const clearEntireCache = async () => {
       await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
     }
     await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
-    await AsyncStorage.clear();
+
+    const allKeys = await AsyncStorage.getAllKeys();
+    const fileListCacheKeys = allKeys.filter((key) =>
+      key.startsWith(FILE_LIST_CACHE_KEY_PREFIX)
+    );
+    if (fileListCacheKeys.length > 0) {
+      await AsyncStorage.multiRemove(fileListCacheKeys);
+    }
   } catch (error) {
     console.error('Error clearing entire cache:', error);
   }

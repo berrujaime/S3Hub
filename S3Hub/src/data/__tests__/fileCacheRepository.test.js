@@ -6,14 +6,12 @@ import {
   getCachedItems,
   setCachedItems,
   removeCachedItems,
-  clearAllCache,
 } from '../fileCacheRepository';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
   removeItem: jest.fn(),
-  clear: jest.fn(),
 }));
 
 const CACHE_KEY = 'connection::bucket::path/';
@@ -113,21 +111,6 @@ describe('fileCacheRepository', () => {
       AsyncStorage.removeItem.mockRejectedValue(new Error('remove failure'));
 
       await expect(removeCachedItems(CACHE_KEY)).resolves.toBeUndefined();
-      expect(console.error).toHaveBeenCalled();
-    });
-  });
-
-  describe('clearAllCache', () => {
-    it('clears all AsyncStorage entries', async () => {
-      await clearAllCache();
-
-      expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
-    });
-
-    it('logs and does not throw when clearing fails', async () => {
-      AsyncStorage.clear.mockRejectedValue(new Error('clear failure'));
-
-      await expect(clearAllCache()).resolves.toBeUndefined();
       expect(console.error).toHaveBeenCalled();
     });
   });

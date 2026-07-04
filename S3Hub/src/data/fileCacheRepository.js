@@ -51,11 +51,9 @@ export const removeCachedItems = async (cacheKey) => {
   }
 };
 
-// Clear the entire AsyncStorage-backed cache.
-export const clearAllCache = async () => {
-  try {
-    await AsyncStorage.clear();
-  } catch (error) {
-    console.error('Error clearing all cache:', error);
-  }
-};
+// Clearing the whole file-list cache is owned exclusively by
+// services/mediaCache.js's clearEntireCache, which also owns clearing the
+// on-disk media cache and must scope AsyncStorage removal to `files_`-
+// prefixed keys only (see that module for why). This repository
+// deliberately does not duplicate a second, unscoped clear-everything
+// entry point.
