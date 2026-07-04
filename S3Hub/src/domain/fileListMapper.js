@@ -106,6 +106,31 @@ export const parseObjects = (listing, currentPath) => {
 export const stampItemOrigin = (items, connectionId, bucket) =>
   (items ?? []).map((item) => ({ ...item, connectionId, bucket }));
 
+// Strips fields that must never be persisted to the (long-TTL) file-list
+// AsyncStorage cache. `url` is the motivating case: a presigned URL expires
+// in 1h (see services/s3Service.getSignedUrl) while the list cache lives for
+// CACHE_EXPIRATION (7 days) — persisting it would let a cache hit resurface
+// an expired signature, failing downloads/renders with 403 SignatureExpired,
+// and would also leave a signed URL (a bearer credential) sitting in
+// unencrypted AsyncStorage. Presigning is a local, network-free HMAC
+// operation, so callers cheaply re-derive `url` after hydration instead of
+// ever caching it (see hooks/useFileList).
+// Returns a new array of new objects; never mutates the input.
+export const stripVolatileFields = (items) =>
+  (items ?? []).map(({ url, ...rest }) => rest);
+
+// True when an item's stamped fetch-time origin (connectionId, bucket — see
+// stampItemOrigin above) matches the given connection id and bucket. Used to
+// guard on-demand presigned-URL regeneration for items that were fetched
+// without an upfront URL (non-previewable file types — see
+// isPreviewableMediaType): an item's origin can lag one render behind the
+// live AuthContext during a bucket/connection switch, and signing with the
+// wrong connection's credentials would silently mint a URL for the wrong
+// account/bucket. Returns false (never match) for an item lacking a stamped
+// origin, or for a missing item.
+export const matchesOrigin = (item, connectionId, bucket) =>
+  Boolean(item) && item.connectionId === connectionId && item.bucket === bucket;
+
 // Ensures unique ids; duplicates get a time-suffixed id.
 export const dedupeById = (items) => {
   const uniqueItemsMap = new Map();

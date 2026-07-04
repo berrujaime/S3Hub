@@ -5,6 +5,8 @@ import {
   parseObjects,
   dedupeById,
   stampItemOrigin,
+  stripVolatileFields,
+  matchesOrigin,
 } from '../fileListMapper';
 
 describe('classifyKey', () => {
@@ -367,5 +369,68 @@ describe('dedupeById', () => {
 
   it('returns an empty array for empty input', () => {
     expect(dedupeById([])).toEqual([]);
+  });
+});
+
+describe('stripVolatileFields', () => {
+  it('removes the url field from an item', () => {
+    const items = [
+      { id: 'a.jpg', key: 'a.jpg', name: 'a.jpg', mediaType: 'image', url: 'https://signed-url' },
+    ];
+    const [result] = stripVolatileFields(items);
+    expect(result).toEqual({ id: 'a.jpg', key: 'a.jpg', name: 'a.jpg', mediaType: 'image' });
+    expect(result).not.toHaveProperty('url');
+  });
+
+  it('leaves items without a url field unchanged (folders, non-media items)', () => {
+    const items = [
+      { id: 'sub/', key: 'sub/', name: 'sub', isFolder: true },
+      { id: 'notes.txt', key: 'notes.txt', name: 'notes.txt', mediaType: 'document', url: null },
+    ];
+    const result = stripVolatileFields(items);
+    expect(result[0]).toEqual({ id: 'sub/', key: 'sub/', name: 'sub', isFolder: true });
+    expect(result[1]).toEqual({ id: 'notes.txt', key: 'notes.txt', name: 'notes.txt', mediaType: 'document' });
+  });
+
+  it('returns a new array with new item objects and never mutates the input', () => {
+    const original = { id: 'a.jpg', key: 'a.jpg', url: 'https://signed-url' };
+    const items = [original];
+    const result = stripVolatileFields(items);
+    expect(result).not.toBe(items);
+    expect(result[0]).not.toBe(original);
+    expect(original).toEqual({ id: 'a.jpg', key: 'a.jpg', url: 'https://signed-url' });
+  });
+
+  it('returns an empty array for empty or missing input', () => {
+    expect(stripVolatileFields([])).toEqual([]);
+    expect(stripVolatileFields(null)).toEqual([]);
+    expect(stripVolatileFields(undefined)).toEqual([]);
+  });
+});
+
+describe('matchesOrigin', () => {
+  it('returns true when both connectionId and bucket match', () => {
+    const item = { id: 'a.jpg', connectionId: 'conn1', bucket: 'bucket1' };
+    expect(matchesOrigin(item, 'conn1', 'bucket1')).toBe(true);
+  });
+
+  it('returns false when the connectionId differs', () => {
+    const item = { id: 'a.jpg', connectionId: 'conn1', bucket: 'bucket1' };
+    expect(matchesOrigin(item, 'conn2', 'bucket1')).toBe(false);
+  });
+
+  it('returns false when the bucket differs', () => {
+    const item = { id: 'a.jpg', connectionId: 'conn1', bucket: 'bucket1' };
+    expect(matchesOrigin(item, 'conn1', 'bucket2')).toBe(false);
+  });
+
+  it('returns false when the item has no stamped origin', () => {
+    const item = { id: 'a.jpg' };
+    expect(matchesOrigin(item, 'conn1', 'bucket1')).toBe(false);
+  });
+
+  it('returns false for a null or undefined item', () => {
+    expect(matchesOrigin(null, 'conn1', 'bucket1')).toBe(false);
+    expect(matchesOrigin(undefined, 'conn1', 'bucket1')).toBe(false);
   });
 });

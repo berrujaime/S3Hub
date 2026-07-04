@@ -8,6 +8,7 @@ import {
   dedupeById,
   isPreviewableMediaType,
   stampItemOrigin,
+  stripVolatileFields,
 } from '../domain/fileListMapper';
 import { getCacheKey } from '../domain/cacheKeys';
 import {
@@ -21,6 +22,31 @@ import {
 } from '../services/mediaCache';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
+
+// Generates presigned preview URLs for previewable (image/video) items,
+// mutating each item's `url` in place. Presigning is a local, network-free
+// HMAC operation (see services/s3Service.getSignedUrl) — it never makes a
+// round trip to S3 — so this is cheap to run on every load, including a
+// file-list cache hit, rather than persisting the URL itself (see
+// domain/fileListMapper.stripVolatileFields for why persisting it is
+// unsafe). Shared by both the cache-hit and fresh-fetch paths below.
+const attachSignedUrls = async (items, connection, bucket) => {
+  const signPromises = [];
+  items.forEach((item) => {
+    if (!item.isFolder && isPreviewableMediaType(item.mediaType)) {
+      signPromises.push(
+        getSignedUrl(connection, bucket, item.key)
+          .then((url) => {
+            item.url = url;
+          })
+          .catch((error) => {
+            console.error('Error getting the signed URL:', error);
+          })
+      );
+    }
+  });
+  await Promise.all(signPromises);
+};
 
 // Owns the file-list data: fetching, pagination, navigation, search and the
 // media-cache lifecycle. Ports the exact behavior of the original
@@ -49,6 +75,12 @@ export default function useFileList(currentConnection, currentBucket) {
         const sortedItems = sortFiles(
           stampItemOrigin(cachedItems, currentConnection?.id, currentBucket)
         );
+        // The cache never stores `url` (see stripVolatileFields below), so
+        // previewable items always need a freshly-signed URL here.
+        await attachSignedUrls(sortedItems, currentConnection, currentBucket);
+        if (!isMounted.current) {
+          return; // The component has unmounted, cancel state update.
+        }
         setFullFiles(sortedItems);
         setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
         setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
@@ -82,23 +114,7 @@ export default function useFileList(currentConnection, currentBucket) {
       // Fetch the signed URLs for previewable (image/video) items in parallel.
       // Other file types don't need an upfront URL: they render a generic
       // icon and only need a URL later, on demand (download/share).
-      const filePromises = [];
-      items.forEach((item) => {
-        if (!item.isFolder && isPreviewableMediaType(item.mediaType)) {
-          filePromises.push(
-            getSignedUrl(currentConnection, currentBucket, item.key)
-              .then((url) => {
-                item.url = url;
-              })
-              .catch((error) => {
-                console.error('Error getting the signed URL:', error);
-              })
-          );
-        }
-      });
-
-      // Wait for all signed URLs to be obtained.
-      await Promise.all(filePromises);
+      await attachSignedUrls(items, currentConnection, currentBucket);
 
       // Sort first, then dedupe (preserving the original sequence).
       items = sortFiles(items);
@@ -111,7 +127,10 @@ export default function useFileList(currentConnection, currentBucket) {
         setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
         setLoading(false);
         setPage(1);
-        await setCachedItems(cacheKey, items);
+        // Never persist `url`: it's a presigned URL with a 1h TTL, far
+        // shorter than the file-list cache's TTL (see
+        // domain/fileListMapper.stripVolatileFields).
+        await setCachedItems(cacheKey, stripVolatileFields(items));
       }
     } catch (error) {
       console.error('Error fetching the file list:', error);

@@ -29,6 +29,7 @@ import MediaViewerModal from '../components/MediaViewerModal';
 import i18n from '../locales/translations';
 import { ensureDirectoryExists, getCachedFileUri } from '../services/mediaCache';
 import { mediaCacheKey } from '../domain/cacheKeys';
+import { matchesOrigin } from '../domain/fileListMapper';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 
@@ -201,6 +202,26 @@ export default function FileListScreen() {
     }
   };
 
+  // Non-previewable items (document/audio/archive/other) are fetched without
+  // an upfront signed URL (see domain/fileListMapper.isPreviewableMediaType)
+  // and only get one on demand, here. Signing is only safe when the item's
+  // own stamped fetch-time origin still matches the live connection/bucket
+  // (see domain/fileListMapper.matchesOrigin) — otherwise this would mint a
+  // URL using the wrong account's credentials. Returns null when a URL
+  // cannot be safely obtained.
+  const resolveFileUrl = async (file) => {
+    if (file.url) {
+      return file.url;
+    }
+    if (
+      currentConnection &&
+      matchesOrigin(file, currentConnection.id, currentBucket)
+    ) {
+      return getSignedUrl(currentConnection, currentBucket, file.key);
+    }
+    return null;
+  };
+
   const handleDownloadSelected = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -209,15 +230,25 @@ export default function FileListScreen() {
         return;
       }
 
+      let hasErrors = false;
       for (const fileId of selectedFiles) {
         const file = fullFiles.find((f) => f.id === fileId);
         if (file.isFolder) {
           await downloadFolder(file.key);
         } else {
-          await downloadFile(file);
+          const url = await resolveFileUrl(file);
+          if (!url) {
+            hasErrors = true;
+            continue;
+          }
+          await downloadFile({ ...file, url });
         }
       }
-      Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
+
+      Alert.alert(
+        hasErrors ? i18n.t('error') : i18n.t('success'),
+        hasErrors ? i18n.t('downloadError') : i18n.t('downloadSuccess')
+      );
       clearSelection();
     } catch (error) {
       console.error("Error downloading files:", error);
@@ -226,17 +257,22 @@ export default function FileListScreen() {
   };
 
   const downloadFile = async (file) => {
+    // Written under cacheDirectory (not documentDirectory) with a unique
+    // suffix: cacheDirectory is OS-reclaimable disposable storage, and the
+    // suffix avoids same-name collisions across downloads. The file is only
+    // ever a hand-off to the gallery/share target, so it's always removed
+    // afterwards in the finally block below — success or failure — instead
+    // of accumulating unbounded on disk.
+    const tempFileUri = `${FileSystem.cacheDirectory}${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name}`;
     try {
       const uri = file.url;
-      const fileName = file.name;
-      const fileUri = FileSystem.documentDirectory + fileName;
 
       // Ensure directory exists before downloading
-      await ensureDirectoryExists(fileUri);
+      await ensureDirectoryExists(tempFileUri);
 
       const downloadObject = FileSystem.createDownloadResumable(
         uri,
-        fileUri
+        tempFileUri
       );
       const response = await downloadObject.downloadAsync();
 
@@ -244,6 +280,10 @@ export default function FileListScreen() {
       await MediaLibrary.saveToLibraryAsync(response.uri);
     } catch (error) {
       console.error("Error downloading file:", error);
+    } finally {
+      await FileSystem.deleteAsync(tempFileUri, { idempotent: true }).catch(
+        (error) => console.error("Error deleting temp download file:", error)
+      );
     }
   };
 
