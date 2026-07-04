@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Alert, AppState } from 'react-native';
-import { listObjects, getSignedUrl } from '../services/s3Service';
+import { listAllObjects, getSignedUrl } from '../services/s3Service';
 import { PAGE_SIZE } from '../config/cacheConfig';
 import { sortFiles, parseObjects, dedupeById } from '../domain/fileListMapper';
 import { getCacheKey } from '../domain/cacheKeys';
@@ -46,61 +46,51 @@ export default function useFileList(currentConnection, currentBucket) {
         return; // Exit early to avoid fetching from server.
       }
 
-      // Fetch fresh data from the server.
-      const response = await listObjects(
-        currentConnection,
-        currentBucket,
-        currentPath
-      );
+      // Fetch fresh data from the server: the delimiter caps the result to
+      // this level's files plus immediate subfolders, and listAllObjects
+      // paginates until the full current-level listing is retrieved.
+      const listing = await listAllObjects(currentConnection, currentBucket, {
+        prefix: currentPath,
+        delimiter: '/',
+      });
 
       if (!isMounted.current) {
         return; // The component has unmounted, cancel state update.
       }
 
-      if (response.Contents) {
-        let items = parseObjects(response.Contents, currentPath);
+      let items = parseObjects(listing, currentPath);
 
-        // Fetch the signed URLs for file items in parallel.
-        const filePromises = [];
-        items.forEach((item) => {
-          if (!item.isFolder) {
-            filePromises.push(
-              getSignedUrl(currentConnection, currentBucket, item.key)
-                .then((url) => {
-                  item.url = url;
-                })
-                .catch((error) => {
-                  console.error('Error getting the signed URL:', error);
-                })
-            );
-          }
-        });
-
-        // Wait for all signed URLs to be obtained.
-        await Promise.all(filePromises);
-
-        // Sort first, then dedupe (preserving the original sequence).
-        items = sortFiles(items);
-        items = dedupeById(items);
-
-        // Update state and cache.
-        if (isMounted.current) {
-          setFullFiles(items);
-          setDisplayedFiles(items.slice(0, PAGE_SIZE));
-          setMediaFiles(items.filter((f) => !f.isFolder));
-          setLoading(false);
-          setPage(1);
-          await setCachedItems(cacheKey, items);
+      // Fetch the signed URLs for file items in parallel.
+      const filePromises = [];
+      items.forEach((item) => {
+        if (!item.isFolder) {
+          filePromises.push(
+            getSignedUrl(currentConnection, currentBucket, item.key)
+              .then((url) => {
+                item.url = url;
+              })
+              .catch((error) => {
+                console.error('Error getting the signed URL:', error);
+              })
+          );
         }
-      } else {
-        // If no contents, clear the list.
-        if (isMounted.current) {
-          setFullFiles([]);
-          setDisplayedFiles([]);
-          setMediaFiles([]);
-          setLoading(false);
-          await setCachedItems(cacheKey, []);
-        }
+      });
+
+      // Wait for all signed URLs to be obtained.
+      await Promise.all(filePromises);
+
+      // Sort first, then dedupe (preserving the original sequence).
+      items = sortFiles(items);
+      items = dedupeById(items);
+
+      // Update state and cache.
+      if (isMounted.current) {
+        setFullFiles(items);
+        setDisplayedFiles(items.slice(0, PAGE_SIZE));
+        setMediaFiles(items.filter((f) => !f.isFolder));
+        setLoading(false);
+        setPage(1);
+        await setCachedItems(cacheKey, items);
       }
     } catch (error) {
       console.error('Error fetching the file list:', error);

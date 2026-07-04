@@ -24,55 +24,49 @@ export const sortFiles = (filesArray) => {
   });
 };
 
-// Parses S3 response Contents into list items (files first, then folders),
-// without signed URLs. Callers are responsible for sorting and deduping.
-// `contents` is response.Contents (each element has .Key and .Size).
-export const parseObjects = (contents, currentPath) => {
+// Parses a delimiter-based S3 listing into list items (files first, then
+// folders), without signed URLs. Callers are responsible for sorting and
+// deduping.
+// `listing` is `{ contents, commonPrefixes }` as returned by
+// `listAllObjects`/`listObjectsPage`: `contents` holds the objects at the
+// current level (each element has .Key and .Size) and `commonPrefixes` holds
+// the immediate subfolder prefix strings (e.g. "photos/sub/").
+export const parseObjects = (listing, currentPath) => {
   const items = [];
-  if (!contents) {
+  if (!listing) {
     return items;
   }
 
-  const directories = new Set();
+  const { contents, commonPrefixes } = listing;
 
-  contents.forEach((object) => {
+  (contents ?? []).forEach((object) => {
     const key = object.Key;
 
-    // Remove the 'currentPath' prefix from the key to get the relative path.
-    const relativeKey = key.substring(currentPath.length);
+    // Ignore the S3 "folder marker" object that represents currentPath itself.
+    if (key === currentPath) return;
 
-    // Ignore the 'currentPath' itself.
-    if (relativeKey === '') return;
+    // Only include supported media files (see Task 1.3 for full file-type support).
+    if (!isMediaKey(key)) return;
 
-    // Check if it is a directory or a file.
-    const index = relativeKey.indexOf('/');
-    if (index !== -1) {
-      // It is a directory.
-      const dirName = relativeKey.substring(0, index);
-      directories.add(dirName);
-    } else {
-      // It is a file — only include supported media files.
-      if (isMediaKey(key)) {
-        items.push({
-          id: key, // Unique identifier based on S3 key.
-          key: key,
-          name: relativeKey,
-          size: object.Size,
-          isFolder: false,
-          isVideo: isVideoKey(key),
-          url: null,
-        });
-      }
-    }
+    items.push({
+      id: key, // Unique identifier based on S3 key.
+      key: key,
+      name: key.substring(currentPath.length),
+      size: object.Size,
+      isFolder: false,
+      isVideo: isVideoKey(key),
+      url: null,
+    });
   });
 
-  // Append folders after the files.
-  directories.forEach((dir) => {
-    const folderKey = currentPath + dir + '/';
+  // Append folders (derived from CommonPrefixes) after the files.
+  (commonPrefixes ?? []).forEach((prefix) => {
+    const relative = prefix.substring(currentPath.length);
+    const name = relative.endsWith('/') ? relative.slice(0, -1) : relative;
     items.push({
-      id: folderKey, // Unique identifier for folder.
-      key: folderKey,
-      name: dir,
+      id: prefix, // Unique identifier for folder.
+      key: prefix,
+      name,
       isFolder: true,
     });
   });

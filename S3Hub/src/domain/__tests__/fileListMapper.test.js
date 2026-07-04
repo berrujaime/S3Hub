@@ -114,80 +114,121 @@ describe('sortFiles', () => {
 });
 
 describe('parseObjects', () => {
-  it('returns [] for null or undefined contents', () => {
+  it('returns [] for a null or undefined listing', () => {
     expect(parseObjects(null, '')).toEqual([]);
     expect(parseObjects(undefined, 'some/path/')).toEqual([]);
   });
 
-  it('skips the currentPath itself (relativeKey === "")', () => {
-    const contents = [{ Key: 'photos/', Size: 0 }];
-    expect(parseObjects(contents, 'photos/')).toEqual([]);
+  it('returns [] when contents and commonPrefixes are missing from the listing', () => {
+    expect(parseObjects({}, '')).toEqual([]);
   });
 
-  it('detects directories via the first "/" in the relative key', () => {
-    const contents = [{ Key: 'sub/image.jpg', Size: 10 }];
-    const result = parseObjects(contents, '');
+  it('skips the currentPath itself when it appears as an object key (S3 folder marker)', () => {
+    const listing = { contents: [{ Key: 'photos/', Size: 0 }], commonPrefixes: [] };
+    expect(parseObjects(listing, 'photos/')).toEqual([]);
+  });
+
+  it('derives folder rows from commonPrefixes, stripping the current prefix', () => {
+    const listing = { contents: [], commonPrefixes: ['sub/'] };
+    const result = parseObjects(listing, '');
     expect(result).toEqual([
       { id: 'sub/', key: 'sub/', name: 'sub', isFolder: true },
     ]);
   });
 
-  it('dedupes directory names into a single folder item', () => {
-    const contents = [
-      { Key: 'sub/a.jpg', Size: 1 },
-      { Key: 'sub/b.jpg', Size: 2 },
-    ];
-    const result = parseObjects(contents, '');
-    const folders = result.filter(i => i.isFolder);
-    expect(folders).toEqual([{ id: 'sub/', key: 'sub/', name: 'sub', isFolder: true }]);
-  });
-
-  it('builds folder keys relative to currentPath', () => {
-    const contents = [{ Key: 'root/sub/file.jpg', Size: 5 }];
-    const result = parseObjects(contents, 'root/');
+  it('builds folder rows relative to a non-root currentPath', () => {
+    const listing = { contents: [], commonPrefixes: ['root/sub/'] };
+    const result = parseObjects(listing, 'root/');
     expect(result).toEqual([
       { id: 'root/sub/', key: 'root/sub/', name: 'sub', isFolder: true },
     ]);
   });
 
-  it('includes media files and skips non-media files', () => {
-    const contents = [
-      { Key: 'photo.jpg', Size: 100 },
-      { Key: 'notes.txt', Size: 50 },
-      { Key: 'clip.mp4', Size: 200 },
-    ];
-    const result = parseObjects(contents, '');
+  it('preserves the given commonPrefixes order for multiple folders', () => {
+    const listing = { contents: [], commonPrefixes: ['b/', 'a/'] };
+    const result = parseObjects(listing, '');
+    expect(result.map((i) => i.name)).toEqual(['b', 'a']);
+    expect(result.every((i) => i.isFolder)).toBe(true);
+  });
+
+  it('builds file rows only from contents (current level), including media files and skipping non-media files', () => {
+    const listing = {
+      contents: [
+        { Key: 'photo.jpg', Size: 100 },
+        { Key: 'notes.txt', Size: 50 },
+        { Key: 'clip.mp4', Size: 200 },
+      ],
+      commonPrefixes: [],
+    };
+    const result = parseObjects(listing, '');
     expect(result).toEqual([
       { id: 'photo.jpg', key: 'photo.jpg', name: 'photo.jpg', size: 100, isFolder: false, isVideo: false, url: null },
       { id: 'clip.mp4', key: 'clip.mp4', name: 'clip.mp4', size: 200, isFolder: false, isVideo: true, url: null },
     ]);
   });
 
-  it('strips the currentPath prefix to compute the file name', () => {
-    const contents = [{ Key: 'album/photo.jpg', Size: 100 }];
-    const result = parseObjects(contents, 'album/');
+  it('does not infer folders from contents (folders come only from commonPrefixes)', () => {
+    // With delimiter-based listing, contents never holds nested keys, but the
+    // mapper must not fall back to scanning contents for "/" like before.
+    const listing = { contents: [{ Key: 'photo.jpg', Size: 1 }], commonPrefixes: [] };
+    const result = parseObjects(listing, '');
+    expect(result.some((i) => i.isFolder)).toBe(false);
+  });
+
+  it('strips the currentPath prefix to compute the file display name while keeping the full Key', () => {
+    const listing = { contents: [{ Key: 'album/photo.jpg', Size: 100 }], commonPrefixes: [] };
+    const result = parseObjects(listing, 'album/');
     expect(result[0].name).toBe('photo.jpg');
     expect(result[0].key).toBe('album/photo.jpg');
     expect(result[0].id).toBe('album/photo.jpg');
   });
 
-  it('orders files first (encounter order) then folders', () => {
-    const contents = [
-      { Key: 'sub/nested.jpg', Size: 1 },
-      { Key: 'b.jpg', Size: 2 },
-      { Key: 'a.jpg', Size: 3 },
-    ];
-    const result = parseObjects(contents, '');
-    expect(result.map(i => i.name)).toEqual(['b.jpg', 'a.jpg', 'sub']);
+  it('orders file rows (encounter order) before folder rows', () => {
+    const listing = {
+      contents: [
+        { Key: 'b.jpg', Size: 2 },
+        { Key: 'a.jpg', Size: 3 },
+      ],
+      commonPrefixes: ['sub/'],
+    };
+    const result = parseObjects(listing, '');
+    expect(result.map((i) => i.name)).toEqual(['b.jpg', 'a.jpg', 'sub']);
     expect(result[0].isFolder).toBe(false);
     expect(result[1].isFolder).toBe(false);
     expect(result[2].isFolder).toBe(true);
   });
 
   it('does not attach a url for files (url is null)', () => {
-    const contents = [{ Key: 'photo.jpg', Size: 1 }];
-    const result = parseObjects(contents, '');
+    const listing = { contents: [{ Key: 'photo.jpg', Size: 1 }], commonPrefixes: [] };
+    const result = parseObjects(listing, '');
     expect(result[0].url).toBeNull();
+  });
+
+  it('handles file keys with spaces, unicode, and + characters', () => {
+    const listing = {
+      contents: [{ Key: 'álbum/résumé + notes (v1).jpg', Size: 10 }],
+      commonPrefixes: [],
+    };
+    const result = parseObjects(listing, 'álbum/');
+    expect(result).toEqual([
+      {
+        id: 'álbum/résumé + notes (v1).jpg',
+        key: 'álbum/résumé + notes (v1).jpg',
+        name: 'résumé + notes (v1).jpg',
+        size: 10,
+        isFolder: false,
+        isVideo: false,
+        url: null,
+      },
+    ]);
+  });
+
+  it('handles folder prefixes with spaces, unicode, and + characters', () => {
+    const listing = { contents: [], commonPrefixes: ['My Photos + Vidéos/'] };
+    const result = parseObjects(listing, '');
+    expect(result).toEqual([
+      { id: 'My Photos + Vidéos/', key: 'My Photos + Vidéos/', name: 'My Photos + Vidéos', isFolder: true },
+    ]);
   });
 });
 
