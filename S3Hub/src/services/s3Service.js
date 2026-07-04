@@ -247,6 +247,9 @@ export async function listAllObjects(connection, bucket, { prefix = '', delimite
     const page = await listObjectsPage(connection, bucket, { prefix, delimiter, continuationToken });
     contents.push(...page.contents);
     commonPrefixes.push(...page.commonPrefixes);
+    if (page.isTruncated && !page.nextContinuationToken) {
+      throw new Error('S3 listing reported truncation without a continuation token');
+    }
     continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
   } while (continuationToken);
   return { contents, commonPrefixes };
