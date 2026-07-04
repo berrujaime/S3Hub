@@ -9,7 +9,14 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
-import { listObjects, getSignedUrl, deleteFile, deleteFiles, getPresignedUploadUrl, uploadEmptyFolder } from "../services/s3Service";
+import {
+  getSignedUrl,
+  deleteFile,
+  deleteFolderRecursive,
+  listAllUnderPrefix,
+  getPresignedUploadUrl,
+  uploadEmptyFolder,
+} from "../services/s3Service";
 import { FAB, Button, IconButton, Dialog, Portal, TextInput, Searchbar, useTheme } from 'react-native-paper';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
@@ -230,25 +237,19 @@ export default function FileListScreen() {
 
   const downloadFolder = async (folderKey) => {
     try {
-      const response = await listObjects(
-        currentConnection,
-        currentBucket,
-        folderKey
-      );
+      const objects = await listAllUnderPrefix(currentConnection, currentBucket, folderKey);
 
-      if (response.Contents) {
-        for (const object of response.Contents) {
-          const key = object.Key;
-          if (!key.endsWith('/')) {
-            // It is a file
-            const url = await getSignedUrl(currentConnection, currentBucket, key);
-            const fileName = key.substring(key.lastIndexOf('/') + 1);
-            const file = {
-              url: url,
-              name: fileName,
-            };
-            await downloadFile(file);
-          }
+      for (const object of objects) {
+        const key = object.Key;
+        if (!key.endsWith('/')) {
+          // It is a file
+          const url = await getSignedUrl(currentConnection, currentBucket, key);
+          const fileName = key.substring(key.lastIndexOf('/') + 1);
+          const file = {
+            url: url,
+            name: fileName,
+          };
+          await downloadFile(file);
         }
       }
     } catch (error) {
@@ -286,23 +287,16 @@ export default function FileListScreen() {
 
       const totalItems = selectedFiles.length;
       let deletedItems = 0;
+      let hasErrors = false;
       setIsDeleting(true);
       setDeleteProgress(0);
 
       for (const fileId of selectedFiles) {
         const file = fullFiles.find((f) => f.id === fileId);
         if (file.isFolder) {
-          // Get all objects within the folder
-          const response = await listObjects(currentConnection, currentBucket, file.key);
-          if (response.Contents && response.Contents.length > 0) {
-            const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
-
-            // Delete objects in batches of 1000
-            const chunkSize = 1000;
-            for (let i = 0; i < objects.length; i += chunkSize) {
-              const chunk = objects.slice(i, i + chunkSize);
-              await deleteFiles(currentConnection, currentBucket, chunk);
-            }
+          const { errors } = await deleteFolderRecursive(currentConnection, currentBucket, file.key);
+          if (errors.length > 0) {
+            hasErrors = true;
           }
         } else {
           await deleteFile(currentConnection, currentBucket, file.key);
@@ -318,7 +312,11 @@ export default function FileListScreen() {
 
       setIsDeleting(false);
       setDeleteProgress(1);
-      Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      if (hasErrors) {
+        Alert.alert(i18n.t('error'), i18n.t('deleteError'));
+      } else {
+        Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      }
       clearSelection();
     } catch (error) {
       console.error('Error deleting items:', error);
@@ -417,19 +415,10 @@ export default function FileListScreen() {
       setIsDeleting(true);
       setDeleteProgress(0);
 
+      let hasErrors = false;
       if (currentMedia.isFolder) {
-        // Obtain and delete all objects within the folder
-        const response = await listObjects(currentConnection, currentBucket, currentMedia.key);
-        if (response.Contents && response.Contents.length > 0) {
-          const objects = response.Contents.map((obj) => ({ Key: obj.Key }));
-
-          // Delete objects in batches of 1000
-          const chunkSize = 1000;
-          for (let i = 0; i < objects.length; i += chunkSize) {
-            const chunk = objects.slice(i, i + chunkSize);
-            await deleteFiles(currentConnection, currentBucket, chunk);
-          }
-        }
+        const { errors } = await deleteFolderRecursive(currentConnection, currentBucket, currentMedia.key);
+        hasErrors = errors.length > 0;
       } else {
         await deleteFile(currentConnection, currentBucket, currentMedia.key);
       }
@@ -439,7 +428,11 @@ export default function FileListScreen() {
 
       setIsDeleting(false);
       setDeleteProgress(1);
-      Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      if (hasErrors) {
+        Alert.alert(i18n.t('error'), i18n.t('deleteError'));
+      } else {
+        Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      }
       setIsModalVisible(false);
     } catch (error) {
       console.error('Error deleting file:', error);

@@ -10,6 +10,7 @@ import {
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getS3Client } from "./s3Client";
 import { Buffer } from 'buffer';
+import { S3_DELETE_BATCH_SIZE } from '../config/s3Config';
 
 /**
  * Lists available buckets.
@@ -253,5 +254,67 @@ export async function listAllObjects(connection, bucket, { prefix = '', delimite
     continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
   } while (continuationToken);
   return { contents, commonPrefixes };
+}
+
+/**
+ * Deletes multiple objects from a bucket, splitting the request into batches
+ * that respect the S3 DeleteObjects API limit of S3_DELETE_BATCH_SIZE keys
+ * per request. Results (deleted counts and per-object errors) are aggregated
+ * across all batches.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucket - Bucket name.
+ * @param {Array<string>} keys - Object keys to delete.
+ * @returns {Promise<Object>} Object with `deleted` (number of objects deleted)
+ *   and `errors` (array of per-object errors reported by S3).
+ */
+export async function deleteObjects(connection, bucket, keys) {
+  const client = getS3Client(connection);
+  let deleted = 0;
+  const errors = [];
+
+  for (let i = 0; i < keys.length; i += S3_DELETE_BATCH_SIZE) {
+    const batch = keys.slice(i, i + S3_DELETE_BATCH_SIZE);
+    const command = new DeleteObjectsCommand({
+      Bucket: bucket,
+      Delete: {
+        Objects: batch.map((key) => ({ Key: key })),
+        Quiet: false,
+      },
+    });
+    const response = await client.send(command);
+    deleted += (response.Deleted ?? []).length;
+    errors.push(...(response.Errors ?? []));
+  }
+
+  return { deleted, errors };
+}
+
+/**
+ * Recursively deletes every object under a prefix (a "folder"), paginating
+ * through the full listing before batching the deletes. This avoids the
+ * silent partial delete that a single unpaginated listing would cause for
+ * folders with more objects than a single ListObjectsV2 page.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucket - Bucket name.
+ * @param {string} prefix - Folder prefix to delete.
+ * @returns {Promise<Object>} Object with `deleted` (number of objects deleted)
+ *   and `errors` (array of per-object errors reported by S3).
+ */
+export async function deleteFolderRecursive(connection, bucket, prefix) {
+  const { contents } = await listAllObjects(connection, bucket, { prefix });
+  const keys = contents.map((object) => object.Key);
+  return deleteObjects(connection, bucket, keys);
+}
+
+/**
+ * Lists every object under a prefix (a "folder"), across all pages.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucket - Bucket name.
+ * @param {string} prefix - Folder prefix to list.
+ * @returns {Promise<Array>} All objects found under the prefix.
+ */
+export async function listAllUnderPrefix(connection, bucket, prefix) {
+  const { contents } = await listAllObjects(connection, bucket, { prefix });
+  return contents;
 }
 

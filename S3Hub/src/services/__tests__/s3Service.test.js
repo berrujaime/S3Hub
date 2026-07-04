@@ -1,4 +1,10 @@
-import { listAllObjects, listObjectsPage } from '../s3Service';
+import {
+  listAllObjects,
+  listObjectsPage,
+  deleteObjects,
+  deleteFolderRecursive,
+  listAllUnderPrefix,
+} from '../s3Service';
 import { getS3Client } from '../s3Client';
 
 jest.mock('../s3Client', () => ({
@@ -44,4 +50,61 @@ test('listAllObjects throws when truncated page lacks a continuation token', asy
   ]);
   getS3Client.mockReturnValue(client);
   await expect(listAllObjects(connection, 'bucket', { prefix: 'p/' })).rejects.toThrow();
+});
+
+test('deleteObjects splits 2500 keys into 3 DeleteObjectsCommand calls and aggregates results', async () => {
+  const keys = Array.from({ length: 2500 }, (_, i) => `file-${i}.txt`);
+  const client = makeClient([
+    { Deleted: Array(1000).fill({}), Errors: [] },
+    { Deleted: Array(999).fill({}), Errors: [{ Key: 'file-1500.txt', Code: 'AccessDenied' }] },
+    { Deleted: Array(500).fill({}), Errors: [] },
+  ]);
+  getS3Client.mockReturnValue(client);
+
+  const result = await deleteObjects(connection, 'bucket', keys);
+
+  expect(client.send).toHaveBeenCalledTimes(3);
+  expect(client.send.mock.calls[0][0].input.Delete.Objects).toHaveLength(1000);
+  expect(client.send.mock.calls[1][0].input.Delete.Objects).toHaveLength(1000);
+  expect(client.send.mock.calls[2][0].input.Delete.Objects).toHaveLength(500);
+  // batches contain the correct slice of keys, in order
+  expect(client.send.mock.calls[0][0].input.Delete.Objects[0]).toEqual({ Key: 'file-0.txt' });
+  expect(client.send.mock.calls[2][0].input.Delete.Objects[0]).toEqual({ Key: 'file-2000.txt' });
+  expect(result.deleted).toBe(2499);
+  expect(result.errors).toEqual([{ Key: 'file-1500.txt', Code: 'AccessDenied' }]);
+});
+
+test('deleteFolderRecursive lists all pages (no delimiter) then deletes every object found', async () => {
+  const client = makeClient([
+    { Contents: [{ Key: 'folder/a.txt' }], IsTruncated: true, NextContinuationToken: 'T1' },
+    { Contents: [{ Key: 'folder/b.txt' }], IsTruncated: false },
+    { Deleted: [{ Key: 'folder/a.txt' }, { Key: 'folder/b.txt' }], Errors: [] },
+  ]);
+  getS3Client.mockReturnValue(client);
+
+  const result = await deleteFolderRecursive(connection, 'bucket', 'folder/');
+
+  expect(client.send).toHaveBeenCalledTimes(3);
+  // listing calls must not restrict to a single level (no Delimiter)
+  expect(client.send.mock.calls[0][0].input.Delimiter).toBeUndefined();
+  expect(client.send.mock.calls[1][0].input.Delimiter).toBeUndefined();
+  // the delete call targets every key collected across pages
+  expect(client.send.mock.calls[2][0].input.Delete.Objects).toEqual([
+    { Key: 'folder/a.txt' },
+    { Key: 'folder/b.txt' },
+  ]);
+  expect(result).toEqual({ deleted: 2, errors: [] });
+});
+
+test('listAllUnderPrefix returns every object under a prefix across pages, without a delimiter', async () => {
+  const client = makeClient([
+    { Contents: [{ Key: 'folder/a.txt' }], IsTruncated: true, NextContinuationToken: 'T1' },
+    { Contents: [{ Key: 'folder/b.txt' }], IsTruncated: false },
+  ]);
+  getS3Client.mockReturnValue(client);
+
+  const result = await listAllUnderPrefix(connection, 'bucket', 'folder/');
+
+  expect(result.map((o) => o.Key)).toEqual(['folder/a.txt', 'folder/b.txt']);
+  expect(client.send.mock.calls[0][0].input.Delimiter).toBeUndefined();
 });
