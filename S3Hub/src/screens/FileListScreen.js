@@ -32,12 +32,19 @@ import { mediaCacheKey } from '../domain/cacheKeys';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 
+// Cache namespace derived from the ITEM's own fetch-time origin (stamped in
+// useFileList), never from the live connection/bucket context — during a
+// bucket/connection switch the context updates one render before the items
+// do, and a live-context key would file the old bucket's bytes under the
+// new bucket's namespace. Returns null (callers skip the disk cache) when
+// an item lacks origin fields rather than guessing a namespace.
+const itemCacheKey = (item) =>
+  item.connectionId && item.bucket
+    ? mediaCacheKey(item.connectionId, item.bucket, item.key)
+    : null;
+
 export default function FileListScreen() {
   const { currentConnection, currentBucket, preview } = useContext(AuthContext);
-  // Namespaces the on-disk media cache by connection + bucket (see
-  // domain/cacheKeys.mediaCacheKey) so two accounts/buckets sharing an
-  // object key never collide on the same cached file.
-  const connectionId = currentConnection?.id;
 
   const {
     fullFiles,
@@ -364,10 +371,10 @@ export default function FileListScreen() {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
 
-      const localUri = await getCachedFileUri(
-        mediaCacheKey(connectionId, currentBucket, currentMedia.key),
-        currentMedia.url
-      );
+      const cacheKey = itemCacheKey(currentMedia);
+      const localUri = cacheKey
+        ? await getCachedFileUri(cacheKey, currentMedia.url)
+        : null;
 
       if (localUri) {
         await Sharing.shareAsync(localUri);
@@ -391,10 +398,14 @@ export default function FileListScreen() {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
 
-      const localUri = await getCachedFileUri(
-        mediaCacheKey(connectionId, currentBucket, currentMedia.key),
-        currentMedia.url
-      );
+      const cacheKey = itemCacheKey(currentMedia);
+      const localUri = cacheKey
+        ? await getCachedFileUri(cacheKey, currentMedia.url)
+        : null;
+      if (!localUri) {
+        Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+        return;
+      }
 
       await MediaLibrary.saveToLibraryAsync(localUri);
 
@@ -546,8 +557,6 @@ export default function FileListScreen() {
               preview={preview}
               currentMediaIndex={currentMediaIndex}
               isModalVisible={isModalVisible}
-              connectionId={connectionId}
-              bucket={currentBucket}
               onPress={handleItemSelect}
               onLongPress={handleItemLongPress}
             />
@@ -604,8 +613,6 @@ export default function FileListScreen() {
         onIndexChange={setCurrentMediaIndex}
         onReachEnd={handleModalReachEnd}
         theme={theme}
-        connectionId={connectionId}
-        bucket={currentBucket}
       />
     </View>
   );

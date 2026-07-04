@@ -30,15 +30,20 @@ const FileItem = ({
   preview,
   currentMediaIndex,
   isModalVisible,
-  connectionId,
-  bucket,
   onPress,
   onLongPress,
 }) => {
   const theme = useTheme();
-  // Namespaced by connection + bucket so two accounts/buckets sharing the
-  // same object key never collide on the same on-disk cache file.
-  const cacheKey = mediaCacheKey(connectionId, bucket, item.key);
+  // Cache namespace derived from the ITEM's own fetch-time origin (stamped
+  // in useFileList), never from live connection/bucket context: during a
+  // bucket/connection switch the context updates one render before the
+  // items do, and a live-context key would cache the old bucket's bytes
+  // under the new bucket's namespace. An item without origin fields skips
+  // disk caching entirely (null cacheKey) rather than guessing a namespace.
+  const cacheKey =
+    item.connectionId && item.bucket
+      ? mediaCacheKey(item.connectionId, item.bucket, item.key)
+      : null;
 
   if (item.isFolder) {
     // Render folder

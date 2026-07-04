@@ -4,6 +4,7 @@ import {
   sortFiles,
   parseObjects,
   dedupeById,
+  stampItemOrigin,
 } from '../fileListMapper';
 
 describe('classifyKey', () => {
@@ -280,6 +281,63 @@ describe('parseObjects', () => {
     expect(result).toEqual([
       { id: 'My Photos + Vidéos/', key: 'My Photos + Vidéos/', name: 'My Photos + Vidéos', isFolder: true },
     ]);
+  });
+});
+
+describe('stampItemOrigin', () => {
+  it('stamps connectionId and bucket on every item', () => {
+    const items = [
+      { id: 'a.jpg', key: 'a.jpg', name: 'a.jpg' },
+      { id: 'sub/', key: 'sub/', name: 'sub', isFolder: true },
+    ];
+    const result = stampItemOrigin(items, 'conn1', 'bucket1');
+    expect(result).toHaveLength(2);
+    result.forEach((item) => {
+      expect(item.connectionId).toBe('conn1');
+      expect(item.bucket).toBe('bucket1');
+    });
+  });
+
+  it('preserves all pre-existing item fields', () => {
+    const items = [
+      { id: 'a.jpg', key: 'a.jpg', name: 'a.jpg', size: 10, mediaType: 'image', url: 'https://x' },
+    ];
+    const [stamped] = stampItemOrigin(items, 'conn1', 'bucket1');
+    expect(stamped).toEqual({
+      id: 'a.jpg',
+      key: 'a.jpg',
+      name: 'a.jpg',
+      size: 10,
+      mediaType: 'image',
+      url: 'https://x',
+      connectionId: 'conn1',
+      bucket: 'bucket1',
+    });
+  });
+
+  it('returns a new array with new item objects and never mutates the input', () => {
+    const original = { id: 'a.jpg', key: 'a.jpg', name: 'a.jpg' };
+    const items = [original];
+    const result = stampItemOrigin(items, 'conn1', 'bucket1');
+    expect(result).not.toBe(items);
+    expect(result[0]).not.toBe(original);
+    expect(original).toEqual({ id: 'a.jpg', key: 'a.jpg', name: 'a.jpg' });
+    expect(items).toHaveLength(1);
+  });
+
+  it('overwrites stale origin fields from a previous stamp', () => {
+    const items = [
+      { id: 'a.jpg', key: 'a.jpg', connectionId: 'oldConn', bucket: 'oldBucket' },
+    ];
+    const [stamped] = stampItemOrigin(items, 'newConn', 'newBucket');
+    expect(stamped.connectionId).toBe('newConn');
+    expect(stamped.bucket).toBe('newBucket');
+  });
+
+  it('returns an empty array for empty or missing input', () => {
+    expect(stampItemOrigin([], 'conn1', 'bucket1')).toEqual([]);
+    expect(stampItemOrigin(null, 'conn1', 'bucket1')).toEqual([]);
+    expect(stampItemOrigin(undefined, 'conn1', 'bucket1')).toEqual([]);
   });
 });
 

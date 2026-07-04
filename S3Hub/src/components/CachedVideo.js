@@ -11,6 +11,14 @@ const CachedVideo = ({ source, style, cacheKey, ...props }) => {
   useEffect(() => {
     let isMounted = true;
     const loadVideo = async () => {
+      // No origin-bound cache key (the item lacked its fetch-time
+      // connection/bucket — see domain/cacheKeys.mediaCacheKey): skip the
+      // disk cache and play the remote URI directly, rather than ever
+      // writing bytes under a namespace not derived from the item itself.
+      if (!cacheKey) {
+        if (isMounted) setVideoUri(source.uri);
+        return;
+      }
       const path = `${CACHE_DIR}${cacheKey}`;
       try {
         // Ensure the directory exists

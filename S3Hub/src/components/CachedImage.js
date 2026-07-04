@@ -10,6 +10,14 @@ const CachedImage = ({ source, style, cacheKey }) => {
   useEffect(() => {
     let isMounted = true;
     const loadImage = async () => {
+      // No origin-bound cache key (the item lacked its fetch-time
+      // connection/bucket — see domain/cacheKeys.mediaCacheKey): skip the
+      // disk cache and render the remote URI directly, rather than ever
+      // writing bytes under a namespace not derived from the item itself.
+      if (!cacheKey) {
+        if (isMounted) setImgUri(source.uri);
+        return;
+      }
       const path = `${CACHE_DIR}${cacheKey}`;
       try {
         // Ensure the directory exists

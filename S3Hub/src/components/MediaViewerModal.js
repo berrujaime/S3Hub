@@ -6,6 +6,17 @@ import CachedVideo from './CachedVideo';
 import i18n from '../locales/translations';
 import { mediaCacheKey } from '../domain/cacheKeys';
 
+// Cache namespace derived from the ITEM's own fetch-time origin (stamped in
+// useFileList), never from live connection/bucket context: during a
+// bucket/connection switch the context updates one render before the items
+// do, and a live-context key would cache the old bucket's bytes under the
+// new bucket's namespace. An item without origin fields skips disk caching
+// entirely (null cacheKey) rather than guessing a namespace.
+const itemCacheKey = (item) =>
+  item.connectionId && item.bucket
+    ? mediaCacheKey(item.connectionId, item.bucket, item.key)
+    : null;
+
 // Full-screen media viewer with horizontal paging. Extracted verbatim from
 // FileListScreen's modal. The parent owns the media list, the current index,
 // and the action handlers.
@@ -20,8 +31,6 @@ const MediaViewerModal = ({
   onIndexChange,
   onReachEnd,
   theme,
-  connectionId,
-  bucket,
 }) => {
   const flatListRef = useRef(null);
 
@@ -110,14 +119,14 @@ const MediaViewerModal = ({
                   resizeMode="contain"
                   shouldPlay={currentMediaIndex === index && visible}
                   useNativeControls={true}
-                  cacheKey={mediaCacheKey(connectionId, bucket, item.key)}
+                  cacheKey={itemCacheKey(item)}
                 />
               ) : (
                 <CachedImage
                   source={{ uri: item.url }}
                   style={styles.fullMedia}
                   resizeMode="contain"
-                  cacheKey={mediaCacheKey(connectionId, bucket, item.key)}
+                  cacheKey={itemCacheKey(item)}
                 />
               )}
             </View>

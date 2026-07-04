@@ -2,7 +2,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Alert, AppState } from 'react-native';
 import { listAllObjects, getSignedUrl } from '../services/s3Service';
 import { PAGE_SIZE } from '../config/cacheConfig';
-import { sortFiles, parseObjects, dedupeById, isPreviewableMediaType } from '../domain/fileListMapper';
+import {
+  sortFiles,
+  parseObjects,
+  dedupeById,
+  isPreviewableMediaType,
+  stampItemOrigin,
+} from '../domain/fileListMapper';
 import { getCacheKey } from '../domain/cacheKeys';
 import {
   getCachedItems,
@@ -37,7 +43,12 @@ export default function useFileList(currentConnection, currentBucket) {
       // Attempt to retrieve cached data (returns items only if still fresh).
       const cachedItems = await getCachedItems(cacheKey);
       if (cachedItems) {
-        const sortedItems = sortFiles(cachedItems);
+        // Re-stamp on hydration: the listing cache key already scopes these
+        // items to this connection+bucket, and entries written before origin
+        // stamping existed lack the fields entirely.
+        const sortedItems = sortFiles(
+          stampItemOrigin(cachedItems, currentConnection?.id, currentBucket)
+        );
         setFullFiles(sortedItems);
         setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
         setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
@@ -58,7 +69,15 @@ export default function useFileList(currentConnection, currentBucket) {
         return; // The component has unmounted, cancel state update.
       }
 
-      let items = parseObjects(listing, currentPath);
+      // Stamp each item with its fetch-time origin so media cache keys are
+      // derived from the item itself, never from live context (which can be
+      // one render ahead of the items during a bucket/connection switch —
+      // see domain/fileListMapper.stampItemOrigin).
+      let items = stampItemOrigin(
+        parseObjects(listing, currentPath),
+        currentConnection?.id,
+        currentBucket
+      );
 
       // Fetch the signed URLs for previewable (image/video) items in parallel.
       // Other file types don't need an upfront URL: they render a generic

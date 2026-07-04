@@ -91,6 +91,21 @@ export const parseObjects = (listing, currentPath) => {
   return items;
 };
 
+// Stamps each item with the connection id and bucket it was fetched from,
+// returning a new array of new objects (inputs are never mutated). Existing
+// origin fields from an earlier stamp are overwritten.
+//
+// Why: the media disk cache is namespaced by (connectionId, bucket, key) —
+// see domain/cacheKeys.mediaCacheKey. If components derived that namespace
+// from the LIVE connection/bucket context instead, a bucket or connection
+// switch would leave at least one render where the new context is paired
+// with the previous listing's items (whose signed URLs still point at the
+// old bucket) — caching the old bucket's bytes under the new bucket's
+// namespace. Binding the origin to each item at fetch/hydration time makes
+// the cache key derivable from the item alone, immune to stale renders.
+export const stampItemOrigin = (items, connectionId, bucket) =>
+  (items ?? []).map((item) => ({ ...item, connectionId, bucket }));
+
 // Ensures unique ids; duplicates get a time-suffixed id.
 export const dedupeById = (items) => {
   const uniqueItemsMap = new Map();
