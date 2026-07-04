@@ -3,7 +3,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import i18n from '../locales/translations';
 import * as connectionRepository from '../data/connectionRepository';
-import { deriveConnectionId } from '../domain/cacheKeys';
+import { reconcileCurrentConnection } from '../domain/cacheKeys';
 
 export const AuthContext = createContext();
 
@@ -86,17 +86,13 @@ export const AuthProvider = ({ children }) => {
 
         const storedCurrentConnection = await connectionRepository.getCurrentConnection();
         if (storedCurrentConnection) {
-          // `currentConnection` is stored separately from `connections` and
-          // is not backfilled by the repository. A legacy currentConnection
-          // has `id === undefined`, which would never match any (now
-          // backfilled) entry in `connections` and would break the active
-          // highlight in ConnectionSelectScreen (`currentConnection.id ===
-          // item.id`). Reconcile it: derive its id deterministically (same
-          // derivation the backfill used) and prefer the matching entry
-          // from `connections` so we also pick up any duplicate-suffixed id.
-          const currentId = storedCurrentConnection.id || deriveConnectionId(storedCurrentConnection);
-          const matchedConnection = storedConnections.find((conn) => conn.id === currentId);
-          setCurrentConnection(matchedConnection || { ...storedCurrentConnection, id: currentId });
+          // A legacy currentConnection is stored separately and has no `id`;
+          // reconcile it against the backfilled list so id comparisons
+          // (active highlight, delete) keep working. See
+          // domain/cacheKeys.reconcileCurrentConnection for the full rules.
+          setCurrentConnection(
+            reconcileCurrentConnection(storedCurrentConnection, storedConnections)
+          );
         }
 
         const storedCurrentBucket = await connectionRepository.getCurrentBucket();

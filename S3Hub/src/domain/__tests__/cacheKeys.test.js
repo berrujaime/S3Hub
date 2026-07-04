@@ -1,4 +1,4 @@
-import { getCacheKey, deriveConnectionId } from '../cacheKeys';
+import { getCacheKey, deriveConnectionId, reconcileCurrentConnection } from '../cacheKeys';
 
 describe('getCacheKey', () => {
   it('formats the cache key as files_<connection>_<bucket>_<path>', () => {
@@ -96,5 +96,72 @@ describe('deriveConnectionId', () => {
   it('produces an id safe for use as part of a storage key (alphanumeric only)', () => {
     const id = deriveConnectionId(base);
     expect(id).toMatch(/^[A-Za-z0-9]+$/);
+  });
+});
+
+describe('reconcileCurrentConnection', () => {
+  const legacyFields = {
+    service: 'aws',
+    accessKey: 'AK-current',
+    region: 'us-east-1',
+    endpoint: 'https://s3.amazonaws.com',
+  };
+
+  it('returns null when there is no stored current connection', () => {
+    expect(reconcileCurrentConnection(null, [])).toBeNull();
+    expect(reconcileCurrentConnection(undefined, [])).toBeNull();
+  });
+
+  it('matches a legacy stored current (no id) to its backfilled list entry and returns that exact entry', () => {
+    const derivedId = deriveConnectionId(legacyFields);
+    const listEntry = { ...legacyFields, id: derivedId };
+    const connections = [{ id: 'other', service: 'storj', accessKey: 'AK-x' }, listEntry];
+
+    const result = reconcileCurrentConnection({ ...legacyFields }, connections);
+
+    // Whole-object substitution: the list entry itself is returned (same
+    // reference), keeping object identity consistent with `connections`.
+    expect(result).toBe(listEntry);
+  });
+
+  it('returns the stored connection with a derived id when no list entry matches', () => {
+    const connections = [{ id: 'unrelated', service: 'storj', accessKey: 'AK-x' }];
+
+    const result = reconcileCurrentConnection({ ...legacyFields }, connections);
+
+    expect(result.id).toBe(deriveConnectionId(legacyFields));
+    expect(result.accessKey).toBe(legacyFields.accessKey);
+    expect(result.service).toBe(legacyFields.service);
+  });
+
+  it('passes through a stored current that already has an id, preferring the matching list entry', () => {
+    const listEntry = { id: 'explicit-id', service: 'aws', accessKey: 'AK-1' };
+    const connections = [listEntry];
+
+    const result = reconcileCurrentConnection({ id: 'explicit-id', service: 'aws', accessKey: 'AK-1' }, connections);
+
+    expect(result).toBe(listEntry);
+  });
+
+  it('keeps an explicit id unchanged when it matches no list entry', () => {
+    const stored = { id: 'stale-id', service: 'aws', accessKey: 'AK-gone' };
+
+    const result = reconcileCurrentConnection(stored, []);
+
+    expect(result.id).toBe('stale-id');
+    expect(result.accessKey).toBe('AK-gone');
+  });
+
+  it('resolves a legacy current matching a duplicated account to the FIRST occurrence', () => {
+    // Backfilled duplicates: first keeps the derived id, later ones get
+    // index-suffixed ids (see connectionRepository.backfillConnectionIds).
+    const derivedId = deriveConnectionId(legacyFields);
+    const first = { ...legacyFields, id: derivedId };
+    const second = { ...legacyFields, id: `${derivedId}-1` };
+    const connections = [first, second];
+
+    const result = reconcileCurrentConnection({ ...legacyFields }, connections);
+
+    expect(result).toBe(first);
   });
 });

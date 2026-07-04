@@ -12,12 +12,21 @@ export const getCacheKey = (connection, bucket, path) => {
   return `files_${connectionId}_${bucket}_${path}`;
 };
 
+// FNV-1a seeds for the two hash passes in deriveConnectionId.
+// SEED_A is the standard 32-bit FNV-1a offset basis. SEED_B is a distinct,
+// arbitrary constant (the high 32 bits of the 64-bit FNV offset basis
+// 0xcbf29ce484222325) so the second pass starts from a genuinely different
+// internal state — two different hash functions from the FNV family, rather
+// than the same function over a trivially modified input.
+const FNV_SEED_A = 0x811c9dc5;
+const FNV_SEED_B = 0xcbf29ce4;
+
 // FNV-1a: a small, deterministic, non-cryptographic string hash. Used only to
 // derive a stable identifier from connection attributes — never for security.
-// Same string input always produces the same 32-bit unsigned integer output,
-// in every JS engine (only relies on ordinary 32-bit integer arithmetic).
-const fnv1a = (str) => {
-  let hash = 0x811c9dc5;
+// Same (seed, string) input always produces the same 32-bit unsigned integer
+// output, in every JS engine (only relies on 32-bit integer arithmetic).
+const fnv1a = (seed, str) => {
+  let hash = seed;
   for (let i = 0; i < str.length; i += 1) {
     hash ^= str.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
@@ -37,8 +46,13 @@ const fnv1a = (str) => {
 // collide with {service:'ab', accessKey:'c'}, which plain string
 // concatenation would conflate.
 //
-// The result is combined from two independent hash passes (different seeds)
-// to shrink collision probability, and kept alphanumeric-only so it is safe
+// The id concatenates two 32-bit FNV-1a values computed over the same
+// signature but from DIFFERENT seeds (FNV_SEED_A / FNV_SEED_B above), giving
+// roughly 64 bits of hash material. This is still a non-cryptographic hash:
+// collisions between different connections are astronomically unlikely for a
+// personal connection list but not impossible — the repository's
+// index-suffix dedup (connectionRepository.backfillConnectionIds) is the
+// hard uniqueness guarantee. The result is alphanumeric-only, so it is safe
 // to use as part of a storage key (e.g. a future `conn_secret_<id>` key).
 export const deriveConnectionId = (connection) => {
   const conn = connection || {};
@@ -46,7 +60,34 @@ export const deriveConnectionId = (connection) => {
     value === undefined || value === null ? '' : String(value)
   );
   const signature = JSON.stringify(parts);
-  const h1 = fnv1a(signature).toString(36);
-  const h2 = fnv1a(`${signature}#`).toString(36);
+  const h1 = fnv1a(FNV_SEED_A, signature).toString(36);
+  const h2 = fnv1a(FNV_SEED_B, signature).toString(36);
   return `c${h1}${h2}`;
+};
+
+// Reconciles the separately-stored current connection against the (already
+// id-backfilled) connections list. The stored current connection is NOT
+// backfilled by the repository, so a legacy one still has `id === undefined`
+// and would never match any list entry by id (breaking the active-connection
+// highlight and delete logic, which compare `currentConnection.id ===
+// item.id`).
+//
+// Resolution: use the stored id if present, otherwise derive it with the
+// same derivation the backfill used; then prefer the MATCHING LIST ENTRY
+// over the stored object. Returning the list entry itself (whole-object
+// substitution, not just patching the id) is intentional: it keeps the
+// current connection's object identity — and any duplicate-suffixed id —
+// consistent with the `connections` list the UI renders. `Array.find`
+// naturally resolves a duplicated account to its first occurrence. If
+// nothing matches (e.g. a stale current pointing at a deleted entry), the
+// stored connection is returned with its id filled in.
+//
+// Returns null when there is no stored current connection.
+export const reconcileCurrentConnection = (storedCurrentConnection, connections) => {
+  if (!storedCurrentConnection) {
+    return null;
+  }
+  const id = storedCurrentConnection.id || deriveConnectionId(storedCurrentConnection);
+  const matched = (connections || []).find((conn) => conn.id === id);
+  return matched || { ...storedCurrentConnection, id };
 };
