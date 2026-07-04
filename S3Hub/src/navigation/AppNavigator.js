@@ -50,7 +50,7 @@ function SettingsStack() {
 }
 
 function MainTabs() {
-  const { currentConnection, currentBucket, language } = useContext(AuthContext);
+  const { currentConnection, currentBucket } = useContext(AuthContext);
 
   return (
     <Tab.Navigator

@@ -22,6 +22,8 @@ export default function BucketSelectScreen({ navigation }) {
       setBuckets([]);
       setSelectedBucket(null); // Reset the selection
     }
+    // TODO(Task 5.6): include fetchBuckets once auto-nav guard lands
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentConnection]);
 
   const fetchBuckets = async () => {

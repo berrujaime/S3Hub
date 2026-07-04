@@ -4,6 +4,7 @@ import 'react-native-get-random-values';
 import { ReadableStream } from 'web-streams-polyfill/ponyfill';
 global.ReadableStream = ReadableStream;
 
+/* eslint-disable import/first -- polyfills above must run before any other import */
 import * as React from 'react';
 import { useContext, useEffect } from 'react';
 import { Provider as PaperProvider } from 'react-native-paper';

@@ -13,7 +13,7 @@ export default function ConnectionSelectScreen({ navigation }) {
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
 
   const handleConnectionSelect = async (connection) => {
-    if (connection.accessKey != currentConnection.accessKey) {
+    if (connection.accessKey !== currentConnection.accessKey) {
       await setActiveConnection(connection);
       navigation.navigate('BucketsTab');
     }
