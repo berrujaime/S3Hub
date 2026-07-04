@@ -1,6 +1,12 @@
 {
   "name": "s3hub",
-  "version": "1.0.0",
+  "version": "1.2.0",
+  "description": "React Native mobile app for browsing and managing S3-compatible object storage",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/berrujaime/S3Hub"
+  },
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -12,7 +18,7 @@
     "lint": "eslint ."
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.121.0",
