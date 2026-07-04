@@ -6,7 +6,7 @@ import { ProgressBar } from 'react-native-paper';
 import PropTypes from 'prop-types';
 import theme from '../theme/theme';
 
-const UploadProgressPopup = ({ progress, operation = 'Procesando' }) => {
+const UploadProgressPopup = ({ progress, operation }) => {
   return (
     <View style={styles.popupContainer} accessibilityRole="alert">
       <Text style={styles.popupText}>
@@ -19,7 +19,7 @@ const UploadProgressPopup = ({ progress, operation = 'Procesando' }) => {
 
 UploadProgressPopup.propTypes = {
   progress: PropTypes.number.isRequired,
-  operation: PropTypes.string,
+  operation: PropTypes.string.isRequired,
 };
 
 const styles = StyleSheet.create({

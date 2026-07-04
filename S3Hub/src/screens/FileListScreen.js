@@ -493,7 +493,7 @@ export default function FileListScreen() {
           icon={viewMode === 'grid' ? 'view-list' : 'view-grid'}
           onPress={handleSwitchView}
           style={styles.viewToggleButton}
-          accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : 'gridView'}
+          accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : i18n.t('gridView')}
         />
         <IconButton
           icon="select-all"

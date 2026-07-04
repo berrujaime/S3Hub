@@ -63,7 +63,7 @@ export default function ConnectionSelectScreen({ navigation }) {
     return (
       <List.Item
         title={provider.name}
-        description={`Access Key: ${item.accessKey}`}
+        description={`${i18n.t('accessKey')}: ${item.accessKey}`}
         onPress={() => handleConnectionSelect(item)}
         left={renderMark}
         right={(props) => (

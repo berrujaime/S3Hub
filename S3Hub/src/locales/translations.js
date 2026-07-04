@@ -7,10 +7,8 @@ const en = {
     accessKey: 'Access Key',
     secretKey: 'Secret Key',
     login: 'Login',
-    selectService: 'Select Service:',
     selectRegion: 'Select Region:',
     error: 'Error',
-    loading: 'Loading...',
     chooseConnection: 'Please select a connection first.',
     buckets: 'Buckets',
     upload: 'Upload Files',
@@ -61,6 +59,9 @@ const en = {
     errorAccessDenied: 'Access denied. Your keys lack the required permissions.',
     errorBucketNotFound: 'Bucket not found.',
     errorGeneric: 'Something went wrong. Please try again.',
+    selectAll: 'Select all',
+    close: 'Close',
+    share: 'Share',
   }
 
 const es = {
@@ -69,10 +70,8 @@ const es = {
     accessKey: 'Clave de Acceso',
     secretKey: 'Clave Secreta',
     login: 'Iniciar sesión',
-    selectService: 'Selecciona el servicio:',
     selectRegion: 'Selecciona la región:',
     error: 'Error',
-    loading: 'Cargando...',
     chooseConnection: 'Por favor, selecciona una conexión primero.',
     buckets: 'Buckets',
     upload: 'Subir Archivos',
@@ -123,6 +122,9 @@ const es = {
     errorAccessDenied: 'Acceso denegado. Tus claves no tienen los permisos necesarios.',
     errorBucketNotFound: 'Bucket no encontrado.',
     errorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
+    selectAll: 'Seleccionar todo',
+    close: 'Cerrar',
+    share: 'Compartir',
   }
 
 const i18n = new I18n({en, es});
