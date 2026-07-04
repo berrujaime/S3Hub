@@ -122,7 +122,7 @@ export default function FileListScreen() {
         copyToCacheDirectory: true,
       });
 
-      if (result.type !== 'cancel' && result.assets.length > 0) {
+      if (!result.canceled && result.assets?.length > 0) {
         const totalFiles = result.assets.length;
         let uploadedFiles = 0;
 
