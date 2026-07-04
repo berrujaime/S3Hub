@@ -76,16 +76,14 @@ const LEGACY_LAYOUT_CLEARED_KEY = 'mediaCacheLegacyLayoutCleared';
 // "photos/1.jpg") created real nested subdirectories under CACHE_DIR via
 // ensureDirectoryExists. Every cache lookup now uses a namespaced, flat
 // (no "/") path segment instead, so old-layout files/directories are never
-// looked up again and would otherwise sit on disk forever as orphaned,
-// unevictable garbage — the expiration sweep below only walks CACHE_DIR's
-// top-level entries and isn't designed to recurse into old nested
-// directories.
+// looked up again and would otherwise sit on disk, unreachable, until the
+// recursive expiration sweep below (see evictExpiredEntries) eventually
+// ages them out.
 //
-// Wiping the whole cache once is simpler than teaching the expiration sweep
-// to also recognize and recurse into the old layout, and just as correct:
-// cached media is disposable (re-downloaded on next access), this runs at
-// most once per install, and it also clears out any leftover nested
-// directories from the old layout in one step.
+// Wiping the whole cache once, right away, is simpler than waiting up to a
+// full CACHE_EXPIRATION period for the sweep to reclaim that dead weight,
+// and just as correct: cached media is disposable (re-downloaded on next
+// access), and this runs at most once per install.
 const migrateLegacyCacheLayout = async () => {
   const alreadyCleared = await AsyncStorage.getItem(LEGACY_LAYOUT_CLEARED_KEY);
   if (alreadyCleared) {
@@ -98,6 +96,78 @@ const migrateLegacyCacheLayout = async () => {
   await AsyncStorage.setItem(LEGACY_LAYOUT_CLEARED_KEY, 'true');
 };
 
+// Recursively walks `directory`, deleting files older than CACHE_EXPIRATION
+// and pruning any subdirectory the sweep leaves empty. Current cache keys
+// (domain/cacheKeys.mediaCacheKey) are flat, but the cache dir can still
+// contain subdirectories in practice — leftover legacy-layout entries (see
+// migrateLegacyCacheLayout above) if that one-time wipe is ever skipped or
+// races a write, or any future namespacing — and a sweep that only looked
+// at `directory`'s immediate entries would leave anything nested inside
+// permanently uncollectible.
+//
+// Each entry gets its own try/catch: a single unreadable or already-vanished
+// path (getInfoAsync/readDirectoryAsync throwing, e.g. a permission error or
+// a concurrent deletion) must only skip that one entry, not abort the sweep
+// for every other file in the cache.
+//
+// A missing or non-numeric modificationTime means the filesystem can't tell
+// us how old a file is. Since we can't prove it's still fresh, the safe
+// choice for a disposable cache is to treat it as expired and delete it,
+// rather than let it live forever (the previous behavior, since
+// `undefined * 1000` is NaN and every NaN comparison is false).
+//
+// Returns true when `directory` itself ends up empty (and was therefore
+// removed), so a parent call can prune it too without a second directory
+// listing.
+const evictExpiredEntries = async (directory, now) => {
+  let entries;
+  try {
+    entries = await FileSystem.readDirectoryAsync(directory);
+  } catch (error) {
+    console.error(`Error reading cache directory ${directory}:`, error);
+    return false;
+  }
+
+  let remaining = entries.length;
+
+  for (const entry of entries) {
+    const entryPath = `${directory}${entry}`;
+    try {
+      const entryInfo = await FileSystem.getInfoAsync(entryPath);
+      if (!entryInfo.exists) {
+        remaining -= 1;
+        continue;
+      }
+
+      if (entryInfo.isDirectory) {
+        const wasRemoved = await evictExpiredEntries(`${entryPath}/`, now);
+        if (wasRemoved) {
+          remaining -= 1;
+        }
+        continue;
+      }
+
+      const modifiedMs = entryInfo.modificationTime * 1000; // Convert to ms
+      const isExpired = !Number.isFinite(modifiedMs) || now - modifiedMs > CACHE_EXPIRATION;
+      if (isExpired) {
+        await FileSystem.deleteAsync(entryPath, { idempotent: true });
+        remaining -= 1;
+      }
+    } catch (error) {
+      console.error(`Error evicting cache entry ${entryPath}:`, error);
+      // Leave `remaining` unchanged: an entry we failed to process is not
+      // known to be gone, so `directory` must not be pruned as empty.
+    }
+  }
+
+  // Never remove CACHE_DIR itself, only subdirectories the sweep left empty.
+  if (entries.length > 0 && remaining === 0 && directory !== CACHE_DIR) {
+    await FileSystem.deleteAsync(directory, { idempotent: true });
+    return true;
+  }
+  return false;
+};
+
 // Initialize the cache directory and clean old cache files based on expiration time
 export const initializeMediaCache = async () => {
   try {
@@ -108,20 +178,8 @@ export const initializeMediaCache = async () => {
       await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
     }
 
-    // Clean old cache files based on expiration time
-    const filesInCache = await FileSystem.readDirectoryAsync(CACHE_DIR);
-    const now = Date.now();
-
-    for (const file of filesInCache) {
-      const filePath = `${CACHE_DIR}${file}`;
-      const fileInfo = await FileSystem.getInfoAsync(filePath);
-      if (fileInfo.exists) {
-        const fileModifiedTime = fileInfo.modificationTime * 1000; // Convert to ms
-        if (now - fileModifiedTime > CACHE_EXPIRATION) {
-          await FileSystem.deleteAsync(filePath);
-        }
-      }
-    }
+    // Recursively clean old cache files based on expiration time.
+    await evictExpiredEntries(CACHE_DIR, Date.now());
   } catch (error) {
     console.error('Error initializing cache:', error);
   }

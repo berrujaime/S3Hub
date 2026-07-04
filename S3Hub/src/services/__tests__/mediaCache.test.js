@@ -7,7 +7,8 @@
 
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearEntireCache, CACHE_DIR } from '../mediaCache';
+import { clearEntireCache, initializeMediaCache, CACHE_DIR } from '../mediaCache';
+import { CACHE_EXPIRATION } from '../../config/cacheConfig';
 
 jest.mock('expo-file-system', () => ({
   cacheDirectory: 'file:///cache/',
@@ -78,5 +79,161 @@ describe('clearEntireCache', () => {
 
     await expect(clearEntireCache()).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+// Tests for the expiration sweep run by initializeMediaCache. The cache dir
+// can contain namespaced subdirectories (see domain/cacheKeys), so the sweep
+// must recurse into them instead of only scanning CACHE_DIR's top level —
+// otherwise nested media never expires. It must also treat an
+// unusable/missing modificationTime as "expired" (never as "immortal"), and
+// must not let one bad entry (a throwing getInfoAsync/readDirectoryAsync
+// call) abort the sweep for the rest of the cache.
+describe('initializeMediaCache', () => {
+  const NOW = 1_700_000_000_000;
+  const EXPIRED_SECONDS = (NOW - CACHE_EXPIRATION - 1000) / 1000; // just past expiry
+  const FRESH_SECONDS = (NOW - 1000) / 1000; // just cached
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    // Skip the one-time legacy-layout migration path; it is covered by its
+    // own tests and is orthogonal to the eviction sweep under test here.
+    AsyncStorage.getItem.mockResolvedValue('true');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('recurses into a namespace subdirectory, deleting the expired file and keeping the fresh one', async () => {
+    FileSystem.readDirectoryAsync.mockImplementation(async (dir) => {
+      if (dir === CACHE_DIR) return ['ns1'];
+      if (dir === `${CACHE_DIR}ns1/`) return ['expired.jpg', 'fresh.jpg'];
+      return [];
+    });
+    FileSystem.getInfoAsync.mockImplementation(async (path) => {
+      if (path === CACHE_DIR) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns1`) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns1/expired.jpg`) {
+        return { exists: true, isDirectory: false, modificationTime: EXPIRED_SECONDS };
+      }
+      if (path === `${CACHE_DIR}ns1/fresh.jpg`) {
+        return { exists: true, isDirectory: false, modificationTime: FRESH_SECONDS };
+      }
+      return { exists: false };
+    });
+
+    await initializeMediaCache();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}ns1/expired.jpg`, {
+      idempotent: true,
+    });
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
+      `${CACHE_DIR}ns1/fresh.jpg`,
+      expect.anything()
+    );
+    // The namespace dir still holds the fresh file, so it must survive.
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
+      `${CACHE_DIR}ns1/`,
+      expect.anything()
+    );
+  });
+
+  it('deletes a cached file when modificationTime is missing, rather than treating it as immortal', async () => {
+    FileSystem.readDirectoryAsync.mockImplementation(async (dir) => {
+      if (dir === CACHE_DIR) return ['no-modtime.jpg'];
+      return [];
+    });
+    FileSystem.getInfoAsync.mockImplementation(async (path) => {
+      if (path === CACHE_DIR) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}no-modtime.jpg`) {
+        return { exists: true, isDirectory: false }; // no modificationTime field
+      }
+      return { exists: false };
+    });
+
+    await initializeMediaCache();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}no-modtime.jpg`, {
+      idempotent: true,
+    });
+  });
+
+  it('skips an entry whose getInfoAsync throws and still evicts the rest of the sweep', async () => {
+    FileSystem.readDirectoryAsync.mockImplementation(async (dir) => {
+      if (dir === CACHE_DIR) return ['broken.jpg', 'expired.jpg'];
+      return [];
+    });
+    FileSystem.getInfoAsync.mockImplementation(async (path) => {
+      if (path === CACHE_DIR) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}broken.jpg`) throw new Error('stat failed');
+      if (path === `${CACHE_DIR}expired.jpg`) {
+        return { exists: true, isDirectory: false, modificationTime: EXPIRED_SECONDS };
+      }
+      return { exists: false };
+    });
+
+    await expect(initializeMediaCache()).resolves.toBeUndefined();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}expired.jpg`, {
+      idempotent: true,
+    });
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
+      `${CACHE_DIR}broken.jpg`,
+      expect.anything()
+    );
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('does not abort the sweep when readDirectoryAsync throws for a nested subdirectory', async () => {
+    FileSystem.readDirectoryAsync.mockImplementation(async (dir) => {
+      if (dir === CACHE_DIR) return ['brokenDir', 'ns2'];
+      if (dir === `${CACHE_DIR}brokenDir/`) throw new Error('EACCES');
+      if (dir === `${CACHE_DIR}ns2/`) return ['expired.jpg'];
+      return [];
+    });
+    FileSystem.getInfoAsync.mockImplementation(async (path) => {
+      if (path === CACHE_DIR) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}brokenDir`) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns2`) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns2/expired.jpg`) {
+        return { exists: true, isDirectory: false, modificationTime: EXPIRED_SECONDS };
+      }
+      return { exists: false };
+    });
+
+    await expect(initializeMediaCache()).resolves.toBeUndefined();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}ns2/expired.jpg`, {
+      idempotent: true,
+    });
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('removes a namespace directory once every file inside it has expired', async () => {
+    FileSystem.readDirectoryAsync.mockImplementation(async (dir) => {
+      if (dir === CACHE_DIR) return ['ns3'];
+      if (dir === `${CACHE_DIR}ns3/`) return ['expired.jpg'];
+      return [];
+    });
+    FileSystem.getInfoAsync.mockImplementation(async (path) => {
+      if (path === CACHE_DIR) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns3`) return { exists: true, isDirectory: true };
+      if (path === `${CACHE_DIR}ns3/expired.jpg`) {
+        return { exists: true, isDirectory: false, modificationTime: EXPIRED_SECONDS };
+      }
+      return { exists: false };
+    });
+
+    await initializeMediaCache();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}ns3/expired.jpg`, {
+      idempotent: true,
+    });
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}ns3/`, {
+      idempotent: true,
+    });
   });
 });
