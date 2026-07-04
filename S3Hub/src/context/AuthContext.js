@@ -3,6 +3,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import i18n from '../locales/translations';
 import * as connectionRepository from '../data/connectionRepository';
+import { deriveConnectionId } from '../domain/cacheKeys';
 
 export const AuthContext = createContext();
 
@@ -74,6 +75,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const loadStoredData = async () => {
       try {
+        // getConnections() already backfills a stable id for legacy
+        // connections stored without one (see connectionRepository /
+        // domain/cacheKeys.deriveConnectionId), so `connections` below is
+        // always populated with unique, non-empty ids.
         const storedConnections = await connectionRepository.getConnections();
         if (storedConnections && storedConnections.length > 0) {
           setConnections(storedConnections);
@@ -81,7 +86,17 @@ export const AuthProvider = ({ children }) => {
 
         const storedCurrentConnection = await connectionRepository.getCurrentConnection();
         if (storedCurrentConnection) {
-          setCurrentConnection(storedCurrentConnection);
+          // `currentConnection` is stored separately from `connections` and
+          // is not backfilled by the repository. A legacy currentConnection
+          // has `id === undefined`, which would never match any (now
+          // backfilled) entry in `connections` and would break the active
+          // highlight in ConnectionSelectScreen (`currentConnection.id ===
+          // item.id`). Reconcile it: derive its id deterministically (same
+          // derivation the backfill used) and prefer the matching entry
+          // from `connections` so we also pick up any duplicate-suffixed id.
+          const currentId = storedCurrentConnection.id || deriveConnectionId(storedCurrentConnection);
+          const matchedConnection = storedConnections.find((conn) => conn.id === currentId);
+          setCurrentConnection(matchedConnection || { ...storedCurrentConnection, id: currentId });
         }
 
         const storedCurrentBucket = await connectionRepository.getCurrentBucket();

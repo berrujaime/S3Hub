@@ -4,6 +4,7 @@
 // storage to these functions instead of touching SecureStore directly.
 
 import * as SecureStore from 'expo-secure-store';
+import { deriveConnectionId } from '../domain/cacheKeys';
 
 // SecureStore key names. Defined once, here only.
 const KEYS = {
@@ -15,12 +16,57 @@ const KEYS = {
   THEME: 'appTheme',
 };
 
+// Backfills a missing or duplicate `id` on each connection (in memory only —
+// nothing is persisted here; the storage-format migration that writes these
+// ids back is a later task). Connections stored by the pre-refactor app
+// version have `id === undefined`, which causes cache-namespace collisions
+// (see domain/cacheKeys.getCacheKey) and breaks delete/active-highlight
+// (both compare by `id`).
+//
+// If two connections end up with the same id (either two legacy connections
+// with identical service/accessKey/region/endpoint, or — in principle — a
+// stored duplicate explicit id), the id would no longer be unique. We keep
+// ids deterministic AND unique by suffixing the second and later occurrences
+// with their array index (e.g. `<derivedId>-1`, `<derivedId>-2`). This is
+// stable across reloads as long as the stored array order doesn't change.
+function backfillConnectionIds(connections) {
+  const seenIds = new Set();
+  return connections.map((connection, index) => {
+    const source = connection || {};
+    let id = source.id || deriveConnectionId(source);
+    if (seenIds.has(id)) {
+      id = `${id}-${index}`;
+    }
+    seenIds.add(id);
+    return { ...source, id };
+  });
+}
+
 // --- Connections (array of connection objects, JSON-serialized) ---
 
 // Returns the stored connections, or an empty array if none are stored.
+// Any missing/duplicate `id` is backfilled in memory (see
+// backfillConnectionIds). A corrupt stored value is salvaged by returning an
+// empty array instead of throwing — the value is intentionally left in
+// storage untouched (not deleted) so it isn't lost.
 export async function getConnections() {
   const stored = await SecureStore.getItemAsync(KEYS.CONNECTIONS);
-  return stored ? JSON.parse(stored) : [];
+  if (!stored) {
+    return [];
+  }
+
+  let connections;
+  try {
+    connections = JSON.parse(stored);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(connections)) {
+    return [];
+  }
+
+  return backfillConnectionIds(connections);
 }
 
 // Persists the full list of connections.
