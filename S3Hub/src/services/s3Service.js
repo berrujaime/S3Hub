@@ -206,3 +206,49 @@ export const uploadEmptyFolder = async (connection, bucketName, folderKey) => {
   }
 };
 
+/**
+ * Lists objects in a bucket for a single page with pagination support.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucket - Bucket name.
+ * @param {Object} options - Options for listing.
+ * @param {string} [options.prefix] - Optional prefix to filter objects.
+ * @param {string} [options.delimiter] - Optional delimiter to group objects into common prefixes.
+ * @param {string} [options.continuationToken] - Optional token for pagination.
+ * @returns {Promise<Object>} Object with contents, commonPrefixes, nextContinuationToken, and isTruncated.
+ */
+export async function listObjectsPage(connection, bucket, { prefix = '', delimiter, continuationToken } = {}) {
+  const client = getS3Client(connection);
+  const input = { Bucket: bucket, Prefix: prefix };
+  if (delimiter) input.Delimiter = delimiter;
+  if (continuationToken) input.ContinuationToken = continuationToken;
+  const response = await client.send(new ListObjectsV2Command(input));
+  return {
+    contents: response.Contents ?? [],
+    commonPrefixes: (response.CommonPrefixes ?? []).map((p) => p.Prefix),
+    nextContinuationToken: response.NextContinuationToken ?? null,
+    isTruncated: Boolean(response.IsTruncated),
+  };
+}
+
+/**
+ * Lists all objects in a bucket, handling pagination automatically.
+ * @param {Object} connection - User connection data.
+ * @param {string} bucket - Bucket name.
+ * @param {Object} options - Options for listing.
+ * @param {string} [options.prefix] - Optional prefix to filter objects.
+ * @param {string} [options.delimiter] - Optional delimiter to group objects into common prefixes.
+ * @returns {Promise<Object>} Object with all contents and commonPrefixes aggregated across all pages.
+ */
+export async function listAllObjects(connection, bucket, { prefix = '', delimiter } = {}) {
+  const contents = [];
+  const commonPrefixes = [];
+  let continuationToken;
+  do {
+    const page = await listObjectsPage(connection, bucket, { prefix, delimiter, continuationToken });
+    contents.push(...page.contents);
+    commonPrefixes.push(...page.commonPrefixes);
+    continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
+  } while (continuationToken);
+  return { contents, commonPrefixes };
+}
+
