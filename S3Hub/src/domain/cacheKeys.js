@@ -54,6 +54,16 @@ const fnv1a = (seed, str) => {
 // index-suffix dedup (connectionRepository.backfillConnectionIds) is the
 // hard uniqueness guarantee. The result is alphanumeric-only, so it is safe
 // to use as part of a storage key (e.g. a future `conn_secret_<id>` key).
+//
+// FROZEN COMPATIBILITY SURFACE: since data/connectionRepository.js now
+// persists derived ids as part of the SecureStore key name
+// (`conn_secret_<id>`), this function's output must never change for
+// existing inputs. That means FNV_SEED_A, FNV_SEED_B, and the JSON-array
+// signature format (order and shape of `parts`) are all frozen — changing
+// any of them would silently orphan every already-migrated user's stored
+// secrets (a new id would no longer match the existing `conn_secret_<id>`
+// key). If this derivation ever needs to change, do it via a new function
+// and an explicit migration, not by editing this one in place.
 export const deriveConnectionId = (connection) => {
   const conn = connection || {};
   const parts = [conn.service, conn.accessKey, conn.region, conn.endpoint].map((value) =>

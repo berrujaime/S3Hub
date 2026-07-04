@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
     setConnections(updatedConnections);
 
-    await connectionRepository.saveConnections(updatedConnections);
+    await connectionRepository.deleteConnection(id);
 
     if (currentConnection && currentConnection.id === id) {
       if (updatedConnections.length > 0) {
@@ -86,9 +86,13 @@ export const AuthProvider = ({ children }) => {
 
         const storedCurrentConnection = await connectionRepository.getCurrentConnection();
         if (storedCurrentConnection) {
-          // A legacy currentConnection is stored separately and has no `id`;
-          // reconcile it against the backfilled list so id comparisons
-          // (active highlight, delete) keep working. See
+          // connectionRepository.getCurrentConnection() already resolves the
+          // stored current-connection id against the (migrated, id-backfilled)
+          // connections list, so storedCurrentConnection is either null or one
+          // of storedConnections' entries. Reconciling it again here is a
+          // defensive no-op in the common case; it just guarantees the
+          // `currentConnection` state holds the exact same object reference
+          // as its `connections` counterpart. See
           // domain/cacheKeys.reconcileCurrentConnection for the full rules.
           setCurrentConnection(
             reconcileCurrentConnection(storedCurrentConnection, storedConnections)
