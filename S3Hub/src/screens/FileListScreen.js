@@ -28,11 +28,16 @@ import FileItem from '../components/FileItem';
 import MediaViewerModal from '../components/MediaViewerModal';
 import i18n from '../locales/translations';
 import { ensureDirectoryExists, getCachedFileUri } from '../services/mediaCache';
+import { mediaCacheKey } from '../domain/cacheKeys';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket, preview } = useContext(AuthContext);
+  // Namespaces the on-disk media cache by connection + bucket (see
+  // domain/cacheKeys.mediaCacheKey) so two accounts/buckets sharing an
+  // object key never collide on the same cached file.
+  const connectionId = currentConnection?.id;
 
   const {
     fullFiles,
@@ -359,7 +364,10 @@ export default function FileListScreen() {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
 
-      const localUri = await getCachedFileUri(currentMedia.key, currentMedia.url);
+      const localUri = await getCachedFileUri(
+        mediaCacheKey(connectionId, currentBucket, currentMedia.key),
+        currentMedia.url
+      );
 
       if (localUri) {
         await Sharing.shareAsync(localUri);
@@ -383,7 +391,10 @@ export default function FileListScreen() {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
 
-      const localUri = await getCachedFileUri(currentMedia.key, currentMedia.url);
+      const localUri = await getCachedFileUri(
+        mediaCacheKey(connectionId, currentBucket, currentMedia.key),
+        currentMedia.url
+      );
 
       await MediaLibrary.saveToLibraryAsync(localUri);
 
@@ -535,6 +546,8 @@ export default function FileListScreen() {
               preview={preview}
               currentMediaIndex={currentMediaIndex}
               isModalVisible={isModalVisible}
+              connectionId={connectionId}
+              bucket={currentBucket}
               onPress={handleItemSelect}
               onLongPress={handleItemLongPress}
             />
@@ -591,6 +604,8 @@ export default function FileListScreen() {
         onIndexChange={setCurrentMediaIndex}
         onReachEnd={handleModalReachEnd}
         theme={theme}
+        connectionId={connectionId}
+        bucket={currentBucket}
       />
     </View>
   );

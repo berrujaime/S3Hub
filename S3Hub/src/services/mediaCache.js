@@ -49,9 +49,43 @@ export const clearEntireCache = async () => {
   }
 };
 
+// AsyncStorage flag marking that the pre-namespacing cache layout has been
+// wiped once (see migrateLegacyCacheLayout below).
+const LEGACY_LAYOUT_CLEARED_KEY = 'mediaCacheLegacyLayoutCleared';
+
+// One-time migration for the switch to namespaced media cache paths (see
+// domain/cacheKeys.mediaCacheKey). Before this fix, cache files lived at
+// `${CACHE_DIR}${item.key}` — a raw object key, which for nested keys (e.g.
+// "photos/1.jpg") created real nested subdirectories under CACHE_DIR via
+// ensureDirectoryExists. Every cache lookup now uses a namespaced, flat
+// (no "/") path segment instead, so old-layout files/directories are never
+// looked up again and would otherwise sit on disk forever as orphaned,
+// unevictable garbage — the expiration sweep below only walks CACHE_DIR's
+// top-level entries and isn't designed to recurse into old nested
+// directories.
+//
+// Wiping the whole cache once is simpler than teaching the expiration sweep
+// to also recognize and recurse into the old layout, and just as correct:
+// cached media is disposable (re-downloaded on next access), this runs at
+// most once per install, and it also clears out any leftover nested
+// directories from the old layout in one step.
+const migrateLegacyCacheLayout = async () => {
+  const alreadyCleared = await AsyncStorage.getItem(LEGACY_LAYOUT_CLEARED_KEY);
+  if (alreadyCleared) {
+    return;
+  }
+  const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
+  if (dirInfo.exists) {
+    await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
+  }
+  await AsyncStorage.setItem(LEGACY_LAYOUT_CLEARED_KEY, 'true');
+};
+
 // Initialize the cache directory and clean old cache files based on expiration time
 export const initializeMediaCache = async () => {
   try {
+    await migrateLegacyCacheLayout();
+
     const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
     if (!dirInfo.exists) {
       await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });

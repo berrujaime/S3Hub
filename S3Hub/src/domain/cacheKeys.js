@@ -75,6 +75,67 @@ export const deriveConnectionId = (connection) => {
   return `c${h1}${h2}`;
 };
 
+// Builds a collision-free, filesystem-safe cache path segment for a single
+// media file (thumbnail or full view), namespaced by connection + bucket.
+// Two different (connectionId, bucket) pairs must never resolve to the same
+// segment for the same key — otherwise two accounts that each have a bucket
+// containing e.g. "photos/1.jpg" would share one on-disk cache file and
+// serve each other's bytes (the cross-account data bleed this fixes).
+//
+// Design: hash the whole (connectionId, bucket, key) triple rather than
+// encoding the raw key into a path. Object keys are user-supplied strings
+// that can contain "/", spaces, any Unicode code point, "%", "+", and run up
+// to 1024 bytes (S3's key limit) — encoding all of that safely AND
+// reversibly (so two different raw keys can never encode to the same
+// segment), while also respecting filesystem path-length limits, is far
+// more failure-prone than hashing it away entirely. Hashing always yields a
+// short, flat segment (no nested directories to create or scan) made of
+// alnum characters only, with no encode/decode edge cases.
+//
+// This reuses the same two-seed FNV-1a scheme as deriveConnectionId above,
+// for the same reason: ~64 bits of hash material, with collisions
+// astronomically unlikely for a personal media cache. Unlike
+// deriveConnectionId, nothing but a cache hit/miss depends on this value, so
+// even a hash collision would only make one cached file shadow another
+// until it's next re-fetched — not silently merge two accounts' stored
+// secrets. This is not a FROZEN compatibility surface: unlike connection
+// ids, nothing is persisted keyed by this value beyond disposable cache
+// files, so it is safe to ever change the derivation (existing cache
+// entries would simply become unreachable orphans, cleared the same way
+// stale entries already are — see services/mediaCache.js).
+//
+// The key's own extension (if present) is preserved as a cosmetic suffix so
+// callers that infer content type from a file extension keep working. It
+// plays no part in uniqueness (the hash above already fully determines
+// collision-freedom) and is sanitized/truncated so a malformed or hostile
+// extension can never smuggle an unsafe character back into the segment.
+export const mediaCacheKey = (connectionId, bucket, key) => {
+  const parts = [connectionId, bucket, key].map((value) =>
+    value === undefined || value === null ? '' : String(value)
+  );
+  const signature = JSON.stringify(parts);
+  const h1 = fnv1a(FNV_SEED_A, signature).toString(36);
+  const h2 = fnv1a(FNV_SEED_B, signature).toString(36);
+  return `m${h1}${h2}${extensionOf(parts[2])}`;
+};
+
+// Extracts a short, filesystem-safe extension (including the leading dot,
+// e.g. ".jpg") from a key's final path segment, or '' if there isn't one.
+// Purely cosmetic — see the comment on mediaCacheKey above.
+const extensionOf = (key) => {
+  const lastSegment = key.slice(key.lastIndexOf('/') + 1);
+  const dotIndex = lastSegment.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === lastSegment.length - 1) {
+    return ''; // no dot, a leading dot (dotfile), or a trailing dot: no real extension
+  }
+  const sanitized = lastSegment
+    .slice(dotIndex + 1)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 10);
+  return sanitized ? `.${sanitized}` : '';
+};
+
 // Reconciles the separately-stored current connection against the (already
 // id-backfilled) connections list. The stored current connection is NOT
 // backfilled by the repository, so a legacy one still has `id === undefined`

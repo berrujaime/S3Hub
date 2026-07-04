@@ -4,6 +4,7 @@ import { Checkbox, IconButton, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
+import { mediaCacheKey } from '../domain/cacheKeys';
 
 // Generic glyph shown for file types that have no visual preview
 // (everything except image/video, which get thumbnails/playback instead).
@@ -29,10 +30,15 @@ const FileItem = ({
   preview,
   currentMediaIndex,
   isModalVisible,
+  connectionId,
+  bucket,
   onPress,
   onLongPress,
 }) => {
   const theme = useTheme();
+  // Namespaced by connection + bucket so two accounts/buckets sharing the
+  // same object key never collide on the same on-disk cache file.
+  const cacheKey = mediaCacheKey(connectionId, bucket, item.key);
 
   if (item.isFolder) {
     // Render folder
@@ -86,7 +92,7 @@ const FileItem = ({
                   isMuted
                   shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
                   useNativeControls={false}
-                  cacheKey={item.key}
+                  cacheKey={cacheKey}
                 />
                 <View style={styles.playIconContainer}>
                   <IconButton icon="play-circle-outline" size={50} color="#fff" />
@@ -127,7 +133,7 @@ const FileItem = ({
                   isMuted
                   shouldPlay={currentMediaIndex === index && isModalVisible && item.isVideo}
                   useNativeControls={false}
-                  cacheKey={item.key}
+                  cacheKey={cacheKey}
                 />
                 <View style={styles.playIconContainerList}>
                   <IconButton icon="play-circle-outline" size={30} color="#fff" />
@@ -177,7 +183,7 @@ const FileItem = ({
                   },
                 ]}
                 source={{ uri: item.url }}
-                cacheKey={item.key}
+                cacheKey={cacheKey}
               />
             ) : (
               <ActivityIndicator style={{ flex: 1 }} />
@@ -209,7 +215,7 @@ const FileItem = ({
               <CachedImage
                 style={styles.listImage}
                 source={{ uri: item.url }}
-                cacheKey={item.key}
+                cacheKey={cacheKey}
               />
             ) : (
               <ActivityIndicator style={styles.listImage} />

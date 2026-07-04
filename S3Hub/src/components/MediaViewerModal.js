@@ -4,6 +4,7 @@ import { IconButton } from 'react-native-paper';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
 import i18n from '../locales/translations';
+import { mediaCacheKey } from '../domain/cacheKeys';
 
 // Full-screen media viewer with horizontal paging. Extracted verbatim from
 // FileListScreen's modal. The parent owns the media list, the current index,
@@ -19,6 +20,8 @@ const MediaViewerModal = ({
   onIndexChange,
   onReachEnd,
   theme,
+  connectionId,
+  bucket,
 }) => {
   const flatListRef = useRef(null);
 
@@ -107,14 +110,14 @@ const MediaViewerModal = ({
                   resizeMode="contain"
                   shouldPlay={currentMediaIndex === index && visible}
                   useNativeControls={true}
-                  cacheKey={item.key}
+                  cacheKey={mediaCacheKey(connectionId, bucket, item.key)}
                 />
               ) : (
                 <CachedImage
                   source={{ uri: item.url }}
                   style={styles.fullMedia}
                   resizeMode="contain"
-                  cacheKey={item.key}
+                  cacheKey={mediaCacheKey(connectionId, bucket, item.key)}
                 />
               )}
             </View>

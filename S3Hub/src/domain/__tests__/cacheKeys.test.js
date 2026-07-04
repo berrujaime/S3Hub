@@ -1,4 +1,9 @@
-import { getCacheKey, deriveConnectionId, reconcileCurrentConnection } from '../cacheKeys';
+import {
+  getCacheKey,
+  deriveConnectionId,
+  reconcileCurrentConnection,
+  mediaCacheKey,
+} from '../cacheKeys';
 
 describe('getCacheKey', () => {
   it('formats the cache key as files_<connection>_<bucket>_<path>', () => {
@@ -96,6 +101,87 @@ describe('deriveConnectionId', () => {
   it('produces an id safe for use as part of a storage key (alphanumeric only)', () => {
     const id = deriveConnectionId(base);
     expect(id).toMatch(/^[A-Za-z0-9]+$/);
+  });
+});
+
+describe('mediaCacheKey', () => {
+  it('is stable: the same (connectionId, bucket, key) always derives the same path segment', () => {
+    const a = mediaCacheKey('conn1', 'bucket1', 'photos/1.jpg');
+    const b = mediaCacheKey('conn1', 'bucket1', 'photos/1.jpg');
+    expect(a).toBe(b);
+  });
+
+  it('never collides for two different connections sharing the same bucket and key', () => {
+    const a = mediaCacheKey('connA', 'photos', 'trip/1.jpg');
+    const b = mediaCacheKey('connB', 'photos', 'trip/1.jpg');
+    expect(a).not.toBe(b);
+  });
+
+  it('never collides for two different buckets under the same connection and key', () => {
+    const a = mediaCacheKey('conn1', 'bucketA', 'trip/1.jpg');
+    const b = mediaCacheKey('conn1', 'bucketB', 'trip/1.jpg');
+    expect(a).not.toBe(b);
+  });
+
+  it('never collides for two different keys under the same connection and bucket', () => {
+    const a = mediaCacheKey('conn1', 'bucket1', 'photos/1.jpg');
+    const b = mediaCacheKey('conn1', 'bucket1', 'photos/2.jpg');
+    expect(a).not.toBe(b);
+  });
+
+  it('does not collide two connection/bucket/key triples that could naively concatenate the same way', () => {
+    // Naive concatenation of connectionId + bucket + key would make these
+    // indistinguishable ("a"+"b"+"c" === "ab"+""+"c"). An unambiguous
+    // separator (JSON-encoding the parts) must keep them distinct.
+    const a = mediaCacheKey('a', 'b', 'c');
+    const b = mediaCacheKey('ab', '', 'c');
+    expect(a).not.toBe(b);
+  });
+
+  it('produces a filesystem-safe path segment for keys containing "/", spaces, unicode, "+", and "%"', () => {
+    const weirdKeys = [
+      'photos/2024/vacation photo.jpg',
+      'ünïcödé/dossier/résumé.pdf',
+      'a+b/c%d/e f.png',
+      '日本語/ファイル.txt',
+    ];
+    weirdKeys.forEach((key) => {
+      const result = mediaCacheKey('conn1', 'bucket1', key);
+      expect(result).toMatch(/^[A-Za-z0-9._-]+$/);
+      expect(result).not.toMatch(/[/\\]/);
+    });
+  });
+
+  it('preserves the key extension (lowercased) in the final segment when present', () => {
+    expect(mediaCacheKey('conn1', 'bucket1', 'photos/1.jpg')).toMatch(/\.jpg$/);
+    expect(mediaCacheKey('conn1', 'bucket1', 'video/clip.MP4')).toMatch(/\.mp4$/);
+  });
+
+  it('produces a deterministic path for nested keys of arbitrary depth', () => {
+    const a = mediaCacheKey('conn1', 'bucket1', 'a/b/c/d/e/f/g/photo.png');
+    const b = mediaCacheKey('conn1', 'bucket1', 'a/b/c/d/e/f/g/photo.png');
+    expect(a).toBe(b);
+    expect(a).toMatch(/\.png$/);
+  });
+
+  it('has no extension when the key has none', () => {
+    const result = mediaCacheKey('conn1', 'bucket1', 'photos/noextension');
+    expect(result).not.toMatch(/\./);
+  });
+
+  it('does not throw and stays stable for missing/undefined inputs', () => {
+    expect(() => mediaCacheKey(undefined, undefined, undefined)).not.toThrow();
+    expect(mediaCacheKey(undefined, undefined, undefined)).toBe(
+      mediaCacheKey(undefined, undefined, undefined)
+    );
+  });
+
+  it('accepts a connection id derived by deriveConnectionId, staying collision-free across connections', () => {
+    const connA = deriveConnectionId({ service: 'aws', accessKey: 'AK1' });
+    const connB = deriveConnectionId({ service: 'aws', accessKey: 'AK2' });
+    expect(mediaCacheKey(connA, 'photos', 'trip/1.jpg')).not.toBe(
+      mediaCacheKey(connB, 'photos', 'trip/1.jpg')
+    );
   });
 });
 
