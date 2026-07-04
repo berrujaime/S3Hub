@@ -232,16 +232,29 @@ export default function FileListScreen() {
 
       let hasErrors = false;
       for (const fileId of selectedFiles) {
-        const file = fullFiles.find((f) => f.id === fileId);
-        if (file.isFolder) {
-          await downloadFolder(file.key);
-        } else {
-          const url = await resolveFileUrl(file);
-          if (!url) {
-            hasErrors = true;
-            continue;
+        // Per-file try/catch: one file failing to sign or download (e.g. a
+        // getSignedUrl rejection) must skip only that file and be folded
+        // into the aggregated result, never abort the rest of the batch —
+        // the same skip-and-aggregate behavior as the null-url guard below.
+        try {
+          const file = fullFiles.find((f) => f.id === fileId);
+          if (file.isFolder) {
+            if (!(await downloadFolder(file.key))) {
+              hasErrors = true;
+            }
+          } else {
+            const url = await resolveFileUrl(file);
+            if (!url) {
+              hasErrors = true;
+              continue;
+            }
+            if (!(await downloadFile({ ...file, url }))) {
+              hasErrors = true;
+            }
           }
-          await downloadFile({ ...file, url });
+        } catch (error) {
+          console.error("Error downloading selected item:", error);
+          hasErrors = true;
         }
       }
 
@@ -256,6 +269,10 @@ export default function FileListScreen() {
     }
   };
 
+  // Downloads one file to a temp location and hands it to the gallery.
+  // Returns true on success, false on failure (the error is logged here, not
+  // rethrown), so batch callers can aggregate per-file failures instead of
+  // silently reporting success.
   const downloadFile = async (file) => {
     // Written under cacheDirectory (not documentDirectory) with a unique
     // suffix: cacheDirectory is OS-reclaimable disposable storage, and the
@@ -278,8 +295,10 @@ export default function FileListScreen() {
 
       // Save to gallery
       await MediaLibrary.saveToLibraryAsync(response.uri);
+      return true;
     } catch (error) {
       console.error("Error downloading file:", error);
+      return false;
     } finally {
       await FileSystem.deleteAsync(tempFileUri, { idempotent: true }).catch(
         (error) => console.error("Error deleting temp download file:", error)
@@ -287,10 +306,15 @@ export default function FileListScreen() {
     }
   };
 
+  // Downloads every file under a folder prefix. Returns true only if the
+  // listing succeeded AND every file downloaded; false as soon as anything
+  // failed (errors are logged here, not rethrown), so batch callers can fold
+  // folder failures into their aggregated result.
   const downloadFolder = async (folderKey) => {
     try {
       const objects = await listAllUnderPrefix(currentConnection, currentBucket, folderKey);
 
+      let allSucceeded = true;
       for (const object of objects) {
         const key = object.Key;
         if (!key.endsWith('/')) {
@@ -301,11 +325,15 @@ export default function FileListScreen() {
             url: url,
             name: fileName,
           };
-          await downloadFile(file);
+          if (!(await downloadFile(file))) {
+            allSucceeded = false;
+          }
         }
       }
+      return allSucceeded;
     } catch (error) {
       console.error("Error downloading folder:", error);
+      return false;
     }
   };
 
