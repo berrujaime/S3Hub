@@ -196,6 +196,45 @@ describe('providers registry', () => {
     });
   });
 
+  describe('brandColor (Task 4.5 provider-spine signature)', () => {
+    const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+
+    const expectedBrandColors = {
+      aws: '#FF9900',
+      storj: '#2683FF',
+      r2: '#F6821F',
+      b2: '#E21E29',
+      wasabi: '#00B04F',
+      do: '#0080FF',
+      gcs: '#4285F4',
+    };
+
+    Object.entries(expectedBrandColors).forEach(([id, hex]) => {
+      it(`gives ${id} its brand color ${hex}`, () => {
+        expect(PROVIDERS[id].brandColor).toBe(hex);
+      });
+    });
+
+    it('gives every registered provider a valid 6-digit hex brandColor, or null for custom/unknown', () => {
+      PROVIDER_LIST.forEach((provider) => {
+        if (provider.id === 'custom') {
+          expect(provider.brandColor).toBeNull();
+        } else {
+          expect(provider.brandColor).toMatch(HEX_COLOR);
+        }
+      });
+    });
+
+    it('has no brandColor for the custom provider, so the UI falls back to the theme primary', () => {
+      expect(PROVIDERS.custom.brandColor).toBeNull();
+    });
+
+    it('getProvider falls back to a provider descriptor with brandColor: null for unknown ids', () => {
+      expect(getProvider('totally-unknown').brandColor).toBeNull();
+      expect(getProvider(undefined).brandColor).toBeNull();
+    });
+  });
+
   describe('getProvider', () => {
     it('returns the matching descriptor for a known id', () => {
       expect(getProvider('aws')).toBe(PROVIDERS.aws);

@@ -6,6 +6,7 @@ import { Text, List, FAB, IconButton, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { getProvider } from '../domain/providers';
+import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
 import i18n from '../locales/translations';
 
 export default function ConnectionSelectScreen({ navigation }) {
@@ -47,6 +48,10 @@ export default function ConnectionSelectScreen({ navigation }) {
   const renderConnectionItem = ({ item }) => {
     const isActive = currentConnection && currentConnection.id === item.id;
     const provider = getProvider(item.service);
+    // Region/endpoint tag (provider-spine signature, Task 4.5): most
+    // providers store a region; the ones with a free-text/fixed endpoint
+    // instead (r2, gcs, custom) store it under `endpoint`.
+    const regionLabel = item.region || item.endpoint;
 
     const renderMark = () =>
       provider.logo ? (
@@ -61,21 +66,31 @@ export default function ConnectionSelectScreen({ navigation }) {
       );
 
     return (
-      <List.Item
-        title={provider.name}
-        description={`${i18n.t('accessKey')}: ${item.accessKey}`}
-        onPress={() => handleConnectionSelect(item)}
-        left={renderMark}
-        right={(props) => (
-          <View style={styles.actions}>
-            {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
-            <IconButton
-              icon="delete"
-              onPress={() => handleDeleteConnection(item)}
-            />
-          </View>
-        )}
-      />
+      <View style={styles.rowWrapper}>
+        <ProviderSpine providerId={item.service} />
+        <List.Item
+          title={provider.name}
+          description={({ color }) => (
+            <View>
+              <Text variant="bodyMedium" style={{ color }}>
+                {i18n.t('accessKey')}: {item.accessKey}
+              </Text>
+              <RegionTag value={regionLabel} style={styles.regionTag} />
+            </View>
+          )}
+          onPress={() => handleConnectionSelect(item)}
+          left={renderMark}
+          right={(props) => (
+            <View style={styles.actions}>
+              {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
+              <IconButton
+                icon="delete"
+                onPress={() => handleDeleteConnection(item)}
+              />
+            </View>
+          )}
+        />
+      </View>
     );
   };
 
@@ -107,6 +122,15 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: 16,
     textAlign: 'center',
+  },
+  // Wraps each row so ProviderSpine (position: 'absolute', anchored to this
+  // View) can lay its brand-color bar over the row's left edge without
+  // adding to the row's own width/flex layout or touch target.
+  rowWrapper: {
+    position: 'relative',
+  },
+  regionTag: {
+    marginTop: 2,
   },
   logo: {
     width: 32,

@@ -22,6 +22,9 @@ const storjLogo = require('../../assets/logos/storj.png');
  * @property {(connection: Object) => (string|undefined)} buildEndpoint
  * @property {*} [logo]                      PNG require (aws/storj only).
  * @property {string} [icon]                 MaterialCommunityIcons name.
+ * @property {string|null} brandColor        6-digit hex brand color for the
+ *   provider-spine UI signature, or null for custom/unknown providers (the
+ *   UI falls back to `theme.colors.primary`).
  */
 
 /** @type {Record<string, Provider>} */
@@ -35,6 +38,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'us-east-1',
     buildEndpoint: ({ region }) => `https://s3.${region}.amazonaws.com`,
+    brandColor: '#FF9900',
   },
   storj: {
     id: 'storj',
@@ -45,6 +49,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'eu1',
     buildEndpoint: () => 'https://gateway.storjshare.io',
+    brandColor: '#2683FF',
   },
   r2: {
     id: 'r2',
@@ -56,6 +61,7 @@ export const PROVIDERS = {
     defaultRegion: 'auto',
     buildEndpoint: ({ accountId }) =>
       `https://${accountId}.r2.cloudflarestorage.com`,
+    brandColor: '#F6821F',
   },
   b2: {
     id: 'b2',
@@ -66,6 +72,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'us-west-002',
     buildEndpoint: ({ region }) => `https://s3.${region}.backblazeb2.com`,
+    brandColor: '#E21E29',
   },
   wasabi: {
     id: 'wasabi',
@@ -76,6 +83,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'us-east-1',
     buildEndpoint: ({ region }) => `https://s3.${region}.wasabisys.com`,
+    brandColor: '#00B04F',
   },
   do: {
     id: 'do',
@@ -86,6 +94,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'nyc3',
     buildEndpoint: ({ region }) => `https://${region}.digitaloceanspaces.com`,
+    brandColor: '#0080FF',
   },
   gcs: {
     id: 'gcs',
@@ -96,6 +105,7 @@ export const PROVIDERS = {
     fields: [],
     defaultRegion: 'auto',
     buildEndpoint: () => 'https://storage.googleapis.com',
+    brandColor: '#4285F4',
   },
   custom: {
     id: 'custom',
@@ -106,6 +116,9 @@ export const PROVIDERS = {
     fields: ['endpoint'],
     defaultRegion: 'us-east-1',
     buildEndpoint: ({ endpoint }) => endpoint || undefined,
+    // No brand color for a generic/unknown S3-compatible endpoint: the
+    // provider-spine UI (Task 4.5) falls back to `theme.colors.primary`.
+    brandColor: null,
   },
 };
 

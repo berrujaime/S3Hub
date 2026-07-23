@@ -7,6 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 import { listBuckets } from '../services/s3Service';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
+import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
 
 export default function BucketSelectScreen({ navigation }) {
   const { currentConnection, setCurrentBucket } = useContext(AuthContext);
@@ -58,20 +59,30 @@ export default function BucketSelectScreen({ navigation }) {
     }
   };
 
+  // Every bucket in this list belongs to the SAME active connection, so the
+  // spine color and region tag (provider-spine signature, Task 4.5) are
+  // derived once from `currentConnection` rather than per bucket.
+  const activeProviderId = currentConnection?.service;
+  const activeRegionLabel = currentConnection?.region || currentConnection?.endpoint;
+
   const renderBucketItem = ({ item }) => (
-    <List.Item
-      title={item.Name}
-      onPress={() => handleBucketSelect(item)}
-      left={(props) => <List.Icon {...props} icon="bucket" />}
-      right={() => (
-        selectedBucket === item.Name ? <List.Icon icon="check" /> : null
-      )}
-      style={
-        selectedBucket === item.Name
-          ? [styles.selectedItem, { backgroundColor: theme.colors.secondaryContainer }]
-          : null
-      }
-    />
+    <View style={styles.rowWrapper}>
+      <ProviderSpine providerId={activeProviderId} />
+      <List.Item
+        title={item.Name}
+        description={() => <RegionTag value={activeRegionLabel} />}
+        onPress={() => handleBucketSelect(item)}
+        left={(props) => <List.Icon {...props} icon="bucket" />}
+        right={() => (
+          selectedBucket === item.Name ? <List.Icon icon="check" /> : null
+        )}
+        style={
+          selectedBucket === item.Name
+            ? [styles.selectedItem, { backgroundColor: theme.colors.secondaryContainer }]
+            : null
+        }
+      />
+    </View>
   );
 
   if (loading) {
@@ -139,6 +150,12 @@ const styles = StyleSheet.create({
     // the call site — a pale cyan-ish highlight in both MD3 conventions and
     // this design's own secondary family, so it reads as "selected" without
     // reaching for the amber primary accent (reserved for actions).
+  },
+  // Wraps each row so ProviderSpine (position: 'absolute', anchored to this
+  // View) can lay its brand-color bar over the row's left edge without
+  // adding to the row's own width/flex layout or touch target.
+  rowWrapper: {
+    position: 'relative',
   },
   emptyContainer: {
     alignItems: 'center',
