@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import {
   View,
   FlatList,
@@ -78,9 +78,42 @@ export default function FileListScreen() {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Mutual exclusion for the batch operation handlers below (upload,
+  // download-selected, delete-selected, modal-delete): only one may run at
+  // a time. This both prevents a double-tap from starting two overlapping
+  // operations and — since isUploading/uploadProgress and
+  // isDeleting/deleteProgress are shared across those handlers — stops
+  // their progress updates from interleaving when two would otherwise run
+  // concurrently.
+  //
+  // Ref + state combo, deliberately: `operationInFlightRef` is the actual
+  // gate each handler checks, since a plain `useState` boolean is only
+  // guaranteed to be current after React commits the re-render — two taps
+  // arriving before that commit (the double-tap case) would both read the
+  // pre-update `false` from their own render's closure and both pass the
+  // guard. A ref is mutated synchronously, so the very next handler
+  // invocation — even one dispatched before the next render — sees the
+  // update immediately. `operationInFlight` (state) is kept in lockstep
+  // purely to drive the `disabled` prop of the upload FAB and the
+  // delete/download selection actions, which does need a render to take
+  // effect.
+  const operationInFlightRef = useRef(false);
+  const [operationInFlight, setOperationInFlight] = useState(false);
   const { width } = useWindowDimensions();
 
   const theme = useTheme(); // Access the theme
+
+  // Guards the progress-related setState calls in the batch operation
+  // handlers below against firing after unmount (e.g. the user navigates
+  // away, or the connection/bucket is torn down, while an upload/download/
+  // delete/folder-create is still in flight). Flips to false only on
+  // unmount, mirroring the equivalent ref in useFileList.
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Deselect files when changing connection, bucket, or folder.
   useEffect(() => {
@@ -139,6 +172,12 @@ export default function FileListScreen() {
   };
 
   const handleUpload = async () => {
+    // A second tap while an upload/download/delete is already running is a
+    // no-op: see the `operationInFlight` declaration above for why this is
+    // shared across all the batch handlers, not just upload-specific.
+    if (operationInFlightRef.current) return;
+    operationInFlightRef.current = true;
+    setOperationInFlight(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
         multiple: true,
@@ -151,8 +190,10 @@ export default function FileListScreen() {
         let processedFiles = 0;
         let lastError = null;
 
-        setIsUploading(true);
-        setUploadProgress(0);
+        if (isMounted.current) {
+          setIsUploading(true);
+          setUploadProgress(0);
+        }
 
         // Per-asset try/catch: one file failing to sign or upload must skip
         // only that file and be folded into the aggregated (done/total)
@@ -205,15 +246,19 @@ export default function FileListScreen() {
             lastError = error;
           } finally {
             processedFiles += 1;
-            setUploadProgress(processedFiles / totalFiles);
+            if (isMounted.current) {
+              setUploadProgress(processedFiles / totalFiles);
+            }
           }
         }
 
         // After all uploads are complete, refetch the file list to ensure synchronization
         await fetchFiles();
 
-        setIsUploading(false);
-        setUploadProgress(1);
+        if (isMounted.current) {
+          setIsUploading(false);
+          setUploadProgress(1);
+        }
 
         if (uploadedFiles === totalFiles) {
           Alert.alert(i18n.t('success'), i18n.t('uploadSuccess'));
@@ -237,8 +282,15 @@ export default function FileListScreen() {
       }
     } catch (error) {
       console.error('Error uploading files:', error?.name || error?.code, error?.message);
-      setIsUploading(false);
+      if (isMounted.current) {
+        setIsUploading(false);
+      }
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+    } finally {
+      operationInFlightRef.current = false;
+      if (isMounted.current) {
+        setOperationInFlight(false);
+      }
     }
   };
 
@@ -263,6 +315,11 @@ export default function FileListScreen() {
   };
 
   const handleDownloadSelected = async () => {
+    // A second tap while an upload/download/delete is already running is a
+    // no-op: see the `operationInFlight` declaration above.
+    if (operationInFlightRef.current) return;
+    operationInFlightRef.current = true;
+    setOperationInFlight(true);
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -312,6 +369,11 @@ export default function FileListScreen() {
     } catch (error) {
       console.error('Error downloading files:', error?.name || error?.code, error?.message);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+    } finally {
+      operationInFlightRef.current = false;
+      if (isMounted.current) {
+        setOperationInFlight(false);
+      }
     }
   };
 
@@ -412,6 +474,11 @@ export default function FileListScreen() {
   };
 
   const handleDeleteSelected = async () => {
+    // A second tap while an upload/download/delete is already running is a
+    // no-op: see the `operationInFlight` declaration above.
+    if (operationInFlightRef.current) return;
+    operationInFlightRef.current = true;
+    setOperationInFlight(true);
     try {
       const confirm = await new Promise((resolve) => {
         Alert.alert(
@@ -430,8 +497,10 @@ export default function FileListScreen() {
       let processedItems = 0;
       let succeededItems = 0;
       let lastError = null;
-      setIsDeleting(true);
-      setDeleteProgress(0);
+      if (isMounted.current) {
+        setIsDeleting(true);
+        setDeleteProgress(0);
+      }
 
       for (const fileId of selectedFiles) {
         // Per-item try/catch: one item failing to delete must skip only
@@ -440,7 +509,15 @@ export default function FileListScreen() {
         // per-file aggregation in handleDownloadSelected.
         try {
           const file = fullFiles.find((f) => f.id === fileId);
-          if (file.isFolder) {
+          // Stale-origin guard, same as resolveFileUrl/downloadFolder: skip
+          // deleting a key stamped from a different (connectionId, bucket)
+          // than the live connection/bucket rather than issuing a delete
+          // against the wrong account/bucket for a key that may not even
+          // exist there. Folds into the aggregated result like any other
+          // per-item failure, without throwing.
+          if (!currentConnection || !matchesOrigin(file, currentConnection.id, currentBucket)) {
+            // no-op: counted as a failure via processedItems below.
+          } else if (file.isFolder) {
             const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, file.key);
             if (deleteErrors.length > 0) {
               // Per-object S3 delete errors carry a `Code`, not a `name` —
@@ -458,7 +535,9 @@ export default function FileListScreen() {
           lastError = error;
         } finally {
           processedItems += 1;
-          setDeleteProgress(processedItems / totalItems);
+          if (isMounted.current) {
+            setDeleteProgress(processedItems / totalItems);
+          }
         }
       }
 
@@ -466,8 +545,10 @@ export default function FileListScreen() {
       // Fetch the updated file list from the server
       await refreshAfterMutation();
 
-      setIsDeleting(false);
-      setDeleteProgress(1);
+      if (isMounted.current) {
+        setIsDeleting(false);
+        setDeleteProgress(1);
+      }
       if (succeededItems === totalItems) {
         Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
       } else if (succeededItems > 0) {
@@ -481,8 +562,15 @@ export default function FileListScreen() {
       clearSelection();
     } catch (error) {
       console.error('Error deleting items:', error?.name || error?.code, error?.message);
-      setIsDeleting(false);
+      if (isMounted.current) {
+        setIsDeleting(false);
+      }
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+    } finally {
+      operationInFlightRef.current = false;
+      if (isMounted.current) {
+        setOperationInFlight(false);
+      }
     }
   };
 
@@ -496,27 +584,30 @@ export default function FileListScreen() {
 
     try {
       await uploadEmptyFolder(currentConnection, currentBucket, folderKey);
-      setIsDialogVisible(false);
-      setNewFolderName('');
 
-      // Update local state and cache incrementally. Stamped with the
-      // current (connectionId, bucket) like every other listed item (see
-      // domain/fileListMapper.stampItemOrigin) so an immediate download of
-      // this folder passes the matchesOrigin guard in downloadFolder
-      // instead of being treated as a stale-origin item.
-      const [newFolder] = stampItemOrigin(
-        [
-          {
-            id: folderKey, // Unique identifier for folder
-            key: folderKey,
-            name: newFolderName.trim(),
-            isFolder: true,
-          },
-        ],
-        currentConnection?.id,
-        currentBucket
-      );
-      addFolderOptimistic(newFolder);
+      if (isMounted.current) {
+        setIsDialogVisible(false);
+        setNewFolderName('');
+
+        // Update local state and cache incrementally. Stamped with the
+        // current (connectionId, bucket) like every other listed item (see
+        // domain/fileListMapper.stampItemOrigin) so an immediate download of
+        // this folder passes the matchesOrigin guard in downloadFolder
+        // instead of being treated as a stale-origin item.
+        const [newFolder] = stampItemOrigin(
+          [
+            {
+              id: folderKey, // Unique identifier for folder
+              key: folderKey,
+              name: newFolderName.trim(),
+              isFolder: true,
+            },
+          ],
+          currentConnection?.id,
+          currentBucket
+        );
+        addFolderOptimistic(newFolder);
+      }
 
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
@@ -576,6 +667,13 @@ export default function FileListScreen() {
   };
 
   const handleModalDelete = async () => {
+    // A second tap while an upload/download/delete is already running is a
+    // no-op: see the `operationInFlight` declaration above. This also keeps
+    // this handler from interleaving with handleDeleteSelected, which
+    // shares the same isDeleting/deleteProgress state.
+    if (operationInFlightRef.current) return;
+    operationInFlightRef.current = true;
+    setOperationInFlight(true);
     try {
       const currentMedia = mediaFiles[currentMediaIndex];
       if (!currentMedia) return;
@@ -593,11 +691,21 @@ export default function FileListScreen() {
 
       if (!confirm) return;
 
-      setIsDeleting(true);
-      setDeleteProgress(0);
+      if (isMounted.current) {
+        setIsDeleting(true);
+        setDeleteProgress(0);
+      }
 
       let deleteError = null;
-      if (currentMedia.isFolder) {
+      // Stale-origin guard, same as resolveFileUrl/downloadFolder/
+      // handleDeleteSelected: the viewer can still be showing an item from
+      // a bucket/connection the user has since switched away from. Skip
+      // rather than deleting a key stamped from a different origin using
+      // the live connection/bucket's credentials; report it as a failure
+      // (mapS3Error falls back to errorGeneric for a non-error object).
+      if (!currentConnection || !matchesOrigin(currentMedia, currentConnection.id, currentBucket)) {
+        deleteError = {};
+      } else if (currentMedia.isFolder) {
         const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, currentMedia.key);
         if (deleteErrors.length > 0) {
           // Per-object S3 delete errors carry a `Code`, not a `name` —
@@ -611,18 +719,29 @@ export default function FileListScreen() {
       // Update local state and cache incrementally
       await refreshAfterMutation();
 
-      setIsDeleting(false);
-      setDeleteProgress(1);
+      if (isMounted.current) {
+        setIsDeleting(false);
+        setDeleteProgress(1);
+      }
       if (deleteError) {
         Alert.alert(i18n.t('error'), i18n.t(mapS3Error(deleteError)));
       } else {
         Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
       }
-      setIsModalVisible(false);
+      if (isMounted.current) {
+        setIsModalVisible(false);
+      }
     } catch (error) {
       console.error('Error deleting file:', error?.name || error?.code, error?.message);
-      setIsDeleting(false);
+      if (isMounted.current) {
+        setIsDeleting(false);
+      }
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+    } finally {
+      operationInFlightRef.current = false;
+      if (isMounted.current) {
+        setOperationInFlight(false);
+      }
     }
   };
 
@@ -686,6 +805,7 @@ export default function FileListScreen() {
           <Button
             mode="contained"
             onPress={handleDownloadSelected}
+            disabled={operationInFlight}
             style={styles.downloadButton}
           >
             {i18n.t('download')}
@@ -693,6 +813,7 @@ export default function FileListScreen() {
           <Button
             mode="contained"
             onPress={handleDeleteSelected}
+            disabled={operationInFlight}
             style={styles.deleteButton}
           >
             {i18n.t('delete')}
@@ -761,6 +882,7 @@ export default function FileListScreen() {
         style={styles.fab}
         icon="upload"
         onPress={handleUpload}
+        disabled={operationInFlight}
         accessibilityLabel={i18n.t('upload')}
       />
 
