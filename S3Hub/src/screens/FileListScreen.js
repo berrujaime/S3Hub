@@ -209,12 +209,15 @@ export default function FileListScreen() {
   // That makes every row exactly `itemSize` tall, so FlatList can compute
   // offsets without measuring. Only valid for the grid — list-view rows are
   // not fixed height — so it's applied conditionally below.
+  //
+  // NOTE: when numColumns > 1, FlatList overrides getItemCount/getItem so
+  // VirtualizedList iterates over ROWS (Math.ceil(data.length/numColumns))
+  // and passes that ROW index straight into getItemLayout — `index` here is
+  // already the row index. Dividing it by numColumns again would collapse
+  // distinct rows onto the same offset and corrupt the windowing math.
   const gridItemLayout = useCallback(
-    (data, index) => {
-      const row = Math.floor(index / numColumns);
-      return { length: itemSize, offset: row * itemSize, index };
-    },
-    [itemSize, numColumns]
+    (data, index) => ({ length: itemSize, offset: index * itemSize, index }),
+    [itemSize]
   );
 
   const handleUpload = async () => {
