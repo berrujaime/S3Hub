@@ -67,7 +67,6 @@ export default function BucketSelectScreen({ navigation }) {
 
   const renderBucketItem = ({ item }) => (
     <View style={styles.rowWrapper}>
-      <ProviderSpine providerId={activeProviderId} />
       <List.Item
         title={item.Name}
         description={() => <RegionTag value={activeRegionLabel} />}
@@ -82,6 +81,12 @@ export default function BucketSelectScreen({ navigation }) {
             : null
         }
       />
+      {/* Declared AFTER List.Item on purpose: RN paints later siblings on
+          top, and the selected-row highlight above gives List.Item an OPAQUE
+          secondaryContainer background that would otherwise cover the spine.
+          The spine is pointerEvents="none", so press/ripple on the row are
+          unaffected by it sitting on top. */}
+      <ProviderSpine providerId={activeProviderId} />
     </View>
   );
 

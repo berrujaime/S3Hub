@@ -67,12 +67,16 @@ export default function ConnectionSelectScreen({ navigation }) {
 
     return (
       <View style={styles.rowWrapper}>
-        <ProviderSpine providerId={item.service} />
         <List.Item
           title={provider.name}
           description={({ color }) => (
             <View>
-              <Text variant="bodyMedium" style={{ color }}>
+              {/* A function `description` bypasses Paper's built-in
+                  descriptionNumberOfLines={2} clamp, so each line clamps
+                  itself (1 + 1 = the same 2-line budget as before) to keep
+                  long access keys/endpoints from growing the row unbounded.
+                  RegionTag already clamps to one line internally. */}
+              <Text variant="bodyMedium" numberOfLines={1} style={{ color }}>
                 {i18n.t('accessKey')}: {item.accessKey}
               </Text>
               <RegionTag value={regionLabel} style={styles.regionTag} />
@@ -90,6 +94,12 @@ export default function ConnectionSelectScreen({ navigation }) {
             </View>
           )}
         />
+        {/* Declared AFTER List.Item on purpose: RN paints later siblings on
+            top, so any opaque row background (none today, but
+            BucketSelectScreen's selected-row highlight shows the hazard is
+            real) can never cover the spine. pointerEvents="none" keeps
+            press/ripple on the row unaffected. */}
+        <ProviderSpine providerId={item.service} />
       </View>
     );
   };
