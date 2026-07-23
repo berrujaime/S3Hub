@@ -10,11 +10,18 @@
 // the keyboard is up (`keyboardShouldPersistTaps="handled"`,
 // `contentContainerStyle={{ flexGrow: 1 }}`).
 import React from 'react';
-import { StyleSheet, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
-import { render, screen, within } from '@testing-library/react-native';
+import {
+  StyleSheet,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  TextInput as RNTextInput,
+} from 'react-native';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import LoginScreen from '../LoginScreen';
 import { AuthContext } from '../../context/AuthContext';
+import { validateCredentials } from '../../services/authService';
 import { darkTheme } from '../../theme/theme';
 import i18n from '../../locales/translations';
 
@@ -29,8 +36,16 @@ jest.mock('../../services/authService', () => ({
 }));
 jest.mock('../../data/connectionRepository', () => ({}));
 
-const renderScreen = () => {
-  const navigation = { navigate: jest.fn() };
+// canGoBack defaults to false (the pre-login root-stack case, where
+// LoginScreen is the navigator's only screen); pass `{ canGoBack: () => true }`
+// for the post-login "add connection from tabs" case.
+const renderScreen = (navigationOverrides = {}) => {
+  const navigation = {
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+    canGoBack: jest.fn(() => false),
+    ...navigationOverrides,
+  };
   const addConnection = jest.fn().mockResolvedValue(undefined);
   const setActiveConnection = jest.fn().mockResolvedValue(undefined);
   render(
@@ -41,6 +56,15 @@ const renderScreen = () => {
     </PaperProvider>
   );
   return { navigation, addConnection, setActiveConnection };
+};
+
+// Storj (the default selected provider) has a fixed region list and no
+// extra fields, so exactly two native TextInputs render: accessKey then
+// secretKey, in that declaration order.
+const fillCredentials = () => {
+  const inputs = screen.UNSAFE_getAllByType(RNTextInput);
+  fireEvent.changeText(inputs[0], 'test-access-key');
+  fireEvent.changeText(inputs[1], 'test-secret-key');
 };
 
 describe('LoginScreen keyboard avoidance', () => {
@@ -75,5 +99,42 @@ describe('LoginScreen keyboard avoidance', () => {
     expect(scoped.getAllByText(i18n.t('accessKey')).length).toBeGreaterThan(0);
     expect(scoped.getAllByText(i18n.t('secretKey')).length).toBeGreaterThan(0);
     expect(scoped.getByText(i18n.t('login'))).toBeTruthy();
+  });
+});
+
+// Regression test for the dead `navigation.navigate('Connections')` call:
+// that route only exists in ConnectionsStack (post-login), never in the
+// pre-login root stack where LoginScreen is reachable as the sole screen.
+// `canGoBack()` is the discriminator between the two cases (see
+// AppNavigator.js / ConnectionSelectScreen.js): false in the root stack,
+// true when LoginScreen is pushed onto ConnectionsStack via "add connection".
+describe('LoginScreen post-login navigation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    validateCredentials.mockResolvedValue(true);
+  });
+
+  it('does not navigate on first login (root stack, canGoBack() is false) — the conditional root mounts MainTabs once currentConnection is set', async () => {
+    const { navigation, addConnection, setActiveConnection } = renderScreen({
+      canGoBack: jest.fn(() => false),
+    });
+
+    fillCredentials();
+    fireEvent.press(screen.getByText(i18n.t('login')));
+
+    await waitFor(() => expect(setActiveConnection).toHaveBeenCalled());
+    expect(addConnection).toHaveBeenCalled();
+    expect(navigation.navigate).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the Connections list when adding a connection from inside the tabs (canGoBack() is true)', async () => {
+    const { navigation } = renderScreen({ canGoBack: jest.fn(() => true) });
+
+    fillCredentials();
+    fireEvent.press(screen.getByText(i18n.t('login')));
+
+    await waitFor(() => expect(navigation.goBack).toHaveBeenCalled());
+    expect(navigation.navigate).not.toHaveBeenCalled();
   });
 });

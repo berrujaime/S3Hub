@@ -72,7 +72,20 @@ export default function LoginScreen({ navigation }) {
 
       await addConnection(connection);
       await setActiveConnection(connection);
-      navigation.navigate('Connections');
+
+      // This screen is reachable two ways: as the sole screen of the
+      // pre-login root stack (AppNavigator), or pushed onto ConnectionsStack
+      // via "add connection" from inside the tabs. `canGoBack()` tells them
+      // apart (false in the former — there is nothing to go back to; true in
+      // the latter, since Connections is the screen below it on that stack).
+      if (navigation.canGoBack()) {
+        // Post-login: return to the Connections list, which now shows the
+        // new (and, per addConnection, newly active) connection.
+        navigation.goBack();
+      }
+      // Else: first login. addConnection/setActiveConnection above already
+      // set currentConnection, so AppNavigator's conditional root mounts
+      // MainTabs on its own — no manual navigation needed or possible here.
     } catch (error) {
       console.error('Error validating credentials:', error?.name || error?.code, error?.message);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
