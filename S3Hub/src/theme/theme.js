@@ -131,7 +131,8 @@ export const darkTheme = {
 // static (non-useTheme()) consumer, UploadProgressPopup.js, which does
 // `import theme from '../theme/theme'` instead of using Paper's useTheme()
 // hook. App.js already imports the named lightTheme/darkTheme exports and
-// picks between them based on the active scheme. Task 4.4 removes this
-// static import in favor of useTheme(); until then, default to darkTheme
-// since dark is the primary experience per the design direction.
-export default darkTheme;
+// picks between them based on the active scheme. lightTheme preserves the
+// pre-existing default (which scheme is default belongs to Tasks 4.2/4.3);
+// Task 4.4 rewires UploadProgressPopup onto useTheme(), after which this
+// export can be removed.
+export default lightTheme;
