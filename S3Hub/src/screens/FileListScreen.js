@@ -7,6 +7,8 @@ import {
   Alert,
   Text,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import {
@@ -869,14 +871,16 @@ export default function FileListScreen() {
       <Portal>
         <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
           <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label={i18n.t('folderName')}
-              value={newFolderName}
-              onChangeText={setNewFolderName}
-              mode="outlined"
-            />
-          </Dialog.Content>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <Dialog.Content>
+              <TextInput
+                label={i18n.t('folderName')}
+                value={newFolderName}
+                onChangeText={setNewFolderName}
+                mode="outlined"
+              />
+            </Dialog.Content>
+          </KeyboardAvoidingView>
           <Dialog.Actions>
             <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
             <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
