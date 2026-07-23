@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
 
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import i18n from '../locales/translations';
 import * as connectionRepository from '../data/connectionRepository';
 import { reconcileCurrentConnection } from '../domain/cacheKeys';
@@ -16,28 +16,44 @@ export const AuthProvider = ({ children }) => {
   const [preview, setPreview] = useState("true");
   const [theme, setTheme] = useState('system');
 
-  const addConnection = async (connection) => {
-    const newConnections = [...connections, connection];
-    setConnections(newConnections);
-    await connectionRepository.saveConnections(newConnections);
-    await setActiveConnection(connection);
-  };
-
-  const setActiveConnection = async (connection) => {
+  const setActiveConnection = useCallback(async (connection) => {
     // Reset currentBucket before changing currentConnection
     setCurrentBucket(null);
     await connectionRepository.clearCurrentBucket();
 
     setCurrentConnection(connection);
     await connectionRepository.saveCurrentConnection(connection);
-  };
+  }, []);
 
-  const setCurrentBucketFunction = async (bucketName) => {
+  const setCurrentBucketFunction = useCallback(async (bucketName) => {
     setCurrentBucket(bucketName);
     await connectionRepository.saveCurrentBucket(bucketName);
-  };
+  }, []);
 
-  const deleteConnection = async (id) => {
+  const changeLanguage = useCallback(async (newLanguage) => {
+    setLanguage(newLanguage);
+    i18n.locale = newLanguage;
+    await connectionRepository.saveLanguage(newLanguage);
+  }, []);
+
+  const changePreview = useCallback(async (newPreview) => {
+    setPreview(newPreview);
+    await connectionRepository.savePreview(newPreview);
+  }, []);
+
+  const changeTheme = useCallback(async (newTheme) => {
+    setTheme(newTheme);
+    await connectionRepository.saveTheme(newTheme);
+  }, []);
+
+  const addConnection = useCallback(async (connection) => {
+    const newConnections = [...connections, connection];
+    setConnections(newConnections);
+    await connectionRepository.saveConnections(newConnections);
+    await setActiveConnection(connection);
+  }, [connections, setActiveConnection]);
+
+  const deleteConnection = useCallback(async (id) => {
     const updatedConnections = connections.filter(conn => conn.id !== id);
 
     setConnections(updatedConnections);
@@ -54,23 +70,7 @@ export const AuthProvider = ({ children }) => {
         await connectionRepository.clearCurrentBucket();
       }
     }
-  };
-
-  const changeLanguage = async (newLanguage) => {
-    setLanguage(newLanguage);
-    i18n.locale = newLanguage;
-    await connectionRepository.saveLanguage(newLanguage);
-  };
-
-  const changePreview = async (newPreview) => {
-    setPreview(newPreview);
-    await connectionRepository.savePreview(newPreview);
-  };
-
-  const changeTheme = async (newTheme) => {
-    setTheme(newTheme);
-    await connectionRepository.saveTheme(newTheme);
-  };
+  }, [connections, currentConnection, setActiveConnection]);
 
   useEffect(() => {
     const loadStoredData = async () => {
@@ -132,23 +132,40 @@ export const AuthProvider = ({ children }) => {
     loadStoredData();
   }, []);
 
+  const value = useMemo(() => ({
+    connections,
+    currentConnection,
+    currentBucket,
+    language,
+    isLoading,
+    preview,
+    theme,
+    addConnection,
+    setActiveConnection,
+    setCurrentBucket: setCurrentBucketFunction,
+    deleteConnection,
+    changeLanguage,
+    changePreview,
+    changeTheme,
+  }), [
+    connections,
+    currentConnection,
+    currentBucket,
+    language,
+    isLoading,
+    preview,
+    theme,
+    addConnection,
+    setActiveConnection,
+    setCurrentBucketFunction,
+    deleteConnection,
+    changeLanguage,
+    changePreview,
+    changeTheme,
+  ]);
+
   return (
-    <AuthContext.Provider value={{
-      connections,
-      currentConnection,
-      currentBucket,
-      language,
-      isLoading,
-      preview,
-      theme,
-      addConnection,
-      setActiveConnection,
-      setCurrentBucket: setCurrentBucketFunction,
-      deleteConnection,
-      changeLanguage,
-      changePreview,
-      changeTheme,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
