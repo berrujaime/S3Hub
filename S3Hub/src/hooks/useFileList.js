@@ -201,13 +201,7 @@ export default function useFileList(currentConnection, currentBucket) {
   }, [currentConnection, currentBucket, currentPath, fetchFiles]);
 
   const setMediaFileUrl = useCallback((index, url) => {
-    setMediaFiles((prev) => {
-      // Mutate in place to preserve the original on-demand URL behavior.
-      if (prev[index]) {
-        prev[index].url = url;
-      }
-      return prev;
-    });
+    setMediaFiles((prev) => prev.map((it, i) => (i === index ? { ...it, url } : it)));
   }, []);
 
   // Mount effect: initialize the media cache and subscribe to app-state changes

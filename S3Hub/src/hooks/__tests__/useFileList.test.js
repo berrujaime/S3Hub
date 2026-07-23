@@ -196,4 +196,50 @@ describe('useFileList', () => {
       expect(clearEntireCache).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('setMediaFileUrl immutability', () => {
+    it('returns a new array with a new object at the updated index, preserving origin fields', async () => {
+      // Fetch with a listing containing one previewable media item.
+      listAllObjects.mockResolvedValue({
+        contents: [{ Key: 'image.jpg', Size: 100 }],
+        commonPrefixes: [],
+      });
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Verify mediaFiles has at least one item with origin fields.
+      expect(result.current.mediaFiles.length).toBeGreaterThan(0);
+      const firstItem = result.current.mediaFiles[0];
+      expect(firstItem.connectionId).toBe('connA');
+      expect(firstItem.bucket).toBe('bucket-a');
+
+      // Capture the original array and element references.
+      const originalMediaFiles = result.current.mediaFiles;
+      const originalFirstElement = result.current.mediaFiles[0];
+
+      const newUrl = 'https://new-signed.example/url';
+
+      // Call setMediaFileUrl to update the URL at index 0.
+      act(() => {
+        result.current.setMediaFileUrl(0, newUrl);
+      });
+
+      // Verify the mediaFiles array reference has changed.
+      expect(result.current.mediaFiles).not.toBe(originalMediaFiles);
+
+      // Verify the element at index 0 has a new reference.
+      expect(result.current.mediaFiles[0]).not.toBe(originalFirstElement);
+
+      // Verify the URL was updated.
+      expect(result.current.mediaFiles[0].url).toBe(newUrl);
+
+      // Verify origin fields survived the spread operation.
+      expect(result.current.mediaFiles[0].connectionId).toBe('connA');
+      expect(result.current.mediaFiles[0].bucket).toBe('bucket-a');
+
+      // Verify other fields of the updated element survived.
+      expect(result.current.mediaFiles[0].name).toBe('image.jpg');
+    });
+  });
 });
