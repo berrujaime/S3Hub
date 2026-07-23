@@ -62,6 +62,9 @@ const en = {
     selectAll: 'Select all',
     close: 'Close',
     share: 'Share',
+    partialUpload: '%{done} of %{total} uploaded.',
+    partialDownload: '%{done} of %{total} downloaded.',
+    partialDelete: '%{done} of %{total} deleted.',
   }
 
 const es = {
@@ -125,6 +128,9 @@ const es = {
     selectAll: 'Seleccionar todo',
     close: 'Cerrar',
     share: 'Compartir',
+    partialUpload: '%{done} de %{total} subidos.',
+    partialDownload: '%{done} de %{total} descargados.',
+    partialDelete: '%{done} de %{total} eliminados.',
   }
 
 const i18n = new I18n({en, es});

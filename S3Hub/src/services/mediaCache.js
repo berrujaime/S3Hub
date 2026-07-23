@@ -29,7 +29,10 @@ export const getCachedFileUri = async (cacheKey, remoteUri) => {
       const result = await FileSystem.downloadAsync(remoteUri, path);
       return result.uri;
     } catch (error) {
-      console.error('Error caching file:', error);
+      // Log the error identity only — never the full error — since
+      // `remoteUri` is a presigned URL (a bearer credential) and some
+      // download-layer errors embed the failing URL in their message.
+      console.error('Error caching file:', error?.name || error?.code, error?.message);
       return null;
     }
   }

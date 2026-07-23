@@ -3,33 +3,17 @@ import { ListBucketsCommand } from "@aws-sdk/client-s3";
 import { getS3Client } from "./s3Client";
 
 /**
- * Validate the credentials.
+ * Validates credentials by attempting to list buckets. Any response that
+ * doesn't throw is treated as valid — including an account with zero (or
+ * no) buckets, since a successful empty response is not an auth failure.
+ * Errors are rethrown as-is (never swallowed into a `false` return) so the
+ * caller maps them via domain/errors.mapS3Error instead of this module
+ * duplicating error-name checks.
  * @param {Object} authData - Authentication data.
- * @returns {boolean} - True if the credentials are valid, false otherwise.
+ * @returns {Promise<boolean>} True when the credentials are valid.
  */
 export const validateCredentials = async (authData) => {
-  try {
-    const s3Client = getS3Client(authData);
-
-    // Try to list buckets to check if the credentials are valid
-    const command = new ListBucketsCommand({});
-    const response = await s3Client.send(command);
-
-    // If the response has buckets, the credentials are valid
-    if (response.Buckets) {
-      return true;
-    } else {
-      return false;
-    }
-  } catch (error) {
-    console.error("Error al validar las credenciales:", error);
-    if (
-      error.name === "InvalidAccessKeyId" ||
-      error.name === "SignatureDoesNotMatch" ||
-      error.name === "AccessDenied"
-    ) {
-      return false;
-    }
-    throw error;
-  }
+  const s3Client = getS3Client(authData);
+  await s3Client.send(new ListBucketsCommand({}));
+  return true;
 };

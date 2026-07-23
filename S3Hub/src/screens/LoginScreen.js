@@ -61,7 +61,7 @@ export default function LoginScreen({ navigation }) {
         Alert.alert(i18n.t('error'), i18n.t('errorInvalidCredentials'));
       }
     } catch (error) {
-      console.error(error);
+      console.error('Error validating credentials:', error?.name || error?.code, error?.message);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };

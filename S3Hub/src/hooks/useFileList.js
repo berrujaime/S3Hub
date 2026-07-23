@@ -40,7 +40,9 @@ const attachSignedUrls = async (items, connection, bucket) => {
             item.url = url;
           })
           .catch((error) => {
-            console.error('Error getting the signed URL:', error);
+            // Log the error identity only — never the full error — since a
+            // signed URL is a bearer credential.
+            console.error('Error getting the signed URL:', error?.name || error?.code, error?.message);
           })
       );
     }

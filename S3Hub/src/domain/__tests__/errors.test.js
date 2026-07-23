@@ -44,12 +44,32 @@ describe('mapS3Error', () => {
       expect(mapS3Error({ name: 'TimeoutError' })).toBe('errorNetwork');
     });
 
-    it("maps a message containing 'Network' to 'errorNetwork'", () => {
+    it("maps a message containing 'Network' (no name, no $metadata) to 'errorNetwork'", () => {
       expect(mapS3Error({ message: 'Network request failed' })).toBe('errorNetwork');
     });
 
-    it("maps an error with no $metadata and no httpStatusCode to 'errorNetwork'", () => {
-      expect(mapS3Error({ message: 'connection refused' })).toBe('errorNetwork');
+    it("maps a message containing 'network' case-insensitively to 'errorNetwork'", () => {
+      expect(mapS3Error({ message: 'network error occurred' })).toBe('errorNetwork');
+    });
+
+    it("maps a message containing 'offline' to 'errorNetwork'", () => {
+      expect(mapS3Error({ message: 'The Internet connection appears to be offline.' })).toBe(
+        'errorNetwork'
+      );
+    });
+  });
+
+  describe('signature / clock-skew errors', () => {
+    it("maps SignatureExpired to 'errorInvalidCredentials'", () => {
+      expect(mapS3Error({ name: 'SignatureExpired' })).toBe('errorInvalidCredentials');
+    });
+
+    it("maps ExpiredToken to 'errorInvalidCredentials'", () => {
+      expect(mapS3Error({ name: 'ExpiredToken' })).toBe('errorInvalidCredentials');
+    });
+
+    it("maps RequestTimeTooSkewed to 'errorInvalidCredentials'", () => {
+      expect(mapS3Error({ name: 'RequestTimeTooSkewed' })).toBe('errorInvalidCredentials');
     });
   });
 
@@ -57,6 +77,16 @@ describe('mapS3Error', () => {
     it("maps an unknown named error (with metadata) to 'errorGeneric'", () => {
       expect(
         mapS3Error({ name: 'InternalError', $metadata: { httpStatusCode: 500 } })
+      ).toBe('errorGeneric');
+    });
+
+    it("maps an unknown no-status error with a non-network message to 'errorGeneric' (previously mis-mapped to errorNetwork)", () => {
+      expect(mapS3Error({ message: 'connection refused' })).toBe('errorGeneric');
+    });
+
+    it("maps a plain Error with no name/$metadata match (e.g. the listAllObjects truncation guard) to 'errorGeneric'", () => {
+      expect(
+        mapS3Error(new Error('S3 listing reported truncation without a continuation token'))
       ).toBe('errorGeneric');
     });
 

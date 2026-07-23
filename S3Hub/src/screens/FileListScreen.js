@@ -29,7 +29,8 @@ import MediaViewerModal from '../components/MediaViewerModal';
 import i18n from '../locales/translations';
 import { ensureDirectoryExists, getCachedFileUri } from '../services/mediaCache';
 import { mediaCacheKey } from '../domain/cacheKeys';
-import { matchesOrigin } from '../domain/fileListMapper';
+import { matchesOrigin, stampItemOrigin } from '../domain/fileListMapper';
+import { mapS3Error } from '../domain/errors';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 
@@ -113,7 +114,9 @@ export default function FileListScreen() {
             const url = await getSignedUrl(currentConnection, currentBucket, mediaFiles[mediaIndex].key);
             setMediaFileUrl(mediaIndex, url);
           } catch (error) {
-            console.error("Error loading media URL on demand:", error);
+            // Log the error identity only — never the full error — since a
+            // signed URL is a bearer credential.
+            console.error('Error loading media URL on demand:', error?.name || error?.code, error?.message);
           }
         }
         setCurrentMediaIndex(mediaIndex);
@@ -145,38 +148,50 @@ export default function FileListScreen() {
       if (!result.canceled && result.assets?.length > 0) {
         const totalFiles = result.assets.length;
         let uploadedFiles = 0;
+        let processedFiles = 0;
+        let lastError = null;
 
         setIsUploading(true);
         setUploadProgress(0);
 
+        // Per-asset try/catch: one file failing to sign or upload must skip
+        // only that file and be folded into the aggregated (done/total)
+        // result, never abort the rest of the batch — see the equivalent
+        // per-item aggregation in handleDownloadSelected/handleDeleteSelected.
         for (const asset of result.assets) {
-          const fileUri = asset.uri;
-          const fileName = asset.name;
-          const mimeType = asset.mimeType || 'application/octet-stream';
+          try {
+            const fileUri = asset.uri;
+            const fileName = asset.name;
+            const mimeType = asset.mimeType || 'application/octet-stream';
 
-          let key = currentPath + fileName;
+            let key = currentPath + fileName;
 
-          // Handle duplicate file names by appending a timestamp
-          const existingFile = fullFiles.find(f => f.key === key);
-          if (existingFile) {
-            const timestamp = Date.now();
-            key = `${currentPath}${fileName}_${timestamp}`;
+            // Handle duplicate file names by appending a timestamp
+            const existingFile = fullFiles.find(f => f.key === key);
+            if (existingFile) {
+              const timestamp = Date.now();
+              key = `${currentPath}${fileName}_${timestamp}`;
+            }
+
+            const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
+
+            // Upload the file using uploadAsync to allow background upload
+            await FileSystem.uploadAsync(uploadUrl, fileUri, {
+              httpMethod: 'PUT',
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: {
+                'Content-Type': mimeType,
+              },
+            });
+
+            uploadedFiles += 1;
+          } catch (error) {
+            console.error('Error uploading file:', error?.name || error?.code, error?.message);
+            lastError = error;
+          } finally {
+            processedFiles += 1;
+            setUploadProgress(processedFiles / totalFiles);
           }
-
-          const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
-
-          // Upload the file using uploadAsync to allow background upload
-          await FileSystem.uploadAsync(uploadUrl, fileUri, {
-            httpMethod: 'PUT',
-            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-            headers: {
-              'Content-Type': mimeType,
-            },
-          });
-
-          uploadedFiles += 1;
-          const progress = uploadedFiles / totalFiles;
-          setUploadProgress(progress);
         }
 
         // After all uploads are complete, refetch the file list to ensure synchronization
@@ -184,21 +199,31 @@ export default function FileListScreen() {
 
         setIsUploading(false);
         setUploadProgress(1);
-        Alert.alert(i18n.t('success'), i18n.t('uploadSuccess'));
 
-        // Send notification upon completion of the upload
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: i18n.t('upload'),
-            body: i18n.t('uploadSuccess'),
-          },
-          trigger: null,
-        });
+        if (uploadedFiles === totalFiles) {
+          Alert.alert(i18n.t('success'), i18n.t('uploadSuccess'));
+
+          // Send notification upon completion of the upload
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: i18n.t('upload'),
+              body: i18n.t('uploadSuccess'),
+            },
+            trigger: null,
+          });
+        } else if (uploadedFiles > 0) {
+          Alert.alert(
+            i18n.t('error'),
+            i18n.t('partialUpload', { done: uploadedFiles, total: totalFiles })
+          );
+        } else {
+          Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
+        }
       }
     } catch (error) {
-      console.error('Error uploading files:', error);
+      console.error('Error uploading files:', error?.name || error?.code, error?.message);
       setIsUploading(false);
-      Alert.alert(i18n.t('error'), i18n.t('uploadError'));
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -230,42 +255,48 @@ export default function FileListScreen() {
         return;
       }
 
-      let hasErrors = false;
+      const totalItems = selectedFiles.length;
+      let succeededItems = 0;
+      let lastError = null;
+
       for (const fileId of selectedFiles) {
         // Per-file try/catch: one file failing to sign or download (e.g. a
         // getSignedUrl rejection) must skip only that file and be folded
-        // into the aggregated result, never abort the rest of the batch —
-        // the same skip-and-aggregate behavior as the null-url guard below.
+        // into the aggregated (done/total) result, never abort the rest of
+        // the batch — the same skip-and-aggregate behavior as the null-url
+        // guard below.
         try {
           const file = fullFiles.find((f) => f.id === fileId);
           if (file.isFolder) {
-            if (!(await downloadFolder(file.key))) {
-              hasErrors = true;
+            if (await downloadFolder(file)) {
+              succeededItems += 1;
             }
           } else {
             const url = await resolveFileUrl(file);
-            if (!url) {
-              hasErrors = true;
-              continue;
-            }
-            if (!(await downloadFile({ ...file, url }))) {
-              hasErrors = true;
+            if (url && (await downloadFile({ ...file, url }))) {
+              succeededItems += 1;
             }
           }
         } catch (error) {
-          console.error("Error downloading selected item:", error);
-          hasErrors = true;
+          console.error('Error downloading selected item:', error?.name || error?.code, error?.message);
+          lastError = error;
         }
       }
 
-      Alert.alert(
-        hasErrors ? i18n.t('error') : i18n.t('success'),
-        hasErrors ? i18n.t('downloadError') : i18n.t('downloadSuccess')
-      );
+      if (succeededItems === totalItems) {
+        Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
+      } else if (succeededItems > 0) {
+        Alert.alert(
+          i18n.t('error'),
+          i18n.t('partialDownload', { done: succeededItems, total: totalItems })
+        );
+      } else {
+        Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
+      }
       clearSelection();
     } catch (error) {
-      console.error("Error downloading files:", error);
-      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+      console.error('Error downloading files:', error?.name || error?.code, error?.message);
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -297,7 +328,10 @@ export default function FileListScreen() {
       await MediaLibrary.saveToLibraryAsync(response.uri);
       return true;
     } catch (error) {
-      console.error("Error downloading file:", error);
+      // Log the error identity only, never the full error: `file.url` is a
+      // presigned URL (a bearer credential), and some download-layer errors
+      // embed the failing URL in their message.
+      console.error('Error downloading file:', error?.name || error?.code, error?.message);
       return false;
     } finally {
       await FileSystem.deleteAsync(tempFileUri, { idempotent: true }).catch(
@@ -310,9 +344,21 @@ export default function FileListScreen() {
   // listing succeeded AND every file downloaded; false as soon as anything
   // failed (errors are logged here, not rethrown), so batch callers can fold
   // folder failures into their aggregated result.
-  const downloadFolder = async (folderKey) => {
+  //
+  // Origin guard mirrors resolveFileUrl above: `folder` carries its own
+  // fetch-time (connectionId, bucket) — see domain/fileListMapper.
+  // stampItemOrigin — which can lag one render behind the live
+  // AuthContext during a bucket/connection switch. Listing/signing with the
+  // LIVE currentConnection/currentBucket against a folder key stamped from a
+  // DIFFERENT origin would list and sign against the wrong account/bucket
+  // for a key that may not even exist there. Returns false (no network call)
+  // when the origin no longer matches.
+  const downloadFolder = async (folder) => {
+    if (!currentConnection || !matchesOrigin(folder, currentConnection.id, currentBucket)) {
+      return false;
+    }
     try {
-      const objects = await listAllUnderPrefix(currentConnection, currentBucket, folderKey);
+      const objects = await listAllUnderPrefix(currentConnection, currentBucket, folder.key);
 
       let allSucceeded = true;
       for (const object of objects) {
@@ -332,7 +378,7 @@ export default function FileListScreen() {
       }
       return allSucceeded;
     } catch (error) {
-      console.error("Error downloading folder:", error);
+      console.error('Error downloading folder:', error?.name || error?.code, error?.message);
       return false;
     }
   };
@@ -366,24 +412,39 @@ export default function FileListScreen() {
       if (!confirm) return;
 
       const totalItems = selectedFiles.length;
-      let deletedItems = 0;
-      let hasErrors = false;
+      let processedItems = 0;
+      let succeededItems = 0;
+      let lastError = null;
       setIsDeleting(true);
       setDeleteProgress(0);
 
       for (const fileId of selectedFiles) {
-        const file = fullFiles.find((f) => f.id === fileId);
-        if (file.isFolder) {
-          const { errors } = await deleteFolderRecursive(currentConnection, currentBucket, file.key);
-          if (errors.length > 0) {
-            hasErrors = true;
+        // Per-item try/catch: one item failing to delete must skip only
+        // that item and be folded into the aggregated (done/total) result,
+        // never abort the rest of the batch — same rationale as the
+        // per-file aggregation in handleDownloadSelected.
+        try {
+          const file = fullFiles.find((f) => f.id === fileId);
+          if (file.isFolder) {
+            const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, file.key);
+            if (deleteErrors.length > 0) {
+              // Per-object S3 delete errors carry a `Code`, not a `name` —
+              // reshape so mapS3Error (which reads `.name`) can look it up.
+              lastError = { name: deleteErrors[0].Code, message: deleteErrors[0].Message };
+            } else {
+              succeededItems += 1;
+            }
+          } else {
+            await deleteFile(currentConnection, currentBucket, file.key);
+            succeededItems += 1;
           }
-        } else {
-          await deleteFile(currentConnection, currentBucket, file.key);
+        } catch (error) {
+          console.error('Error deleting item:', error?.name || error?.code, error?.message);
+          lastError = error;
+        } finally {
+          processedItems += 1;
+          setDeleteProgress(processedItems / totalItems);
         }
-        deletedItems += 1;
-        const progress = deletedItems / totalItems;
-        setDeleteProgress(progress);
       }
 
       // **Clear the cache for the current path to ensure fetchFiles retrieves fresh data**
@@ -392,16 +453,21 @@ export default function FileListScreen() {
 
       setIsDeleting(false);
       setDeleteProgress(1);
-      if (hasErrors) {
-        Alert.alert(i18n.t('error'), i18n.t('deleteError'));
-      } else {
+      if (succeededItems === totalItems) {
         Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
+      } else if (succeededItems > 0) {
+        Alert.alert(
+          i18n.t('error'),
+          i18n.t('partialDelete', { done: succeededItems, total: totalItems })
+        );
+      } else {
+        Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
       }
       clearSelection();
     } catch (error) {
-      console.error('Error deleting items:', error);
+      console.error('Error deleting items:', error?.name || error?.code, error?.message);
       setIsDeleting(false);
-      Alert.alert(i18n.t('error'), i18n.t('deleteError'));
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -418,19 +484,29 @@ export default function FileListScreen() {
       setIsDialogVisible(false);
       setNewFolderName('');
 
-      // Update local state and cache incrementally
-      const newFolder = {
-        id: folderKey, // Unique identifier for folder
-        key: folderKey,
-        name: newFolderName.trim(),
-        isFolder: true,
-      };
+      // Update local state and cache incrementally. Stamped with the
+      // current (connectionId, bucket) like every other listed item (see
+      // domain/fileListMapper.stampItemOrigin) so an immediate download of
+      // this folder passes the matchesOrigin guard in downloadFolder
+      // instead of being treated as a stale-origin item.
+      const [newFolder] = stampItemOrigin(
+        [
+          {
+            id: folderKey, // Unique identifier for folder
+            key: folderKey,
+            name: newFolderName.trim(),
+            isFolder: true,
+          },
+        ],
+        currentConnection?.id,
+        currentBucket
+      );
       addFolderOptimistic(newFolder);
 
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));
     } catch (error) {
-      console.error('Error creating folder:', error);
-      Alert.alert(i18n.t('error'), i18n.t('folderError'));
+      console.error('Error creating folder:', error?.name || error?.code, error?.message);
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -450,8 +526,8 @@ export default function FileListScreen() {
         Alert.alert(i18n.t('error'), i18n.t('downloadError'));
       }
     } catch (error) {
-      console.error('Error sharing file:', error);
-      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+      console.error('Error sharing file:', error?.name || error?.code, error?.message);
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -479,8 +555,8 @@ export default function FileListScreen() {
 
       Alert.alert(i18n.t('success'), i18n.t('downloadSuccess'));
     } catch (error) {
-      console.error('Error downloading file:', error);
-      Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+      console.error('Error downloading file:', error?.name || error?.code, error?.message);
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 
@@ -505,10 +581,14 @@ export default function FileListScreen() {
       setIsDeleting(true);
       setDeleteProgress(0);
 
-      let hasErrors = false;
+      let deleteError = null;
       if (currentMedia.isFolder) {
-        const { errors } = await deleteFolderRecursive(currentConnection, currentBucket, currentMedia.key);
-        hasErrors = errors.length > 0;
+        const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, currentMedia.key);
+        if (deleteErrors.length > 0) {
+          // Per-object S3 delete errors carry a `Code`, not a `name` —
+          // reshape so mapS3Error (which reads `.name`) can look it up.
+          deleteError = { name: deleteErrors[0].Code, message: deleteErrors[0].Message };
+        }
       } else {
         await deleteFile(currentConnection, currentBucket, currentMedia.key);
       }
@@ -518,16 +598,16 @@ export default function FileListScreen() {
 
       setIsDeleting(false);
       setDeleteProgress(1);
-      if (hasErrors) {
-        Alert.alert(i18n.t('error'), i18n.t('deleteError'));
+      if (deleteError) {
+        Alert.alert(i18n.t('error'), i18n.t(mapS3Error(deleteError)));
       } else {
         Alert.alert(i18n.t('success'), i18n.t('deleteSuccess'));
       }
       setIsModalVisible(false);
     } catch (error) {
-      console.error('Error deleting file:', error);
+      console.error('Error deleting file:', error?.name || error?.code, error?.message);
       setIsDeleting(false);
-      Alert.alert(i18n.t('error'), i18n.t('deleteError'));
+      Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
 

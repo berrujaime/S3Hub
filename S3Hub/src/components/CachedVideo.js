@@ -35,7 +35,9 @@ const CachedVideo = ({ source, style, cacheKey, ...props }) => {
           if (isMounted) setVideoUri(result.uri);
         }
       } catch (error) {
-        console.error('Error caching video:', error);
+        // Log the error identity only — never the full error — since
+        // source.uri is a presigned URL (a bearer credential).
+        console.error('Error caching video:', error?.name || error?.code, error?.message);
         if (isMounted) setVideoUri(source.uri); // Fallback to remote URI
       }
     };

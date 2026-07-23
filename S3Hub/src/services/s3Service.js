@@ -83,7 +83,6 @@ export const uploadFile = async (connection, bucketName, file) => {
       ContentType: file.mimeType,
     });
     const response = await s3Client.send(command);
-    console.log(response);
     return response;
   } catch (error) {
     console.error("Error uploading the file:", error);
@@ -108,7 +107,10 @@ export const getSignedUrl = async (connection, bucketName, key) => {
     const url = await getAWSSignedUrl(s3Client, command, { expiresIn: 3600 });
     return url;
   } catch (error) {
-    console.error("Error obtaining the signed URL:", error);
+    // Log the error identity only: `error` (and, more importantly, `url`,
+    // which is deliberately never in scope here) must never be logged in
+    // full — a presigned URL is a bearer credential.
+    console.error("Error obtaining the signed URL:", error?.name || error?.code, error?.message);
     throw error;
   }
 };
@@ -179,7 +181,9 @@ export const getPresignedUploadUrl = async (connection, bucketName, key, mimeTyp
     const url = await getAWSSignedUrl(s3Client, command, { expiresIn: 3600 });
     return url;
   } catch (error) {
-    console.error('Error obtaining the presigned upload URL:', error);
+    // See getSignedUrl above: never log the full error (or the URL itself)
+    // for a presigned-URL operation — a signed URL is a bearer credential.
+    console.error('Error obtaining the presigned upload URL:', error?.name || error?.code, error?.message);
     throw error;
   }
 };

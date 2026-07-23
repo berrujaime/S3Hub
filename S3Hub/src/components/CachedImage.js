@@ -34,7 +34,9 @@ const CachedImage = ({ source, style, cacheKey }) => {
           if (isMounted) setImgUri(result.uri);
         }
       } catch (error) {
-        console.error('Error caching image:', error);
+        // Log the error identity only — never the full error — since
+        // source.uri is a presigned URL (a bearer credential).
+        console.error('Error caching image:', error?.name || error?.code, error?.message);
         if (isMounted) setImgUri(source.uri); // Fallback to remote URI
       }
     };
