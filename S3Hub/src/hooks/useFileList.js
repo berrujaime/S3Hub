@@ -60,86 +60,102 @@ export default function useFileList(currentConnection, currentBucket) {
   const [currentPath, setCurrentPath] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Guards async work that is NOT tied to a single effect run (the public
+  // `fetchFiles`/`refreshAfterMutation` callbacks, invoked directly by
+  // screens e.g. for pull-to-refresh): flips to false only on unmount, via
+  // the mount-effect cleanup below. Effect-initiated fetches instead use a
+  // per-run `active` flag (see the merged fetch effect) — that flag captures
+  // BOTH unmount AND "superseded by a newer run" (e.g. fast folder
+  // navigation), which this long-lived ref alone cannot distinguish.
   const isMounted = useRef(true);
   const appState = useRef(AppState.currentState);
+  // Previous (connectionId, bucket) the fetch effect ran with, so it can
+  // tell a real connection/bucket switch (cache must be cleared) apart from
+  // a same-bucket path navigation (cache must be kept). Sentinel values so
+  // the very first run with a real connection/bucket also counts as a
+  // change (parity with the previous unconditional clear-on-mount).
+  const prevOriginRef = useRef({ connectionId: undefined, bucket: undefined });
 
-  const fetchFiles = useCallback(async () => {
-    const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
-    try {
-      // Attempt to retrieve cached data (returns items only if still fresh).
-      const cachedItems = await getCachedItems(cacheKey);
-      if (cachedItems) {
-        // Re-stamp on hydration: the listing cache key already scopes these
-        // items to this connection+bucket, and entries written before origin
-        // stamping existed lack the fields entirely.
-        const sortedItems = sortFiles(
-          stampItemOrigin(cachedItems, currentConnection?.id, currentBucket)
-        );
-        // The cache never stores `url` (see stripVolatileFields below), so
-        // previewable items always need a freshly-signed URL here.
-        await attachSignedUrls(sortedItems, currentConnection, currentBucket);
-        if (!isMounted.current) {
-          return; // The component has unmounted, cancel state update.
+  const fetchFiles = useCallback(
+    async (isActive = () => isMounted.current) => {
+      const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
+      try {
+        // Attempt to retrieve cached data (returns items only if still fresh).
+        const cachedItems = await getCachedItems(cacheKey);
+        if (cachedItems) {
+          // Re-stamp on hydration: the listing cache key already scopes these
+          // items to this connection+bucket, and entries written before origin
+          // stamping existed lack the fields entirely.
+          const sortedItems = sortFiles(
+            stampItemOrigin(cachedItems, currentConnection?.id, currentBucket)
+          );
+          // The cache never stores `url` (see stripVolatileFields below), so
+          // previewable items always need a freshly-signed URL here.
+          await attachSignedUrls(sortedItems, currentConnection, currentBucket);
+          if (!isActive()) {
+            return; // Unmounted, or superseded by a newer fetch: cancel.
+          }
+          setFullFiles(sortedItems);
+          setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
+          setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
+          setLoading(false);
+          setPage(1);
+          return; // Exit early to avoid fetching from server.
         }
-        setFullFiles(sortedItems);
-        setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
-        setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
-        setLoading(false);
-        setPage(1);
-        return; // Exit early to avoid fetching from server.
+
+        // Fetch fresh data from the server: the delimiter caps the result to
+        // this level's files plus immediate subfolders, and listAllObjects
+        // paginates until the full current-level listing is retrieved.
+        const listing = await listAllObjects(currentConnection, currentBucket, {
+          prefix: currentPath,
+          delimiter: '/',
+        });
+
+        if (!isActive()) {
+          return; // Unmounted, or superseded by a newer fetch: cancel.
+        }
+
+        // Stamp each item with its fetch-time origin so media cache keys are
+        // derived from the item itself, never from live context (which can be
+        // one render ahead of the items during a bucket/connection switch —
+        // see domain/fileListMapper.stampItemOrigin).
+        let items = stampItemOrigin(
+          parseObjects(listing, currentPath),
+          currentConnection?.id,
+          currentBucket
+        );
+
+        // Fetch the signed URLs for previewable (image/video) items in parallel.
+        // Other file types don't need an upfront URL: they render a generic
+        // icon and only need a URL later, on demand (download/share).
+        await attachSignedUrls(items, currentConnection, currentBucket);
+
+        // Sort first, then dedupe (preserving the original sequence).
+        items = sortFiles(items);
+        items = dedupeById(items);
+
+        // Update state and cache.
+        if (isActive()) {
+          setFullFiles(items);
+          setDisplayedFiles(items.slice(0, PAGE_SIZE));
+          setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
+          setLoading(false);
+          setPage(1);
+          // Never persist `url`: it's a presigned URL with a 1h TTL, far
+          // shorter than the file-list cache's TTL (see
+          // domain/fileListMapper.stripVolatileFields).
+          await setCachedItems(cacheKey, stripVolatileFields(items));
+        }
+      } catch (error) {
+        console.error('Error fetching the file list:', error);
+        if (isActive()) {
+          Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+          setLoading(false);
+        }
       }
-
-      // Fetch fresh data from the server: the delimiter caps the result to
-      // this level's files plus immediate subfolders, and listAllObjects
-      // paginates until the full current-level listing is retrieved.
-      const listing = await listAllObjects(currentConnection, currentBucket, {
-        prefix: currentPath,
-        delimiter: '/',
-      });
-
-      if (!isMounted.current) {
-        return; // The component has unmounted, cancel state update.
-      }
-
-      // Stamp each item with its fetch-time origin so media cache keys are
-      // derived from the item itself, never from live context (which can be
-      // one render ahead of the items during a bucket/connection switch —
-      // see domain/fileListMapper.stampItemOrigin).
-      let items = stampItemOrigin(
-        parseObjects(listing, currentPath),
-        currentConnection?.id,
-        currentBucket
-      );
-
-      // Fetch the signed URLs for previewable (image/video) items in parallel.
-      // Other file types don't need an upfront URL: they render a generic
-      // icon and only need a URL later, on demand (download/share).
-      await attachSignedUrls(items, currentConnection, currentBucket);
-
-      // Sort first, then dedupe (preserving the original sequence).
-      items = sortFiles(items);
-      items = dedupeById(items);
-
-      // Update state and cache.
-      if (isMounted.current) {
-        setFullFiles(items);
-        setDisplayedFiles(items.slice(0, PAGE_SIZE));
-        setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
-        setLoading(false);
-        setPage(1);
-        // Never persist `url`: it's a presigned URL with a 1h TTL, far
-        // shorter than the file-list cache's TTL (see
-        // domain/fileListMapper.stripVolatileFields).
-        await setCachedItems(cacheKey, stripVolatileFields(items));
-      }
-    } catch (error) {
-      console.error('Error fetching the file list:', error);
-      if (isMounted.current) {
-        Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
-        setLoading(false);
-      }
-    }
-  }, [currentConnection, currentBucket, currentPath]);
+    },
+    [currentConnection, currentBucket, currentPath]
+  );
 
   const loadMoreFiles = useCallback(() => {
     setPage((prevPage) => {
@@ -218,42 +234,59 @@ export default function useFileList(currentConnection, currentBucket) {
     };
   }, []);
 
-  // Fetch files when the connection, bucket, or path changes.
+  // Fetch files when the connection, bucket, or path changes. This is the
+  // single effect that owns the file listing (previously split across two
+  // effects that both fetched on mount — a double network burst — and
+  // shared one `isMounted` ref, which meant a slow fetch for a path the user
+  // had already navigated away from could still land in state).
+  //
+  // `active` is a per-run cancellation token, not a ref: React runs this
+  // run's cleanup (`active = false`) both when a NEWER run starts (deps
+  // changed — connection/bucket/path navigation) and on unmount, so a single
+  // flag covers both "stale response" and "unmounted" without conflating
+  // them with other runs.
   useEffect(() => {
-    isMounted.current = true;
+    let active = true;
+    const isActive = () => active;
 
-    const fetchData = async () => {
-      if (currentConnection && currentBucket) {
-        setLoading(true);
-        await fetchFiles();
-      } else {
+    const run = async () => {
+      if (!currentConnection || !currentBucket) {
+        // No active connection/bucket: reset to empty, and reset the origin
+        // ref so the next real (connection, bucket) is treated as a change
+        // (matching the previous unconditional clear-on-mount behavior).
+        prevOriginRef.current = { connectionId: undefined, bucket: undefined };
         setFullFiles([]);
         setDisplayedFiles([]);
         setMediaFiles([]);
         setLoading(false);
+        return;
       }
+
+      // Clear the media/file cache only when the connection or bucket
+      // ACTUALLY changed since the previous run, never on a path-only
+      // navigation (which would otherwise wipe the cache on every folder
+      // the user enters).
+      const originChanged =
+        prevOriginRef.current.connectionId !== currentConnection?.id ||
+        prevOriginRef.current.bucket !== currentBucket;
+      prevOriginRef.current = { connectionId: currentConnection?.id, bucket: currentBucket };
+
+      setLoading(true);
+      if (originChanged) {
+        await clearEntireCache();
+        if (!isActive()) {
+          return; // Superseded or unmounted while clearing the cache.
+        }
+      }
+      await fetchFiles(isActive);
     };
 
-    fetchData();
+    run();
 
     return () => {
-      isMounted.current = false;
+      active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentConnection, currentBucket, currentPath]);
-
-  // Clear cache and fetch new files when the bucket or connection changes.
-  useEffect(() => {
-    const handleBucketChange = async () => {
-      if (currentConnection && currentBucket) {
-        await clearEntireCache();
-        await fetchFiles();
-      }
-    };
-
-    handleBucketChange();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentConnection, currentBucket]);
+  }, [currentConnection, currentBucket, currentPath, fetchFiles]);
 
   // Filter the already-loaded items client-side by name (case-insensitive).
   // No new S3 requests are triggered. Existing sorting is preserved.
