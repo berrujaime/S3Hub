@@ -65,6 +65,7 @@ const en = {
     partialUpload: '%{done} of %{total} uploaded.',
     partialDownload: '%{done} of %{total} downloaded.',
     partialDelete: '%{done} of %{total} deleted.',
+    logout: 'Log out',
   }
 
 const es = {
@@ -131,6 +132,7 @@ const es = {
     partialUpload: '%{done} de %{total} subidos.',
     partialDownload: '%{done} de %{total} descargados.',
     partialDelete: '%{done} de %{total} eliminados.',
+    logout: 'Cerrar sesión',
   }
 
 const i18n = new I18n({en, es});

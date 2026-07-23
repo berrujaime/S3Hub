@@ -72,6 +72,18 @@ export const AuthProvider = ({ children }) => {
     }
   }, [connections, currentConnection, setActiveConnection]);
 
+  // Logs the user out of the currently active connection: clears
+  // currentConnection/currentBucket (in memory and persisted), so a restart
+  // lands back on Login instead of auto-signing back in. Deliberately does
+  // NOT touch `connections` or their storage — logging out never deletes any
+  // saved connection, it only deactivates the current one.
+  const logout = useCallback(async () => {
+    setCurrentConnection(null);
+    await connectionRepository.clearCurrentConnection();
+    setCurrentBucket(null);
+    await connectionRepository.clearCurrentBucket();
+  }, []);
+
   useEffect(() => {
     const loadStoredData = async () => {
       try {
@@ -144,6 +156,7 @@ export const AuthProvider = ({ children }) => {
     setActiveConnection,
     setCurrentBucket: setCurrentBucketFunction,
     deleteConnection,
+    logout,
     changeLanguage,
     changePreview,
     changeTheme,
@@ -159,6 +172,7 @@ export const AuthProvider = ({ children }) => {
     setActiveConnection,
     setCurrentBucketFunction,
     deleteConnection,
+    logout,
     changeLanguage,
     changePreview,
     changeTheme,

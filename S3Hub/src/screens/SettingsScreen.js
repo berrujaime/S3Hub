@@ -1,7 +1,7 @@
 // src/screens/SettingsScreen.js
 import React, { useContext } from 'react';
 import { View, StyleSheet, Linking, TouchableOpacity } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { Text, Button, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import i18n from '../locales/translations';
@@ -30,6 +30,7 @@ export default function SettingsScreen() {
     const { language, changeLanguage } = useContext(AuthContext);
     const { preview, changePreview } = useContext(AuthContext);
     const { theme: themePreference, changeTheme } = useContext(AuthContext);
+    const { logout } = useContext(AuthContext);
 
     const privacyPolicyUrl = Constants.expoConfig?.extra?.privacyPolicyUrl;
 
@@ -49,6 +50,10 @@ export default function SettingsScreen() {
         if (privacyPolicyUrl) {
             Linking.openURL(privacyPolicyUrl);
         }
+    };
+
+    const handleLogout = () => {
+        logout();
     };
 
     const pickerColor = theme.colors.onSurface;
@@ -112,6 +117,10 @@ export default function SettingsScreen() {
                 </Picker>
             </View>
 
+            <Button mode="outlined" onPress={handleLogout} style={styles.logoutButton}>
+                {i18n.t('logout')}
+            </Button>
+
             {privacyPolicyUrl ? (
                 <TouchableOpacity onPress={handlePrivacyPolicy} style={styles.privacyLink}>
                     <Text style={[styles.privacyText, { color: theme.colors.primary }]}>{i18n.t('privacyPolicy')}</Text>
@@ -144,6 +153,9 @@ const styles = StyleSheet.create({
     picker: {
         height: 50,
         width: '100%',
+    },
+    logoutButton: {
+        marginTop: 24,
     },
     privacyLink: {
         marginTop: 24,
