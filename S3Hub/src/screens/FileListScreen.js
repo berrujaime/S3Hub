@@ -874,29 +874,43 @@ export default function FileListScreen() {
             frame versus the keyboard's absolute screen Y, so the math only
             fires when the wrapper spans the screen (frame.y ~ 0). Wrapping
             anything deeper (e.g. Dialog.Content) yields zero overlap and no
-            adjustment. Paper re-centers the Dialog inside the shrunken area,
-            keeping the input above the keyboard. pointerEvents="box-none"
-            lets backdrop presses through so onDismiss still works. */}
+            adjustment.
+            The flex:1 spacer View is load-bearing, not decoration: on iOS the
+            'padding' behavior adds paddingBottom to the avoider, but Yoga
+            never applies parent padding to absolutely-positioned children
+            with all insets defined — and Paper Modal's root is exactly that
+            (absoluteFill). Padding only affects normal-flow children, so the
+            spacer shrinks with the padding and the Modal fills the shrunken
+            spacer instead of the whole window. Android's 'height' behavior
+            shrinks the avoider's own border box, which works either way.
+            enabled={isDialogVisible} gates the permanently-mounted avoider so
+            its keyboard listeners don't fire a global LayoutAnimation when
+            the keyboard opens for anything else on this screen (e.g. search).
+            pointerEvents="box-none" lets backdrop presses through so
+            onDismiss still works. */}
         <KeyboardAvoidingView
           style={StyleSheet.absoluteFill}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          enabled={isDialogVisible}
           pointerEvents="box-none"
         >
-          <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
-            <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
-            <Dialog.Content>
-              <TextInput
-                label={i18n.t('folderName')}
-                value={newFolderName}
-                onChangeText={setNewFolderName}
-                mode="outlined"
-              />
-            </Dialog.Content>
-            <Dialog.Actions>
-              <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
-              <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
-            </Dialog.Actions>
-          </Dialog>
+          <View style={styles.dialogAvoiderSpacer} pointerEvents="box-none">
+            <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
+              <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
+              <Dialog.Content>
+                <TextInput
+                  label={i18n.t('folderName')}
+                  value={newFolderName}
+                  onChangeText={setNewFolderName}
+                  mode="outlined"
+                />
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
+                <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
+              </Dialog.Actions>
+            </Dialog>
+          </View>
         </KeyboardAvoidingView>
       </Portal>
 
@@ -929,6 +943,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     marginTop: 40,
+  },
+  // Normal-flow child of the create-folder KeyboardAvoidingView; see the
+  // comment at the dialog for why this spacer is required on iOS.
+  dialogAvoiderSpacer: {
+    flex: 1,
   },
   loader: {
     flex: 1,
