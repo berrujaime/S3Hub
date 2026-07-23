@@ -66,14 +66,18 @@ export default function BucketSelectScreen({ navigation }) {
       right={() => (
         selectedBucket === item.Name ? <List.Icon icon="check" /> : null
       )}
-      style={selectedBucket === item.Name ? styles.selectedItem : null}
+      style={
+        selectedBucket === item.Name
+          ? [styles.selectedItem, { backgroundColor: theme.colors.secondaryContainer }]
+          : null
+      }
     />
   );
 
   if (loading) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.loader, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -81,14 +85,18 @@ export default function BucketSelectScreen({ navigation }) {
   if (!currentConnection) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>{i18n.t('chooseConnection')}</Text>
+        <Text style={[styles.message, { color: theme.colors.onBackground }]}>
+          {i18n.t('chooseConnection')}
+        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{i18n.t('selectBucket')}</Text>
+      <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+        {i18n.t('selectBucket')}
+      </Text>
       <FlatList
         data={buckets}
         keyExtractor={(item) => item.Name}
@@ -127,7 +135,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   selectedItem: {
-    backgroundColor: '#e0f7fa',
+    // backgroundColor is themed inline (theme.colors.secondaryContainer) at
+    // the call site — a pale cyan-ish highlight in both MD3 conventions and
+    // this design's own secondary family, so it reads as "selected" without
+    // reaching for the amber primary accent (reserved for actions).
   },
   emptyContainer: {
     alignItems: 'center',

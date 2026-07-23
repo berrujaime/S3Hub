@@ -196,7 +196,9 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text variant="headlineLarge" style={styles.title}>S3Hub</Text>
+      <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>
+        S3Hub
+      </Text>
 
       <Image
         source={require('../../assets/logos/S3HubLogo_bg.png')}

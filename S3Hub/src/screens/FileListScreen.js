@@ -752,8 +752,8 @@ export default function FileListScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.loader, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -766,7 +766,9 @@ export default function FileListScreen() {
           operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')}
         />
       )}
-      <Text style={styles.title}>{i18n.t('filesIn')} {currentBucket}</Text>
+      <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+        {i18n.t('filesIn')} {currentBucket}
+      </Text>
 
       <Searchbar
         placeholder={i18n.t('search')}
@@ -812,6 +814,12 @@ export default function FileListScreen() {
             mode="contained"
             onPress={handleDeleteSelected}
             disabled={operationInFlight}
+            // buttonColor/textColor (not style.backgroundColor) so Paper
+            // computes an AA label color for THIS background rather than
+            // keeping its contained-mode default (onPrimary, meant for a
+            // primary-colored background).
+            buttonColor={theme.colors.error}
+            textColor={theme.colors.onError}
             style={styles.deleteButton}
           >
             {i18n.t('delete')}
@@ -951,7 +959,8 @@ const styles = StyleSheet.create({
   deleteButton: {
     flex: 1,
     marginHorizontal: 8,
-    backgroundColor: 'red',
+    // color is themed via the buttonColor/textColor props at the call site
+    // (theme.colors.error / onError) instead of a hardcoded literal.
   },
   fab: {
     position: 'absolute',

@@ -47,18 +47,47 @@ const lightColors = {
   // ~6.5:1 against #BA1A1A (verified via colorContrast.js).
   onError: '#FFFFFF',
   outline: '#C2CAD4',
-  // Elevation is intentionally NOT overridden here: the design direction
-  // only specifies a dark-theme elevation.level2 value (dark is "the
-  // primary experience"). Paper's default MD3LightTheme elevation ramp
-  // (near-white tints spread in via ...MD3LightTheme.colors above) already
-  // sits close to this theme's near-white surface/background and needs no
-  // bespoke values for this task.
-  // TODO(4.4): temporary compatibility shim. MediaViewerModal.js and
-  // UploadProgressPopup.js still read theme.colors.accent directly (the
-  // legacy token this theme removes). Alias it to secondaryContainer so
-  // those two consumers keep a sensible color until Task 4.4 rewires them
-  // onto real tokens.
-  accent: '#D4E2EF',
+  // Elevation ramp (Task 4.4). Originally left un-overridden, on the
+  // assumption that Paper's default MD3LightTheme elevation (near-white
+  // tints) was "close enough" to this theme's near-white surface/
+  // background. It isn't: MD3LightTheme's
+  // defaults are tints of ITS OWN primary (a purple), not this theme's amber
+  // — and react-native-paper's `adaptNavigationTheme` (see App.js) reads
+  // `colors.elevation.level2` as react-navigation's `card` background, so
+  // every screen that falls back to the navigator's default background
+  // (i.e. doesn't set one explicitly) was getting a visibly purple card.
+  //
+  // Derived here as a monotonic ramp moving away from `surface` (#FFFFFF,
+  // the ceiling — nothing is brighter) down through `surfaceVariant`
+  // (#E7ECF2) and slightly beyond it, entirely within this theme's own
+  // cool-slate family:
+  //  - level0: 'transparent' — matches Paper's own MD3 convention (see
+  //    darkColors.elevation below).
+  //  - level1/level2: linear interpolation from surface(255,255,255) to
+  //    surfaceVariant(231,236,242) in 3 equal per-channel steps of
+  //    roughly (-8,-6,-4): level1 (247,249,251) = #F7F9FB, level2
+  //    (239,243,247) = #EFF3F7.
+  //  - level3: the 3rd interpolation step lands almost exactly on
+  //    `surfaceVariant` itself, so level3 reuses that exact token value
+  //    (#E7ECF2) — mirroring how darkColors.elevation.level1 below reuses
+  //    `surfaceVariant` rather than inventing a fourth near-duplicate value.
+  //  - level4/level5: continue past surfaceVariant with the same per-channel
+  //    direction, tapering the step (-6,-5,-4 then -5,-4,-3) so the ramp
+  //    approaches (without reaching) `outline` (#C2CAD4) rather than
+  //    climbing/falling linearly forever — the same tapering-ceiling
+  //    reasoning darkColors.elevation documents for its own level3-5.
+  // Deliberately NOT a tint of `primary` (Paper's own default algorithm,
+  // and what produced the purple `card` in the first place): the design
+  // direction spends its one bold color exclusively on the amber signal,
+  // so a neutral elevation ramp keeps every other surface out of that.
+  elevation: {
+    level0: 'transparent',
+    level1: '#F7F9FB',
+    level2: '#EFF3F7',
+    level3: '#E7ECF2',
+    level4: '#E1E7EE',
+    level5: '#DCE3EB',
+  },
 };
 
 const darkColors = {
@@ -111,8 +140,6 @@ const darkColors = {
     level4: '#2A3442',
     level5: '#2D3746',
   },
-  // TODO(4.4): temporary compatibility shim, see lightColors.accent above.
-  accent: '#32465B',
 };
 
 // --- Typography (Task 4.2) ---------------------------------------------
@@ -215,13 +242,3 @@ export const darkTheme = {
   colors: darkColors,
   fonts,
 };
-
-// Default export kept for backward compatibility with the one remaining
-// static (non-useTheme()) consumer, UploadProgressPopup.js, which does
-// `import theme from '../theme/theme'` instead of using Paper's useTheme()
-// hook. App.js already imports the named lightTheme/darkTheme exports and
-// picks between them based on the active scheme. lightTheme preserves the
-// pre-existing default (which scheme is default belongs to Tasks 4.2/4.3);
-// Task 4.4 rewires UploadProgressPopup onto useTheme(), after which this
-// export can be removed.
-export default lightTheme;

@@ -81,7 +81,9 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text variant="headlineLarge" style={styles.title}>{i18n.t('selectConnection')}</Text>
+      <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>
+        {i18n.t('selectConnection')}
+      </Text>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}

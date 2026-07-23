@@ -123,7 +123,7 @@ export default function AppNavigator() {
 
   if (isLoading) {
     // Render a loading screen while loading data. Themed (rather than the
-    // old hardcoded white background + #0000ff spinner) since this renders
+    // old hardcoded light background + platform-default spinner) since this renders
     // inside NavigationContainer/PaperProvider, so useTheme() is available
     // and the loader must match the surrounding scheme to avoid a flash.
     return (

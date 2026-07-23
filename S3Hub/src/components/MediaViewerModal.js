@@ -20,6 +20,17 @@ const itemCacheKey = (item) =>
 // Full-screen media viewer with horizontal paging. Extracted verbatim from
 // FileListScreen's modal. The parent owns the media list, the current index,
 // and the action handlers.
+//
+// Design exception (Task 4.4): `modalContainer`/`modalHeader`'s
+// rgba(0,0,0,...) fills and the `iconColor="white"` header buttons are kept
+// as fixed constants rather than theme tokens. This full-screen backdrop and
+// its chrome sit on top of arbitrary user photo/video content, not an app
+// surface — a themed (light-mode) background/icon color here would fight
+// the media itself and could disappear against either a light or dark
+// theme, whereas a black scrim + white icons stays legible in both schemes.
+// `infoContainer`/`infoText` are NOT part of this exception: that box shows
+// app-owned text (file name/size) over a solid theme color
+// (secondaryContainer), so it is themed normally below.
 const MediaViewerModal = ({
   visible,
   mediaFiles,
@@ -141,9 +152,11 @@ const MediaViewerModal = ({
         />
 
         {mediaFiles[currentMediaIndex] && (
-          <View style={[styles.infoContainer, { backgroundColor: theme.colors.accent }]}>
-            <Text style={styles.infoText}>{i18n.t('fileName')}: {mediaFiles[currentMediaIndex].name}</Text>
-            <Text style={styles.infoText}>
+          <View style={[styles.infoContainer, { backgroundColor: theme.colors.secondaryContainer }]}>
+            <Text style={[styles.infoText, { color: theme.colors.onSecondaryContainer }]}>
+              {i18n.t('fileName')}: {mediaFiles[currentMediaIndex].name}
+            </Text>
+            <Text style={[styles.infoText, { color: theme.colors.onSecondaryContainer }]}>
               {i18n.t('fileSize')}: {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
             </Text>
           </View>
@@ -154,6 +167,9 @@ const MediaViewerModal = ({
 };
 
 const styles = StyleSheet.create({
+  // modalContainer/modalHeader keep fixed rgba(0,0,0,...) scrims — see the
+  // "Design exception" comment above the component for why (full-screen
+  // backdrop/chrome over arbitrary media, not an app surface).
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',
@@ -198,12 +214,14 @@ const styles = StyleSheet.create({
     bottom: 16,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    // backgroundColor is themed inline (secondaryContainer) at the call
+    // site — this box shows app-owned text, not media, so it follows the
+    // active scheme instead of the fixed black scrim above.
     padding: 16,
     borderRadius: 8,
   },
   infoText: {
-    color: 'white',
+    // color is themed inline (onSecondaryContainer) at the call site.
     fontSize: 16,
     marginBottom: 8,
   },

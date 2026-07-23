@@ -60,11 +60,12 @@ const FileItem = ({
             justifyContent: viewMode === 'grid' ? 'center' : 'flex-start',
             alignItems: 'center',
             flexDirection: viewMode === 'grid' ? 'column' : 'row',
+            borderColor: theme.colors.outline,
           },
         ]}
       >
         <IconButton icon="folder" size={50} />
-        <Text>{item.name}</Text>
+        <Text style={{ color: theme.colors.onSurface }}>{item.name}</Text>
         {isSelected && (
           <View style={styles.checkboxContainer}>
             <Checkbox
@@ -100,7 +101,7 @@ const FileItem = ({
                   cacheKey={cacheKey}
                 />
                 <View style={styles.playIconContainer}>
-                  <IconButton icon="play-circle-outline" size={50} color="#fff" />
+                  <IconButton icon="play-circle-outline" size={50} color={theme.colors.onSurface} />
                 </View>
               </View>
             ) : (
@@ -110,7 +111,7 @@ const FileItem = ({
             // When preview is off: show placeholder icon + file name (grid only)
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <IconButton icon="video-outline" size={50} />
-              <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
             </View>
           )}
           {isSelected && (
@@ -126,7 +127,7 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
-          style={styles.listItemContainer}
+          style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           {(preview === 'true') ? (
             item.url ? (
@@ -141,7 +142,7 @@ const FileItem = ({
                   cacheKey={cacheKey}
                 />
                 <View style={styles.playIconContainerList}>
-                  <IconButton icon="play-circle-outline" size={30} color="#fff" />
+                  <IconButton icon="play-circle-outline" size={30} color={theme.colors.onSurface} />
                 </View>
               </View>
             ) : (
@@ -154,8 +155,8 @@ const FileItem = ({
             </View>
           )}
           <View style={styles.listTextContainer}>
-            <Text style={styles.listText}>{item.name}</Text>
-            <Text style={styles.listSubText}>
+            <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
+            <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
               {(item.size / (1024 * 1024)).toFixed(2)} MB
             </Text>
           </View>
@@ -185,6 +186,7 @@ const FileItem = ({
                     height: '100%',
                     opacity: isSelected ? 0.5 : 1,
                     borderRadius: 10,
+                    borderColor: theme.colors.outline,
                   },
                 ]}
                 source={{ uri: item.url }}
@@ -197,7 +199,7 @@ const FileItem = ({
             // When preview is off: show placeholder icon + file name (grid only)
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <IconButton icon="image-outline" size={50} />
-              <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
             </View>
           )}
           {isSelected && (
@@ -213,7 +215,7 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
-          style={styles.listItemContainer}
+          style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           {(preview === 'true') ? (
             item.url ? (
@@ -232,8 +234,8 @@ const FileItem = ({
             </View>
           )}
           <View style={styles.listTextContainer}>
-            <Text style={styles.listText}>{item.name}</Text>
-            <Text style={styles.listSubText}>
+            <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
+            <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
               {(item.size / (1024 * 1024)).toFixed(2)} MB
             </Text>
           </View>
@@ -258,7 +260,7 @@ const FileItem = ({
         >
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <MaterialCommunityIcons name={genericIconName} size={50} color={theme.colors.onSurface} />
-            <Text style={{ textAlign: 'center' }}>{item.name}</Text>
+            <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
           </View>
           {isSelected && (
             <View style={styles.checkboxContainer}>
@@ -273,14 +275,14 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
-          style={styles.listItemContainer}
+          style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           <View style={[styles.listImage, { justifyContent: 'center', alignItems: 'center' }]}>
             <MaterialCommunityIcons name={genericIconName} size={30} color={theme.colors.onSurface} />
           </View>
           <View style={styles.listTextContainer}>
-            <Text style={styles.listText}>{item.name}</Text>
-            <Text style={styles.listSubText}>
+            <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
+            <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
               {(item.size / (1024 * 1024)).toFixed(2)} MB
             </Text>
           </View>
@@ -335,14 +337,14 @@ const styles = StyleSheet.create({
   },
   image: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    // borderColor is themed inline (theme.colors.outline) at the call site.
   },
   listItemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 8,
     borderBottomWidth: 1,
-    borderColor: '#ccc',
+    // borderColor is themed inline (theme.colors.outline) at each call site.
   },
   listImage: {
     width: 50,
@@ -358,7 +360,9 @@ const styles = StyleSheet.create({
   },
   listSubText: {
     fontSize: 12,
-    color: '#666',
+    // color is themed inline (theme.colors.onSurfaceVariant) at each call
+    // site — the design direction calls this out by name: onSurfaceVariant
+    // is the token that replaces the old muted mid-gray text color.
   },
   listCheckbox: {
     marginLeft: 8,
@@ -368,6 +372,12 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
   },
+  // Design exception (Task 4.4, same rationale as MediaViewerModal's
+  // backdrop): this translucent white patch sits behind the selection
+  // checkmark on top of an arbitrary photo/video thumbnail, not an app
+  // surface. A theme-driven (dark-mode) tint here would vary in opacity
+  // against unpredictable thumbnail colors, whereas a fixed light patch
+  // reliably keeps the checkmark visible in both schemes.
   checkbox: {
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },

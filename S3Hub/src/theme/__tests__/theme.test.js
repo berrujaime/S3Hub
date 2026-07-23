@@ -1,3 +1,4 @@
+import { MD3LightTheme } from 'react-native-paper';
 import { lightTheme, darkTheme } from '../theme';
 import { contrastRatio } from '../../domain/colorContrast';
 
@@ -103,6 +104,34 @@ describe('lightTheme / darkTheme (Deep storage palette)', () => {
     }
   });
 
+  it('overrides the light elevation ramp instead of inheriting MD3LightTheme\'s purple-tinted default (Task 4.4 — this is what adaptNavigationTheme reads as react-navigation\'s "card")', () => {
+    expect(lightTheme.colors.elevation.level2).not.toBe(
+      MD3LightTheme.colors.elevation.level2
+    );
+  });
+
+  it('exposes a light elevation ramp that moves monotonically away from the pure-white surface, staying in the neutral slate family', () => {
+    const { elevation, surface } = lightTheme.colors;
+    const levels = [
+      elevation.level1,
+      elevation.level2,
+      elevation.level3,
+      elevation.level4,
+      elevation.level5,
+    ];
+    // Surface (#FFFFFF) is the brightest point in the light scheme, so —
+    // unlike dark's ramp, which lightens away from a dark base — the light
+    // ramp darkens (moves toward surfaceVariant/outline) as elevation rises.
+    const luminanceOf = (hex) => contrastRatio(hex, '#FFFFFF');
+    expect(luminanceOf(levels[0])).toBeGreaterThan(luminanceOf(surface));
+    for (let i = 1; i < levels.length; i += 1) {
+      expect(luminanceOf(levels[i])).toBeGreaterThan(luminanceOf(levels[i - 1]));
+    }
+    // level3 anchors to the real surfaceVariant token (see the derivation
+    // comment in theme.js) rather than inventing a near-duplicate value.
+    expect(elevation.level3).toBe(lightTheme.colors.surfaceVariant);
+  });
+
   it('exposes secondary/secondaryContainer tokens instead of the legacy accent', () => {
     expect(lightTheme.colors.secondary).toBeTruthy();
     expect(lightTheme.colors.secondaryContainer).toBeTruthy();
@@ -113,12 +142,9 @@ describe('lightTheme / darkTheme (Deep storage palette)', () => {
     );
   });
 
-  it('keeps a temporary accent alias (= secondaryContainer) so pre-Task-4.4 consumers do not break', () => {
-    // MediaViewerModal and UploadProgressPopup still read theme.colors.accent
-    // directly; Task 4.4 rewires them onto secondaryContainer. Until then,
-    // accent is not a real design token, just a compatibility shim.
-    expect(lightTheme.colors.accent).toBe(lightTheme.colors.secondaryContainer);
-    expect(darkTheme.colors.accent).toBe(darkTheme.colors.secondaryContainer);
+  it('no longer exposes the legacy accent alias (Task 4.4 rewired its last consumers onto real tokens)', () => {
+    expect(lightTheme.colors.accent).toBeUndefined();
+    expect(darkTheme.colors.accent).toBeUndefined();
   });
 });
 
