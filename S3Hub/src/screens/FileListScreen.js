@@ -869,9 +869,21 @@ export default function FileListScreen() {
       />
 
       <Portal>
-        <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
-          <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {/* The keyboard avoider must sit at the Portal root: RN computes the
+            keyboard overlap from the wrapped view's parent-relative onLayout
+            frame versus the keyboard's absolute screen Y, so the math only
+            fires when the wrapper spans the screen (frame.y ~ 0). Wrapping
+            anything deeper (e.g. Dialog.Content) yields zero overlap and no
+            adjustment. Paper re-centers the Dialog inside the shrunken area,
+            keeping the input above the keyboard. pointerEvents="box-none"
+            lets backdrop presses through so onDismiss still works. */}
+        <KeyboardAvoidingView
+          style={StyleSheet.absoluteFill}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+        >
+          <Dialog visible={isDialogVisible} onDismiss={() => setIsDialogVisible(false)}>
+            <Dialog.Title>{i18n.t('createFolder')}</Dialog.Title>
             <Dialog.Content>
               <TextInput
                 label={i18n.t('folderName')}
@@ -880,12 +892,12 @@ export default function FileListScreen() {
                 mode="outlined"
               />
             </Dialog.Content>
-          </KeyboardAvoidingView>
-          <Dialog.Actions>
-            <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
-            <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
-          </Dialog.Actions>
-        </Dialog>
+            <Dialog.Actions>
+              <Button onPress={() => setIsDialogVisible(false)}>{i18n.t('cancel')}</Button>
+              <Button onPress={handleCreateFolder}>{i18n.t('create')}</Button>
+            </Dialog.Actions>
+          </Dialog>
+        </KeyboardAvoidingView>
       </Portal>
 
       <FAB
