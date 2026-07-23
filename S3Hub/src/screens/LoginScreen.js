@@ -1,6 +1,14 @@
 // src/screens/LoginScreen.js
 import React, { useState, useContext } from 'react';
-import { View, StyleSheet, Alert, Image } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { Text, TextInput, Button, Menu, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
@@ -195,77 +203,96 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>
-        S3Hub
-      </Text>
-
-      <Image
-        source={require('../../assets/logos/S3HubLogo_bg.png')}
-        style={styles.centeredImage}
-        resizeMode="contain"
-      />
-
-      <TextInput
-        label={i18n.t('accessKey')}
-        value={accessKey}
-        onChangeText={setAccessKey}
-        mode="outlined"
-        autoCapitalize="none"
-        style={styles.input}
-      />
-      <TextInput
-        label={i18n.t('secretKey')}
-        value={secretKey}
-        onChangeText={setSecretKey}
-        mode="outlined"
-        secureTextEntry
-        autoCapitalize="none"
-        style={styles.input}
-      />
-
-      <Text style={[styles.label, { color: theme.colors.onBackground }]}>
-        {i18n.t('selectProvider')}
-      </Text>
-      <Menu
-        visible={providerMenuVisible}
-        onDismiss={closeProviderMenu}
-        anchor={
-          <Button
-            mode="outlined"
-            onPress={openProviderMenu}
-            icon={() => renderProviderMark(provider)}
-            style={styles.menuButton}
-          >
-            {provider.name}
-          </Button>
-        }
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoidingView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {PROVIDER_LIST.map((item) => (
-          <Menu.Item
-            key={item.id}
-            onPress={() => handleProviderChange(item.id)}
-            title={item.name}
-            leadingIcon={() => renderProviderMark(item)}
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <Text
+            variant="headlineLarge"
+            style={[styles.title, { color: theme.colors.onBackground }]}
+          >
+            S3Hub
+          </Text>
+
+          <Image
+            source={require('../../assets/logos/S3HubLogo_bg.png')}
+            style={styles.centeredImage}
+            resizeMode="contain"
           />
-        ))}
-      </Menu>
 
-      {renderExtraFields()}
+          <TextInput
+            label={i18n.t('accessKey')}
+            value={accessKey}
+            onChangeText={setAccessKey}
+            mode="outlined"
+            autoCapitalize="none"
+            style={styles.input}
+          />
+          <TextInput
+            label={i18n.t('secretKey')}
+            value={secretKey}
+            onChangeText={setSecretKey}
+            mode="outlined"
+            secureTextEntry
+            autoCapitalize="none"
+            style={styles.input}
+          />
 
-      <Text style={[styles.label, { color: theme.colors.onBackground }]}>
-        {i18n.t('selectRegion')}
-      </Text>
-      {renderRegionInput()}
+          <Text style={[styles.label, { color: theme.colors.onBackground }]}>
+            {i18n.t('selectProvider')}
+          </Text>
+          <Menu
+            visible={providerMenuVisible}
+            onDismiss={closeProviderMenu}
+            anchor={
+              <Button
+                mode="outlined"
+                onPress={openProviderMenu}
+                icon={() => renderProviderMark(provider)}
+                style={styles.menuButton}
+              >
+                {provider.name}
+              </Button>
+            }
+          >
+            {PROVIDER_LIST.map((item) => (
+              <Menu.Item
+                key={item.id}
+                onPress={() => handleProviderChange(item.id)}
+                title={item.name}
+                leadingIcon={() => renderProviderMark(item)}
+              />
+            ))}
+          </Menu>
 
-      <Button mode="contained" onPress={handleLogin} style={styles.button}>
-        {i18n.t('login')}
-      </Button>
-    </View>
+          {renderExtraFields()}
+
+          <Text style={[styles.label, { color: theme.colors.onBackground }]}>
+            {i18n.t('selectRegion')}
+          </Text>
+          {renderRegionInput()}
+
+          <Button mode="contained" onPress={handleLogin} style={styles.button}>
+            {i18n.t('login')}
+          </Button>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     padding: 16,
