@@ -1,6 +1,6 @@
 // src/screens/BucketSelectScreen.js
 
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Text, List, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,29 +24,35 @@ export default function BucketSelectScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const containerStyle = [styles.container, { paddingTop: insets.top + SCREEN_TOP_SPACING }];
 
-  useEffect(() => {
-    if (currentConnection) {
-      fetchBuckets();
-    } else {
-      setBuckets([]);
-      setSelectedBucket(null); // Reset the selection
-    }
-    // TODO(Task 5.6): include fetchBuckets once auto-nav guard lands
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentConnection]);
+  // Tracks the id of the connection we've already auto-navigated away from
+  // (single-bucket shortcut below), so the effect can fire the auto-nav
+  // exactly ONCE per connection instead of on every re-run of fetchBuckets
+  // (e.g. simply returning to this tab). Comparing by `id` — rather than
+  // e.g. a boolean flag — means switching to a DIFFERENT connection (even
+  // one that also has a single bucket) correctly fires the auto-nav again,
+  // while re-fetching for the SAME connection does not.
+  const autoNavigatedConnectionIdRef = useRef(null);
 
-  const fetchBuckets = async () => {
+  const fetchBuckets = useCallback(async () => {
     try {
       setLoading(true);
       const bucketsList = await listBuckets(currentConnection);
       setBuckets(bucketsList);
 
-      // If there is only one bucket, select it automatically
+      // If there is only one bucket, select it automatically...
       if (bucketsList.length === 1) {
         const singleBucket = bucketsList[0];
         setSelectedBucket(singleBucket.Name);
         await setCurrentBucket(singleBucket.Name);
-        navigation.navigate('FilesTab');
+
+        // ...but only auto-NAVIGATE the first time we see this connection.
+        // Without this guard, any re-run of fetchBuckets for the same
+        // connection (e.g. the user manually switching back to the Buckets
+        // tab) would immediately bounce them back to Files.
+        if (autoNavigatedConnectionIdRef.current !== currentConnection.id) {
+          autoNavigatedConnectionIdRef.current = currentConnection.id;
+          navigation.navigate('FilesTab');
+        }
       }
     } catch (error) {
       console.error("Error fetching the buckets:", error);
@@ -54,7 +60,16 @@ export default function BucketSelectScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentConnection, navigation, setCurrentBucket]);
+
+  useEffect(() => {
+    if (currentConnection) {
+      fetchBuckets();
+    } else {
+      setBuckets([]);
+      setSelectedBucket(null); // Reset the selection
+    }
+  }, [currentConnection, fetchBuckets]);
 
   const handleBucketSelect = async (bucket) => {
     try {

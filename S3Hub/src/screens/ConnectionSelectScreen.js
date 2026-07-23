@@ -20,13 +20,17 @@ export default function ConnectionSelectScreen({ navigation }) {
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
 
   const handleConnectionSelect = async (connection) => {
-    if (connection.accessKey !== currentConnection.accessKey) {
+    // Compare by `id` (stable per Tasks 1.5/1.6), not `accessKey` (not
+    // guaranteed unique, and irrelevant to "is this already active").
+    // `currentConnection` can be null (no active connection yet), hence the
+    // optional chaining. Re-setting the already-active connection is
+    // skipped, not just redundant: setActiveConnection() unconditionally
+    // resets currentBucket to null, which would needlessly kick the user
+    // out of an already-selected bucket for no actual connection change.
+    if (currentConnection?.id !== connection.id) {
       await setActiveConnection(connection);
-      navigation.navigate('BucketsTab');
     }
-    else{
-      navigation.navigate('BucketsTab');
-    }
+    navigation.navigate('BucketsTab');
   };
 
   const handleAddConnection = () => {

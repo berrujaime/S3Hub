@@ -125,3 +125,68 @@ describe('BucketSelectScreen provider spine stacking', () => {
     });
   });
 });
+
+// Regression test for Task 5.6: the single-bucket auto-navigate used to fire
+// on every re-run of the effect that fetches buckets (any `currentConnection`
+// change, including a same-connection object recreated with the same id),
+// bouncing the user straight back to Files whenever they tried to stay on
+// the Buckets tab. It must now fire exactly once per connection id.
+describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
+  const SINGLE_BUCKET = [{ Name: 'only-bucket' }];
+
+  const connectionA = { id: 'conn-a', service: 'aws', region: 'eu-west-1', accessKey: 'A' };
+  const connectionB = { id: 'conn-b', service: 'storj', region: 'us1', accessKey: 'B' };
+
+  const renderWithConnection = (connection, { navigation, setCurrentBucket }) =>
+    render(
+      <PaperProvider theme={darkTheme}>
+        <AuthContext.Provider value={{ currentConnection: connection, setCurrentBucket }}>
+          <BucketSelectScreen navigation={navigation} />
+        </AuthContext.Provider>
+      </PaperProvider>
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    listBuckets.mockResolvedValue(SINGLE_BUCKET);
+  });
+
+  it('auto-navigates once per connection: not again on a re-render of the same connection, but again after switching connections', async () => {
+    const navigation = { navigate: jest.fn() };
+    const setCurrentBucket = jest.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderWithConnection(connectionA, { navigation, setCurrentBucket });
+
+    await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('FilesTab'));
+    expect(navigation.navigate).toHaveBeenCalledTimes(1);
+
+    // Re-render for the SAME connection id, but with a brand-new object
+    // reference (e.g. a context value recompute elsewhere in the app) — the
+    // effect re-runs (fetchBuckets refreshes) but must NOT re-navigate.
+    rerender(
+      <PaperProvider theme={darkTheme}>
+        <AuthContext.Provider
+          value={{ currentConnection: { ...connectionA }, setCurrentBucket }}
+        >
+          <BucketSelectScreen navigation={navigation} />
+        </AuthContext.Provider>
+      </PaperProvider>
+    );
+
+    await waitFor(() => expect(listBuckets).toHaveBeenCalledTimes(2));
+    expect(navigation.navigate).toHaveBeenCalledTimes(1);
+
+    // Switching to a DIFFERENT connection (also single-bucket) must
+    // auto-navigate again.
+    rerender(
+      <PaperProvider theme={darkTheme}>
+        <AuthContext.Provider value={{ currentConnection: connectionB, setCurrentBucket }}>
+          <BucketSelectScreen navigation={navigation} />
+        </AuthContext.Provider>
+      </PaperProvider>
+    );
+
+    await waitFor(() => expect(navigation.navigate).toHaveBeenCalledTimes(2));
+    expect(navigation.navigate).toHaveBeenNthCalledWith(2, 'FilesTab');
+  });
+});

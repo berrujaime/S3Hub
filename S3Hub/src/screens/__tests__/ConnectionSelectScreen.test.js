@@ -1,0 +1,91 @@
+// src/screens/__tests__/ConnectionSelectScreen.test.js
+//
+// Regression test for Task 5.6: the selection handler used to compare
+// connections by `accessKey` with a dead conditional (both branches
+// navigated) and an unguarded `currentConnection` (crashed when null). It
+// now compares by the stable `id` (Tasks 1.5/1.6) and, crucially, skips
+// re-calling `setActiveConnection` when the tapped connection is already
+// active -- setActiveConnection() unconditionally resets `currentBucket` to
+// null, so calling it for a no-op selection would needlessly kick the user
+// out of an already-selected bucket.
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
+import ConnectionSelectScreen from '../ConnectionSelectScreen';
+import { AuthContext } from '../../context/AuthContext';
+import { darkTheme } from '../../theme/theme';
+
+// Explicit factory (same rationale as BucketSelectScreen.test.js /
+// SettingsScreen.test.js): AuthContext's module-level import of
+// connectionRepository pulls in AsyncStorage/SecureStore native modules that
+// don't load outside a device runtime. The test only needs the AuthContext
+// *object* to provide its own value, never the real provider.
+jest.mock('../../data/connectionRepository', () => ({}));
+
+const ACTIVE_CONNECTION = {
+  id: 'conn-1',
+  service: 'aws',
+  region: 'eu-west-1',
+  accessKey: 'AKIA-ACTIVE',
+};
+
+const OTHER_CONNECTION = {
+  id: 'conn-2',
+  service: 'storj',
+  region: 'us1',
+  accessKey: 'AKIA-OTHER',
+};
+
+const renderScreen = ({ currentConnection = ACTIVE_CONNECTION } = {}) => {
+  const navigation = { navigate: jest.fn() };
+  const setActiveConnection = jest.fn().mockResolvedValue(undefined);
+  const deleteConnection = jest.fn();
+  render(
+    <PaperProvider theme={darkTheme}>
+      <AuthContext.Provider
+        value={{
+          connections: [ACTIVE_CONNECTION, OTHER_CONNECTION],
+          currentConnection,
+          setActiveConnection,
+          deleteConnection,
+        }}
+      >
+        <ConnectionSelectScreen navigation={navigation} />
+      </AuthContext.Provider>
+    </PaperProvider>
+  );
+  return { navigation, setActiveConnection };
+};
+
+describe('ConnectionSelectScreen connection selection', () => {
+  it('does not call setActiveConnection when selecting the already-active connection, but still navigates', async () => {
+    const { navigation, setActiveConnection } = renderScreen();
+
+    fireEvent.press(screen.getByText('AWS S3'));
+    // Let the async handler's microtasks flush.
+    await Promise.resolve();
+
+    expect(setActiveConnection).not.toHaveBeenCalled();
+    expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
+  });
+
+  it('calls setActiveConnection when selecting a different connection', async () => {
+    const { navigation, setActiveConnection } = renderScreen();
+
+    fireEvent.press(screen.getByText('Storj'));
+    await Promise.resolve();
+
+    expect(setActiveConnection).toHaveBeenCalledWith(OTHER_CONNECTION);
+    expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
+  });
+
+  it('does not crash and calls setActiveConnection when there is no active connection yet', async () => {
+    const { navigation, setActiveConnection } = renderScreen({ currentConnection: null });
+
+    fireEvent.press(screen.getByText('AWS S3'));
+    await Promise.resolve();
+
+    expect(setActiveConnection).toHaveBeenCalledWith(ACTIVE_CONNECTION);
+    expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
+  });
+});
