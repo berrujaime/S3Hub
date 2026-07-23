@@ -11,7 +11,7 @@
 // Token values are taken verbatim from the Phase 4 design direction
 // EXCEPT lightTheme.colors.primary — see the comment at
 // LIGHT_PRIMARY_AA_FIXED below for why it was nudged one step darker.
-import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import { MD3LightTheme, MD3DarkTheme, configureFonts } from 'react-native-paper';
 
 // The design direction specifies `primary #B4650F` for light ("deepened
 // amber so white or dark labels pass AA") paired with `onPrimary #FFFFFF`.
@@ -115,16 +115,105 @@ const darkColors = {
   accent: '#32465B',
 };
 
+// --- Typography (Task 4.2) ---------------------------------------------
+//
+// Bundled via `expo-font`'s `useFonts` in App.js — NO native module/plugin
+// involved (see App.js for the full list of imports/registrations). The
+// string literals below MUST exactly match the keys App.js registers
+// (they are the exported member names of the @expo-google-fonts/*
+// packages, e.g. `import { SpaceGrotesk_700Bold } from
+// '@expo-google-fonts/space-grotesk'` then `useFonts({ SpaceGrotesk_700Bold, ... })`).
+// If a weight is ever added/renamed here, update App.js's useFonts() call
+// to match, and vice versa.
+//
+// Per the Phase 4 design direction: display **Space Grotesk** for
+// headers/titles (technical character), body **Inter** for legible UI
+// text, mono **JetBrains Mono** for the storage vernacular (object keys,
+// region codes, byte sizes, endpoints).
+const SPACE_GROTESK_BOLD = 'SpaceGrotesk_700Bold';
+const SPACE_GROTESK_MEDIUM = 'SpaceGrotesk_500Medium';
+const INTER_REGULAR = 'Inter_400Regular';
+const INTER_MEDIUM = 'Inter_500Medium';
+const JETBRAINS_MONO_REGULAR = 'JetBrainsMono_400Regular';
+const JETBRAINS_MONO_MEDIUM = 'JetBrainsMono_500Medium';
+
+// Only `fontFamily` (and `fontWeight: 'normal'`) are overridden per role;
+// fontSize/lineHeight/letterSpacing keep Paper's MD3 defaults, which
+// `configureFonts` merges in automatically for any role not fully
+// specified here (see react-native-paper/src/styles/fonts.tsx).
+//
+// `fontWeight` is deliberately set to 'normal' rather than left as
+// Paper's stock numeric value (or set to match the family's actual
+// weight): these are static, single-weight font files (not variable
+// fonts), so the weight is already baked into the fontFamily string
+// itself (e.g. `SpaceGrotesk_700Bold`). Pairing a bold-weight fontFamily
+// with `fontWeight: '700'` risks Android synthesizing a second, fake
+// bold pass on top of the already-bold glyphs. This matches the official
+// @expo-google-fonts usage pattern, which never sets `fontWeight`
+// alongside a per-weight `fontFamily`.
+const fontConfig = {
+  displayLarge: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  displayMedium: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  displaySmall: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  headlineLarge: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  headlineMedium: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  headlineSmall: { fontFamily: SPACE_GROTESK_BOLD, fontWeight: 'normal' },
+  titleLarge: { fontFamily: SPACE_GROTESK_MEDIUM, fontWeight: 'normal' },
+  titleMedium: { fontFamily: SPACE_GROTESK_MEDIUM, fontWeight: 'normal' },
+  titleSmall: { fontFamily: SPACE_GROTESK_MEDIUM, fontWeight: 'normal' },
+  labelLarge: { fontFamily: INTER_MEDIUM, fontWeight: 'normal' },
+  labelMedium: { fontFamily: INTER_MEDIUM, fontWeight: 'normal' },
+  labelSmall: { fontFamily: INTER_MEDIUM, fontWeight: 'normal' },
+  bodyLarge: { fontFamily: INTER_REGULAR, fontWeight: 'normal' },
+  bodyMedium: { fontFamily: INTER_REGULAR, fontWeight: 'normal' },
+  bodySmall: { fontFamily: INTER_REGULAR, fontWeight: 'normal' },
+};
+
+const fonts = configureFonts({ config: fontConfig });
+
+// `mono` is a theme extension (not a stock MD3 typescale role) for the
+// storage vernacular the design direction calls out: object keys, region
+// codes, byte sizes, endpoints. Consumers (Task 4.5 onward) read it via
+// `useTheme().fonts.mono`:
+//   - `mono.regular` (JetBrains Mono, 400) — inline values: object keys,
+//     byte sizes.
+//   - `mono.medium` (JetBrains Mono, 500) — the slightly-emphasized
+//     region/endpoint tag described in the "provider spine" signature
+//     element.
+// Both share bodyMedium's fontSize/lineHeight/letterSpacing so mono text
+// lines up with surrounding body copy; only family/weight differ. Do NOT
+// hardcode 'JetBrainsMono_...' family strings in components — read this
+// object off the theme instead, so a future font swap only touches this
+// file.
+fonts.mono = {
+  regular: {
+    fontFamily: JETBRAINS_MONO_REGULAR,
+    fontWeight: 'normal',
+    fontSize: fonts.bodyMedium.fontSize,
+    lineHeight: fonts.bodyMedium.lineHeight,
+    letterSpacing: fonts.bodyMedium.letterSpacing,
+  },
+  medium: {
+    fontFamily: JETBRAINS_MONO_MEDIUM,
+    fontWeight: 'normal',
+    fontSize: fonts.bodyMedium.fontSize,
+    lineHeight: fonts.bodyMedium.lineHeight,
+    letterSpacing: fonts.bodyMedium.letterSpacing,
+  },
+};
+
 export const lightTheme = {
   ...MD3LightTheme,
   dark: false,
   colors: lightColors,
+  fonts,
 };
 
 export const darkTheme = {
   ...MD3DarkTheme,
   dark: true,
   colors: darkColors,
+  fonts,
 };
 
 // Default export kept for backward compatibility with the one remaining

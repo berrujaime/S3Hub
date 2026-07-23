@@ -121,3 +121,70 @@ describe('lightTheme / darkTheme (Deep storage palette)', () => {
     expect(darkTheme.colors.accent).toBe(darkTheme.colors.secondaryContainer);
   });
 });
+
+describe('lightTheme / darkTheme fonts (Task 4.2 type scale)', () => {
+  // These family-name strings are the exact keys App.js registers via
+  // expo-font's useFonts() -- see the comment above `fontConfig` in
+  // src/theme/theme.js for why they must stay in sync.
+  const SPACE_GROTESK_BOLD = 'SpaceGrotesk_700Bold';
+  const SPACE_GROTESK_MEDIUM = 'SpaceGrotesk_500Medium';
+  const INTER_REGULAR = 'Inter_400Regular';
+  const INTER_MEDIUM = 'Inter_500Medium';
+  const JETBRAINS_MONO_REGULAR = 'JetBrainsMono_400Regular';
+  const JETBRAINS_MONO_MEDIUM = 'JetBrainsMono_500Medium';
+
+  it('maps display/headline roles to the Space Grotesk bold weight in both themes', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      for (const role of ['displayLarge', 'displayMedium', 'displaySmall', 'headlineLarge', 'headlineMedium', 'headlineSmall']) {
+        expect(theme.fonts[role].fontFamily).toBe(SPACE_GROTESK_BOLD);
+      }
+    }
+  });
+
+  it('maps title roles to the Space Grotesk medium weight in both themes', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      for (const role of ['titleLarge', 'titleMedium', 'titleSmall']) {
+        expect(theme.fonts[role].fontFamily).toBe(SPACE_GROTESK_MEDIUM);
+      }
+    }
+  });
+
+  it('maps body roles to Inter regular and label roles to Inter medium in both themes', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      for (const role of ['bodyLarge', 'bodyMedium', 'bodySmall']) {
+        expect(theme.fonts[role].fontFamily).toBe(INTER_REGULAR);
+      }
+      for (const role of ['labelLarge', 'labelMedium', 'labelSmall']) {
+        expect(theme.fonts[role].fontFamily).toBe(INTER_MEDIUM);
+      }
+    }
+  });
+
+  it('does not pair a per-weight fontFamily with a numeric fontWeight (Android double-bold risk)', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      for (const role of [
+        'displayLarge', 'displayMedium', 'displaySmall',
+        'headlineLarge', 'headlineMedium', 'headlineSmall',
+        'titleLarge', 'titleMedium', 'titleSmall',
+        'labelLarge', 'labelMedium', 'labelSmall',
+        'bodyLarge', 'bodyMedium', 'bodySmall',
+      ]) {
+        expect(theme.fonts[role].fontWeight).toBe('normal');
+      }
+    }
+  });
+
+  it('exposes a mono theme extension (regular + medium) for keys/regions/sizes/endpoints', () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      expect(theme.fonts.mono.regular.fontFamily).toBe(JETBRAINS_MONO_REGULAR);
+      expect(theme.fonts.mono.medium.fontFamily).toBe(JETBRAINS_MONO_MEDIUM);
+      // Sized to match bodyMedium so mono text lines up with surrounding copy.
+      expect(theme.fonts.mono.regular.fontSize).toBe(theme.fonts.bodyMedium.fontSize);
+      expect(theme.fonts.mono.regular.lineHeight).toBe(theme.fonts.bodyMedium.lineHeight);
+    }
+  });
+
+  it('shares the exact same fonts config object between light and dark themes', () => {
+    expect(lightTheme.fonts).toBe(darkTheme.fonts);
+  });
+});
