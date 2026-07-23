@@ -45,11 +45,29 @@ export default function BucketSelectScreen({ navigation }) {
         setSelectedBucket(singleBucket.Name);
         await setCurrentBucket(singleBucket.Name);
 
-        // ...but only auto-NAVIGATE the first time we see this connection.
-        // Without this guard, any re-run of fetchBuckets for the same
-        // connection (e.g. the user manually switching back to the Buckets
-        // tab) would immediately bounce them back to Files.
-        if (autoNavigatedConnectionIdRef.current !== currentConnection.id) {
+        // ...but only auto-NAVIGATE when (a) it's the first time we see this
+        // connection — without the ref guard, any re-run of fetchBuckets
+        // for the same connection (e.g. the user manually switching back to
+        // the Buckets tab) would immediately bounce them back to Files —
+        // and (b) this tab is actually FOCUSED. Bottom-tabs keeps blurred
+        // screens mounted, so this fetch also runs while the user is on
+        // ANOTHER tab whenever the active connection changes in the
+        // background (e.g. deleteConnection auto-activating the next
+        // connection while the user is deleting on the Connections tab);
+        // navigating from back here would yank them away mid-action.
+        // isFocused() is read at fire time (post-await) rather than via the
+        // useIsFocused hook, whose render-time value would be stale inside
+        // this async callback by the time listBuckets resolves. When the
+        // focus check skips the nav, the ref is deliberately NOT recorded,
+        // so the auto-nav stays "armed" for this connection: it won't fire
+        // on a mere later visit to this tab (a focus change alone doesn't
+        // re-run the fetch effect — manual visits must never bounce, which
+        // was the original Task 5.6 bug), but the next fetch that completes
+        // while focused will fire it.
+        if (
+          autoNavigatedConnectionIdRef.current !== currentConnection.id &&
+          navigation.isFocused()
+        ) {
           autoNavigatedConnectionIdRef.current = currentConnection.id;
           navigation.navigate('FilesTab');
         }

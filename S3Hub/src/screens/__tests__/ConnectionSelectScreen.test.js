@@ -9,7 +9,7 @@
 // null, so calling it for a no-op selection would needlessly kick the user
 // out of an already-selected bucket.
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import ConnectionSelectScreen from '../ConnectionSelectScreen';
 import { AuthContext } from '../../context/AuthContext';
@@ -62,20 +62,21 @@ describe('ConnectionSelectScreen connection selection', () => {
     const { navigation, setActiveConnection } = renderScreen();
 
     fireEvent.press(screen.getByText('AWS S3'));
-    // Let the async handler's microtasks flush.
-    await Promise.resolve();
+    // waitFor (rather than a bare await Promise.resolve()) flushes the
+    // async handler INSIDE act(), which also covers Paper icons' own
+    // font-load state update — a bare microtask await leaves that update
+    // outside act() and floods the output with act() warnings.
+    await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab'));
 
     expect(setActiveConnection).not.toHaveBeenCalled();
-    expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
   });
 
   it('calls setActiveConnection when selecting a different connection', async () => {
     const { navigation, setActiveConnection } = renderScreen();
 
     fireEvent.press(screen.getByText('Storj'));
-    await Promise.resolve();
+    await waitFor(() => expect(setActiveConnection).toHaveBeenCalledWith(OTHER_CONNECTION));
 
-    expect(setActiveConnection).toHaveBeenCalledWith(OTHER_CONNECTION);
     expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
   });
 
@@ -83,9 +84,8 @@ describe('ConnectionSelectScreen connection selection', () => {
     const { navigation, setActiveConnection } = renderScreen({ currentConnection: null });
 
     fireEvent.press(screen.getByText('AWS S3'));
-    await Promise.resolve();
+    await waitFor(() => expect(setActiveConnection).toHaveBeenCalledWith(ACTIVE_CONNECTION));
 
-    expect(setActiveConnection).toHaveBeenCalledWith(ACTIVE_CONNECTION);
     expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
   });
 });

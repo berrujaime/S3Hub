@@ -126,11 +126,15 @@ describe('BucketSelectScreen provider spine stacking', () => {
   });
 });
 
-// Regression test for Task 5.6: the single-bucket auto-navigate used to fire
+// Regression tests for Task 5.6: the single-bucket auto-navigate used to fire
 // on every re-run of the effect that fetches buckets (any `currentConnection`
 // change, including a same-connection object recreated with the same id),
 // bouncing the user straight back to Files whenever they tried to stay on
-// the Buckets tab. It must now fire exactly once per connection id.
+// the Buckets tab. It must now fire (a) at most once per connection id and
+// (b) only while the Buckets tab is focused — bottom-tabs keeps blurred
+// screens mounted, so a background connection change (e.g. deleteConnection
+// auto-activating the next connection while the user is on the Connections
+// tab) re-runs the fetch here and must NOT yank the user to Files.
 describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
   const SINGLE_BUCKET = [{ Name: 'only-bucket' }];
 
@@ -152,7 +156,7 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
   });
 
   it('auto-navigates once per connection: not again on a re-render of the same connection, but again after switching connections', async () => {
-    const navigation = { navigate: jest.fn() };
+    const navigation = { navigate: jest.fn(), isFocused: jest.fn(() => true) };
     const setCurrentBucket = jest.fn().mockResolvedValue(undefined);
 
     const { rerender } = renderWithConnection(connectionA, { navigation, setCurrentBucket });
@@ -188,5 +192,38 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
 
     await waitFor(() => expect(navigation.navigate).toHaveBeenCalledTimes(2));
     expect(navigation.navigate).toHaveBeenNthCalledWith(2, 'FilesTab');
+  });
+
+  it('does not auto-navigate while the tab is not focused, and stays armed for the next focused fetch', async () => {
+    const navigation = { navigate: jest.fn(), isFocused: jest.fn(() => false) };
+    const setCurrentBucket = jest.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderWithConnection(connectionA, { navigation, setCurrentBucket });
+
+    // The background fetch completes and still auto-SELECTS the single
+    // bucket (selection is not gated on focus)...
+    await waitFor(() => expect(setCurrentBucket).toHaveBeenCalledWith('only-bucket'));
+    // ...but never navigates: the user is on another tab (e.g. mid-delete
+    // on the Connections tab when deleteConnection auto-activated this
+    // connection).
+    expect(navigation.navigate).not.toHaveBeenCalled();
+
+    // The skipped nav did NOT record the connection id, so the auto-nav is
+    // still armed: the next fetch that completes while the tab IS focused
+    // (same connection id, new object reference re-running the effect)
+    // fires it.
+    navigation.isFocused.mockReturnValue(true);
+    rerender(
+      <PaperProvider theme={darkTheme}>
+        <AuthContext.Provider
+          value={{ currentConnection: { ...connectionA }, setCurrentBucket }}
+        >
+          <BucketSelectScreen navigation={navigation} />
+        </AuthContext.Provider>
+      </PaperProvider>
+    );
+
+    await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('FilesTab'));
+    expect(navigation.navigate).toHaveBeenCalledTimes(1);
   });
 });
