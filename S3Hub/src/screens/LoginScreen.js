@@ -51,15 +51,13 @@ export default function LoginScreen({ navigation }) {
     const connection = buildConnection();
 
     try {
-      const isValid = await validateCredentials(connection);
+      // validateCredentials resolves true or throws — it never resolves
+      // false — so there is no invalid-but-not-throwing case to branch on.
+      await validateCredentials(connection);
 
-      if (isValid) {
-        await addConnection(connection);
-        await setActiveConnection(connection);
-        navigation.navigate('Connections');
-      } else {
-        Alert.alert(i18n.t('error'), i18n.t('errorInvalidCredentials'));
-      }
+      await addConnection(connection);
+      await setActiveConnection(connection);
+      navigation.navigate('Connections');
     } catch (error) {
       console.error('Error validating credentials:', error?.name || error?.code, error?.message);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));

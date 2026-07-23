@@ -9,7 +9,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getS3Client } from "./s3Client";
-import { Buffer } from 'buffer';
 import { S3_DELETE_BATCH_SIZE } from '../config/s3Config';
 
 /**
@@ -22,14 +21,7 @@ export const listBuckets = async (connection) => {
     const s3Client = getS3Client(connection);
     const command = new ListBucketsCommand({});
     const response = await s3Client.send(command);
-
-    if (connection.service === 'storj') {
-      // Storj returns all buckets, no need to filter
-      return response.Buckets;
-    } else {
-      // For AWS S3, you could filter buckets by region if necessary
-      return response.Buckets;
-    }
+    return response.Buckets;
   } catch (error) {
     console.error("Error listing buckets:", error);
     throw error;
@@ -54,38 +46,6 @@ export const listObjects = async (connection, bucketName, prefix = '') => {
     return response;
   } catch (error) {
     console.error("Error listing objects:", error);
-    throw error;
-  }
-};
-
-/**
- * Uploads a file to an S3 bucket.
- * @param {Object} connection - User connection data.
- * @param {string} bucketName - Bucket name.
- * @param {Object} file - File to upload.
- * @returns {Object} AWS S3 response.
- */
-export const uploadFile = async (connection, bucketName, file) => {
-  try {
-    const s3Client = getS3Client(connection);
-
-    // Convert base64 string to Buffer if necessary
-    let bodyContent = file.content;
-    if (typeof file.content === 'string') {
-      const base64Data = file.content.replace(/^data:.+;base64,/, '');
-      bodyContent = Buffer.from(base64Data, 'base64');
-    }
-
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: file.name,
-      Body: bodyContent,
-      ContentType: file.mimeType,
-    });
-    const response = await s3Client.send(command);
-    return response;
-  } catch (error) {
-    console.error("Error uploading the file:", error);
     throw error;
   }
 };

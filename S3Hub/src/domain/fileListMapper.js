@@ -28,7 +28,9 @@ export const isPreviewableMediaType = (mediaType) => {
   return mediaType === 'image' || mediaType === 'video';
 };
 
-// Sorts a list of items: folders first, then images, then videos, alphabetically.
+// Sorts a list of items: folders first (alphabetically), then non-video
+// files (images, audio, documents, archives, other — alphabetically), then
+// videos (alphabetically).
 // Returns a new array without mutating the input.
 export const sortFiles = (filesArray) => {
   return [...filesArray].sort((a, b) => {
@@ -131,15 +133,21 @@ export const stripVolatileFields = (items) =>
 export const matchesOrigin = (item, connectionId, bucket) =>
   Boolean(item) && item.connectionId === connectionId && item.bucket === bucket;
 
-// Ensures unique ids; duplicates get a time-suffixed id.
+// Ensures unique ids; duplicates get a suffix built from a counter that
+// increments per duplicate found, so the same input always produces the
+// same output (unlike a Date.now()-based suffix, which varies by wall-clock
+// time and can even collide when two duplicates are processed within the
+// same millisecond).
 export const dedupeById = (items) => {
   const uniqueItemsMap = new Map();
+  let duplicateCount = 0;
   items.forEach((item) => {
     if (!uniqueItemsMap.has(item.id)) {
       uniqueItemsMap.set(item.id, item);
     } else {
-      // If duplicate key found, append a unique suffix.
-      let uniqueId = `${item.id}_${Date.now()}`;
+      // If duplicate key found, append a deterministic incrementing suffix.
+      duplicateCount += 1;
+      const uniqueId = `${item.id}_${duplicateCount}`;
       uniqueItemsMap.set(uniqueId, { ...item, id: uniqueId });
     }
   });

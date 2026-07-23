@@ -123,9 +123,9 @@ export const AuthProvider = ({ children }) => {
         const storedTheme = await connectionRepository.getTheme();
         setTheme(storedTheme || 'system');
       } catch (error) {
-        console.error("Error cargando datos almacenados:", error);
+        console.error("Error loading stored data:", error);
       } finally {
-        setIsLoading(false); // Finalizar la carga
+        setIsLoading(false); // Finish loading
       }
     };
 

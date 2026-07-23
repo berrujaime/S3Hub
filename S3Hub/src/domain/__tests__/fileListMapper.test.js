@@ -353,22 +353,39 @@ describe('dedupeById', () => {
     expect(result).toEqual(items);
   });
 
-  it('suffixes duplicate ids with a unique suffix', () => {
-    const now = 1234567890;
-    jest.spyOn(Date, 'now').mockReturnValue(now);
+  it('suffixes duplicate ids with a deterministic incrementing suffix', () => {
     const items = [
       { id: 'dup', name: 'first' },
       { id: 'dup', name: 'second' },
+      { id: 'dup', name: 'third' },
     ];
     const result = dedupeById(items);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(result[0]).toEqual({ id: 'dup', name: 'first' });
-    expect(result[1]).toEqual({ id: `dup_${now}`, name: 'second' });
-    Date.now.mockRestore();
+    expect(result[1]).toEqual({ id: 'dup_1', name: 'second' });
+    expect(result[2]).toEqual({ id: 'dup_2', name: 'third' });
   });
 
   it('returns an empty array for empty input', () => {
     expect(dedupeById([])).toEqual([]);
+  });
+
+  it('produces the same output on repeated calls with the same input, even if the wall clock changes between calls', () => {
+    // Guards against the old Date.now()-based suffix, which made the output
+    // depend on the exact millisecond dedupeById was called — two calls with
+    // identical input could legitimately produce different ids.
+    let now = 1000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now++);
+    const items = [
+      { id: 'dup', name: 'first' },
+      { id: 'dup', name: 'second' },
+    ];
+
+    const first = dedupeById(items);
+    const second = dedupeById(items);
+
+    expect(second).toEqual(first);
+    Date.now.mockRestore();
   });
 });
 

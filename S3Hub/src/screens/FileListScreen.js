@@ -703,15 +703,13 @@ export default function FileListScreen() {
       // rather than deleting a key stamped from a different origin using
       // the live connection/bucket's credentials; report it as a failure
       // (mapS3Error falls back to errorGeneric for a non-error object).
+      //
+      // No folder branch here (unlike handleDeleteSelected): currentMedia
+      // comes from mediaFiles, which useFileList populates by filtering out
+      // isFolder items (only previewable image/video files are ever added
+      // to mediaFiles), so currentMedia.isFolder is always false.
       if (!currentConnection || !matchesOrigin(currentMedia, currentConnection.id, currentBucket)) {
         deleteError = {};
-      } else if (currentMedia.isFolder) {
-        const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, currentMedia.key);
-        if (deleteErrors.length > 0) {
-          // Per-object S3 delete errors carry a `Code`, not a `name` —
-          // reshape so mapS3Error (which reads `.name`) can look it up.
-          deleteError = { name: deleteErrors[0].Code, message: deleteErrors[0].Message };
-        }
       } else {
         await deleteFile(currentConnection, currentBucket, currentMedia.key);
       }
