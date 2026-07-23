@@ -199,17 +199,28 @@ describe('useFileList', () => {
 
   describe('setMediaFileUrl immutability', () => {
     it('returns a new array with a new object at the updated index, preserving origin fields', async () => {
-      // Fetch with a listing containing one previewable media item.
+      // Fetch with a listing containing TWO previewable media items: the
+      // second exists purely to assert that untouched siblings keep
+      // reference identity — the property that distinguishes the targeted
+      // `{ ...it, url }` update from a near-miss that spreads every element.
+      // sortFiles orders alphabetically, so image.jpg is index 0 and
+      // photo2.png is index 1.
       listAllObjects.mockResolvedValue({
-        contents: [{ Key: 'image.jpg', Size: 100 }],
+        contents: [
+          { Key: 'image.jpg', Size: 100 },
+          { Key: 'photo2.png', Size: 200 },
+        ],
         commonPrefixes: [],
       });
 
       const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      // Verify mediaFiles has at least one item with origin fields.
-      expect(result.current.mediaFiles.length).toBeGreaterThan(0);
+      // Verify mediaFiles has both items, in sorted order, with origin fields.
+      expect(result.current.mediaFiles.map((f) => f.name)).toEqual([
+        'image.jpg',
+        'photo2.png',
+      ]);
       const firstItem = result.current.mediaFiles[0];
       expect(firstItem.connectionId).toBe('connA');
       expect(firstItem.bucket).toBe('bucket-a');
@@ -217,6 +228,7 @@ describe('useFileList', () => {
       // Capture the original array and element references.
       const originalMediaFiles = result.current.mediaFiles;
       const originalFirstElement = result.current.mediaFiles[0];
+      const originalSecondElement = result.current.mediaFiles[1];
 
       const newUrl = 'https://new-signed.example/url';
 
@@ -230,6 +242,9 @@ describe('useFileList', () => {
 
       // Verify the element at index 0 has a new reference.
       expect(result.current.mediaFiles[0]).not.toBe(originalFirstElement);
+
+      // Verify the untouched sibling at index 1 keeps reference identity.
+      expect(result.current.mediaFiles[1]).toBe(originalSecondElement);
 
       // Verify the URL was updated.
       expect(result.current.mediaFiles[0].url).toBe(newUrl);
