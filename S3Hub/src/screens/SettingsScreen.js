@@ -2,13 +2,19 @@
 import React, { useContext } from 'react';
 import { View, StyleSheet, Linking, TouchableOpacity } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import i18n from '../locales/translations';
 import { Picker } from '@react-native-picker/picker';
 import Constants from 'expo-constants';
+import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 export default function SettingsScreen() {
     const theme = useTheme();
+    // headerShown: false (see AppNavigator.js's SettingsStack) — this screen
+    // sits directly under the status bar, so insets.top replaces the old
+    // hardcoded marginTop (Task 5.3).
+    const insets = useSafeAreaInsets();
 
     const languages = [
         { label: 'English', value: 'en' },
@@ -54,7 +60,12 @@ export default function SettingsScreen() {
     const pickerItemStyle = { color: pickerColor };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View
+            style={[
+                styles.container,
+                { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
+            ]}
+        >
             <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>{i18n.t('settings')}</Text>
 
             <Text style={[styles.label, { color: theme.colors.onBackground }]}>{i18n.t('selectLanguage')}</Text>
@@ -114,7 +125,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 16,
-        marginTop: 24,
     },
     title: {
         marginBottom: 16,

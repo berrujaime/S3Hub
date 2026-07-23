@@ -11,14 +11,21 @@ import {
 } from 'react-native';
 import { Text, TextInput, Button, Menu, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { validateCredentials } from '../services/authService';
 import { PROVIDER_LIST, getProvider } from '../domain/providers';
 import { mapS3Error } from '../domain/errors';
+import { SCREEN_TOP_SPACING } from '../theme/spacing';
 import i18n from '../locales/translations';
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
+  // This screen renders with headerShown: false (see AppNavigator.js) both
+  // as the root screen (no connection yet) and inside ConnectionsStack, so
+  // it is always the first thing under the status bar — insets.top replaces
+  // the old hardcoded marginTop (Task 5.3).
+  const insets = useSafeAreaInsets();
 
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
@@ -211,7 +218,12 @@ export default function LoginScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View
+          style={[
+            styles.container,
+            { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
+          ]}
+        >
           <Text
             variant="headlineLarge"
             style={[styles.title, { color: theme.colors.onBackground }]}
@@ -296,7 +308,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    marginTop: 40,
   },
   title: {
     fontSize: 28,

@@ -20,6 +20,7 @@ import {
   uploadEmptyFolder,
 } from "../services/s3Service";
 import { FAB, Button, IconButton, Dialog, Portal, TextInput, Searchbar, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -35,6 +36,7 @@ import { matchesOrigin, stampItemOrigin } from '../domain/fileListMapper';
 import { mapS3Error } from '../domain/errors';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
+import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 // Cache namespace derived from the ITEM's own fetch-time origin (stamped in
 // useFileList), never from the live connection/bucket context — during a
@@ -104,6 +106,10 @@ export default function FileListScreen() {
   const { width } = useWindowDimensions();
 
   const theme = useTheme(); // Access the theme
+  // headerShown: false (see AppNavigator.js's FilesStack) — this screen sits
+  // directly under the status bar, so insets.top replaces the old hardcoded
+  // marginTop (Task 5.3).
+  const insets = useSafeAreaInsets();
 
   // Guards the progress-related setState calls in the batch operation
   // handlers below against firing after unmount (e.g. the user navigates
@@ -761,7 +767,7 @@ export default function FileListScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + SCREEN_TOP_SPACING }]}>
       {(isUploading || isDeleting) && (
         <UploadProgressPopup
           progress={isUploading ? uploadProgress : deleteProgress}
@@ -942,7 +948,6 @@ export default function FileListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: 40,
   },
   // Normal-flow child of the create-folder KeyboardAvoidingView; see the
   // comment at the dialog for why this spacer is required on iOS.

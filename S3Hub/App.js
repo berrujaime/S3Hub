@@ -24,7 +24,8 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { lightTheme, darkTheme } from './src/theme/theme';
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import * as Notifications from 'expo-notifications';
-import { ActivityIndicator, SafeAreaView, StyleSheet, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 // React Navigation themes derived from the same Paper `lightTheme`/`darkTheme`
@@ -57,7 +58,19 @@ function ThemedApp() {
 
   return (
     <PaperProvider theme={selectedTheme}>
-      <SafeAreaView style={[styles.container, { backgroundColor: selectedTheme.colors.background }]}>
+      {/* `react-native-safe-area-context`'s SafeAreaView (not RN core's —
+          core's is iOS-only and a plain no-op View on Android) applies the
+          left/right/bottom safe-area insets here for screens with no tab
+          bar underneath them (e.g. the standalone Login screen). `top` is
+          deliberately excluded: since Task 5.3, each screen under
+          AppNavigator computes its own top inset via useSafeAreaInsets(),
+          and every one of them has headerShown: false, so padding the top
+          here too would double-count the status bar height on top of what
+          each screen already adds. */}
+      <SafeAreaView
+        edges={['bottom', 'left', 'right']}
+        style={[styles.container, { backgroundColor: selectedTheme.colors.background }]}
+      >
         <StatusBar
           style={isDark ? 'light' : 'dark'}
           backgroundColor={selectedTheme.colors.background}

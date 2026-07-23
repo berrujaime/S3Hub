@@ -3,11 +3,13 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Text, List, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { listBuckets } from '../services/s3Service';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
 import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
+import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 export default function BucketSelectScreen({ navigation }) {
   const { currentConnection, setCurrentBucket } = useContext(AuthContext);
@@ -15,6 +17,12 @@ export default function BucketSelectScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState(null);
   const theme = useTheme();
+  // headerShown: false (see AppNavigator.js's BucketsStack) — this screen
+  // sits directly under the status bar, so insets.top replaces the old
+  // hardcoded marginTop (Task 5.3). Not needed for the loading state, which
+  // is a centered flex:1 spinner with nothing pinned to the top edge.
+  const insets = useSafeAreaInsets();
+  const containerStyle = [styles.container, { paddingTop: insets.top + SCREEN_TOP_SPACING }];
 
   useEffect(() => {
     if (currentConnection) {
@@ -100,7 +108,7 @@ export default function BucketSelectScreen({ navigation }) {
 
   if (!currentConnection) {
     return (
-      <View style={styles.container}>
+      <View style={containerStyle}>
         <Text style={[styles.message, { color: theme.colors.onBackground }]}>
           {i18n.t('chooseConnection')}
         </Text>
@@ -109,7 +117,7 @@ export default function BucketSelectScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={containerStyle}>
       <Text style={[styles.title, { color: theme.colors.onBackground }]}>
         {i18n.t('selectBucket')}
       </Text>
@@ -133,7 +141,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    marginTop: 24,
   },
   title: {
     marginBottom: 16,

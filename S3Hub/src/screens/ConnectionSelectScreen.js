@@ -4,13 +4,19 @@ import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
 import { Text, List, FAB, IconButton, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { getProvider } from '../domain/providers';
 import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
+import { SCREEN_TOP_SPACING } from '../theme/spacing';
 import i18n from '../locales/translations';
 
 export default function ConnectionSelectScreen({ navigation }) {
   const theme = useTheme();
+  // headerShown: false (see AppNavigator.js's ConnectionsStack) — this
+  // screen sits directly under the status bar, so insets.top replaces the
+  // old hardcoded marginTop (Task 5.3).
+  const insets = useSafeAreaInsets();
   const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
 
   const handleConnectionSelect = async (connection) => {
@@ -105,7 +111,12 @@ export default function ConnectionSelectScreen({ navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
+      ]}
+    >
       <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>
         {i18n.t('selectConnection')}
       </Text>
@@ -127,7 +138,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    marginTop: 30,
   },
   title: {
     marginBottom: 16,
