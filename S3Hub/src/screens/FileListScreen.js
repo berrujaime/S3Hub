@@ -176,13 +176,28 @@ export default function FileListScreen() {
             const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
 
             // Upload the file using uploadAsync to allow background upload
-            await FileSystem.uploadAsync(uploadUrl, fileUri, {
+            const uploadResult = await FileSystem.uploadAsync(uploadUrl, fileUri, {
               httpMethod: 'PUT',
               uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
               headers: {
                 'Content-Type': mimeType,
               },
             });
+
+            // uploadAsync RESOLVES on HTTP 4xx/5xx (it only rejects on a
+            // transport failure), so a presigned PUT rejected with e.g. 403
+            // would otherwise be counted as a success. Only a 2xx response
+            // is a successful upload; anything else throws a synthetic
+            // error carrying $metadata.httpStatusCode so the shared catch
+            // below folds it into the partial result and, in the all-failed
+            // case, mapS3Error's status branch maps it (403 ->
+            // errorAccessDenied, ...).
+            if (uploadResult.status < 200 || uploadResult.status >= 300) {
+              throw Object.assign(
+                new Error(`Upload failed with HTTP ${uploadResult.status}`),
+                { $metadata: { httpStatusCode: uploadResult.status } }
+              );
+            }
 
             uploadedFiles += 1;
           } catch (error) {
