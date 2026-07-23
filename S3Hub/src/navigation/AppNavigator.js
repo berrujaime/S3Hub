@@ -4,6 +4,7 @@ import React, { useContext } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { useTheme } from 'react-native-paper';
 import LoginScreen from '../screens/LoginScreen';
 import ConnectionSelectScreen from '../screens/ConnectionSelectScreen';
 import BucketSelectScreen from '../screens/BucketSelectScreen';
@@ -51,6 +52,7 @@ function SettingsStack() {
 
 function MainTabs() {
   const { currentConnection, currentBucket } = useContext(AuthContext);
+  const theme = useTheme();
 
   return (
     <Tab.Navigator
@@ -58,6 +60,13 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
+        // Themed per Task 4.3: without these, the tab bar falls back to
+        // react-navigation's own theme defaults (background from `card`,
+        // inactive tint from a text/card color mix) rather than the actual
+        // MD3 tokens the rest of the app reads via useTheme().
+        tabBarStyle: { backgroundColor: theme.colors.surface },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
     >
       <Tab.Screen
@@ -110,12 +119,16 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { currentConnection, language, isLoading } = useContext(AuthContext);
+  const theme = useTheme();
 
   if (isLoading) {
-    // Render a loading screen while loading data
+    // Render a loading screen while loading data. Themed (rather than the
+    // old hardcoded white background + #0000ff spinner) since this renders
+    // inside NavigationContainer/PaperProvider, so useTheme() is available
+    // and the loader must match the surrounding scheme to avoid a flash.
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }

@@ -7,8 +7,12 @@ global.ReadableStream = ReadableStream;
 /* eslint-disable import/first -- polyfills above must run before any other import */
 import * as React from 'react';
 import { useContext, useEffect } from 'react';
-import { Provider as PaperProvider } from 'react-native-paper';
-import { NavigationContainer } from '@react-navigation/native';
+import { Provider as PaperProvider, adaptNavigationTheme } from 'react-native-paper';
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { Inter_400Regular, Inter_500Medium } from '@expo-google-fonts/inter';
@@ -22,6 +26,25 @@ import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import * as Notifications from 'expo-notifications';
 import { ActivityIndicator, SafeAreaView, StyleSheet, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+
+// React Navigation themes derived from the same Paper `lightTheme`/`darkTheme`
+// token maps (Tasks 4.1/4.2), via Paper's `adaptNavigationTheme` helper. This
+// makes NavigationContainer's own background/card/text/border/primary follow
+// the "Deep storage" palette instead of react-navigation's stock blue/white
+// theme, which is what caused the light flash in dark mode. Computed once at
+// module scope (the inputs are static, not per-render state) and picked by
+// scheme in ThemedApp below.
+//
+// Note: react-navigation v6's `Theme` type carries only `colors`, not
+// `fonts` (that arrives in v7) — `adaptNavigationTheme` detects this itself
+// (it only merges fonts if `'fonts' in theme`), so no font wiring is needed
+// or possible here.
+const { LightTheme: navigationLightTheme, DarkTheme: navigationDarkTheme } = adaptNavigationTheme({
+  reactNavigationLight: NavigationDefaultTheme,
+  reactNavigationDark: NavigationDarkTheme,
+  materialLight: lightTheme,
+  materialDark: darkTheme,
+});
 
 function ThemedApp() {
   const { theme } = useContext(AuthContext);
@@ -39,7 +62,7 @@ function ThemedApp() {
           style={isDark ? 'light' : 'dark'}
           backgroundColor={selectedTheme.colors.background}
         />
-        <NavigationContainer>
+        <NavigationContainer theme={isDark ? navigationDarkTheme : navigationLightTheme}>
           <AppNavigator />
         </NavigationContainer>
       </SafeAreaView>
@@ -61,6 +84,14 @@ export default function App() {
     JetBrainsMono_500Medium,
   });
 
+  // This loader renders before AuthProvider/PaperProvider mount (see below),
+  // so AuthContext's stored `theme` preference isn't available yet. The
+  // system color scheme IS available this early via RN's own useColorScheme,
+  // so use it with the static lightTheme/darkTheme token maps to pick colors
+  // — the same source of truth ThemedApp uses once providers are up — rather
+  // than a hardcoded color that would flash the wrong scheme.
+  const systemScheme = useColorScheme();
+
   useEffect(() => {
     // Request permissions for notifications
     (async () => {
@@ -76,9 +107,12 @@ export default function App() {
     // config assumes the custom families are already registered. If
     // loading fails (fontError set), fall through to the app rather than
     // block forever — Paper/RN fall back to a system font.
+    const loaderTheme = systemScheme === 'dark' ? darkTheme : lightTheme;
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View
+        style={[styles.loadingContainer, { backgroundColor: loaderTheme.colors.background }]}
+      >
+        <ActivityIndicator size="large" color={loaderTheme.colors.primary} />
       </View>
     );
   }
