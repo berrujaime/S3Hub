@@ -35,6 +35,7 @@ export default function LoginScreen({ navigation }) {
   const [endpoint, setEndpoint] = useState('');
   const [providerMenuVisible, setProviderMenuVisible] = useState(false);
   const [regionMenuVisible, setRegionMenuVisible] = useState(false);
+  const [secretVisible, setSecretVisible] = useState(false);
 
   const { addConnection, setActiveConnection } = useContext(AuthContext);
 
@@ -191,7 +192,15 @@ export default function LoginScreen({ navigation }) {
           visible={regionMenuVisible}
           onDismiss={closeRegionMenu}
           anchor={
-            <Button mode="outlined" onPress={openRegionMenu} style={styles.menuButton}>
+            <Button
+              mode="outlined"
+              onPress={openRegionMenu}
+              // Purpose + current value: the visible label is only the raw
+              // region code (e.g. "us1"), which alone tells a screen-reader
+              // user nothing about what this button does.
+              accessibilityLabel={`${i18n.t('selectRegion')} ${region}`}
+              style={styles.menuButton}
+            >
               {region}
             </Button>
           }
@@ -239,6 +248,7 @@ export default function LoginScreen({ navigation }) {
         >
           <Text
             variant="headlineLarge"
+            accessibilityRole="header"
             style={[styles.title, { color: theme.colors.onBackground }]}
           >
             S3Hub
@@ -256,6 +266,9 @@ export default function LoginScreen({ navigation }) {
             onChangeText={setAccessKey}
             mode="outlined"
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            textContentType="none"
             style={styles.input}
           />
           <TextInput
@@ -263,9 +276,21 @@ export default function LoginScreen({ navigation }) {
             value={secretKey}
             onChangeText={setSecretKey}
             mode="outlined"
-            secureTextEntry
+            secureTextEntry={!secretVisible}
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            textContentType="none"
             style={styles.input}
+            right={
+              <TextInput.Icon
+                icon={secretVisible ? 'eye-off' : 'eye'}
+                onPress={() => setSecretVisible((prev) => !prev)}
+                accessibilityLabel={
+                  secretVisible ? i18n.t('hideSecretKey') : i18n.t('showSecretKey')
+                }
+              />
+            }
           />
 
           <Text style={[styles.label, { color: theme.colors.onBackground }]}>
@@ -279,6 +304,9 @@ export default function LoginScreen({ navigation }) {
                 mode="outlined"
                 onPress={openProviderMenu}
                 icon={() => renderProviderMark(provider)}
+                // Purpose + current value, same rationale as the region
+                // menu button.
+                accessibilityLabel={`${i18n.t('selectProvider')} ${provider.name}`}
                 style={styles.menuButton}
               >
                 {provider.name}

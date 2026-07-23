@@ -138,3 +138,40 @@ describe('LoginScreen post-login navigation', () => {
     expect(navigation.navigate).not.toHaveBeenCalled();
   });
 });
+
+// Task 5.8: the secret-key field gets an eye toggle (show/hide) and both
+// credential fields disable autocorrect/autocomplete so the OS never
+// suggests, corrects, or stores S3 credentials.
+describe('LoginScreen credential field hardening', () => {
+  // Storj (the default provider) renders exactly two native TextInputs:
+  // accessKey (index 0) then secretKey (index 1) — see fillCredentials.
+  const getCredentialInputs = () => screen.UNSAFE_getAllByType(RNTextInput);
+
+  it('masks the secret key by default and reveals it after pressing the eye toggle', async () => {
+    renderScreen();
+
+    expect(getCredentialInputs()[1].props.secureTextEntry).toBe(true);
+
+    fireEvent.press(screen.getByLabelText(i18n.t('showSecretKey')));
+    await waitFor(() =>
+      expect(getCredentialInputs()[1].props.secureTextEntry).toBe(false)
+    );
+
+    // The toggle flips back: the label now announces "hide", and pressing it
+    // re-masks the field.
+    fireEvent.press(screen.getByLabelText(i18n.t('hideSecretKey')));
+    await waitFor(() =>
+      expect(getCredentialInputs()[1].props.secureTextEntry).toBe(true)
+    );
+  });
+
+  it('disables autocorrect and autocomplete on both credential fields', () => {
+    renderScreen();
+
+    getCredentialInputs().forEach((input) => {
+      expect(input.props.autoCorrect).toBe(false);
+      expect(input.props.autoComplete).toBe('off');
+      expect(input.props.autoCapitalize).toBe('none');
+    });
+  });
+});

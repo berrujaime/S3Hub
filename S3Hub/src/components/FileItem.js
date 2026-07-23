@@ -60,6 +60,9 @@ const FileItem = ({
       <TouchableOpacity
         onPress={() => onPress(item)}
         onLongPress={() => onLongPress(item)}
+        accessibilityRole="button"
+        accessibilityLabel={item.name}
+        accessibilityState={{ selected: isSelected }}
         style={[
           viewMode === 'grid' ? styles.itemContainer : styles.listItemContainer,
           {
@@ -92,6 +95,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[
             styles.itemContainer,
             { width: itemSize - 16, height: itemSize - 16, margin: 8 },
@@ -136,6 +142,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           {(preview === 'true') ? (
@@ -180,6 +189,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[
             styles.itemContainer,
             { width: itemSize - 16, height: itemSize - 16, margin: 8 },
@@ -224,6 +236,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           {(preview === 'true') ? (
@@ -262,6 +277,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[
             styles.itemContainer,
             { width: itemSize - 16, height: itemSize - 16, margin: 8 },
@@ -284,6 +302,9 @@ const FileItem = ({
         <TouchableOpacity
           onPress={() => onPress(item)}
           onLongPress={() => onLongPress(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.name}
+          accessibilityState={{ selected: isSelected }}
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           <View style={[styles.listImage, { justifyContent: 'center', alignItems: 'center' }]}>

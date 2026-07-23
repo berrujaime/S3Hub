@@ -79,11 +79,16 @@ export default function useFileList(currentConnection, currentBucket) {
   const prevOriginRef = useRef({ connectionId: undefined, bucket: undefined });
 
   const fetchFiles = useCallback(
-    async (isActive = () => isMounted.current) => {
+    // `forceRefresh` (pull-to-refresh, Task 5.8) skips the cache-hit branch
+    // below so a manual refresh always re-lists the bucket from the server —
+    // otherwise a refresh while the AsyncStorage list cache is still "fresh"
+    // (see cacheConfig's TTL) would silently re-render the same stale items
+    // instead of recovering from e.g. a transient network loss.
+    async (isActive = () => isMounted.current, { forceRefresh = false } = {}) => {
       const cacheKey = getCacheKey(currentConnection, currentBucket, currentPath);
       try {
         // Attempt to retrieve cached data (returns items only if still fresh).
-        const cachedItems = await getCachedItems(cacheKey);
+        const cachedItems = forceRefresh ? null : await getCachedItems(cacheKey);
         if (cachedItems) {
           // Re-stamp on hydration: the listing cache key already scopes these
           // items to this connection+bucket, and entries written before origin

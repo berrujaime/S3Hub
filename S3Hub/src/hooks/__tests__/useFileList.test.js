@@ -197,6 +197,59 @@ describe('useFileList', () => {
     });
   });
 
+  // Task 5.8: pull-to-refresh must recover from a network loss even while
+  // the AsyncStorage list cache is still "fresh" -- a plain fetchFiles()
+  // call would hit the cache-hit branch and silently re-render the same
+  // (possibly stale) items instead of re-listing from the server.
+  describe('forceRefresh option', () => {
+    it('skips the cache-hit branch and re-lists from the server when forceRefresh is true', async () => {
+      listAllObjects.mockResolvedValue(emptyListing);
+      getCachedItems.mockResolvedValue([
+        { id: 'cached.txt', key: 'cached.txt', name: 'cached.txt', size: 1 },
+      ]);
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Cache hit on mount: the cached item is shown, and the server is
+      // never listed.
+      expect(result.current.displayedFiles.map((f) => f.name)).toEqual(['cached.txt']);
+      expect(listAllObjects).not.toHaveBeenCalled();
+
+      listAllObjects.mockResolvedValue({
+        contents: [{ Key: 'fresh.txt', Size: 2 }],
+        commonPrefixes: [],
+      });
+
+      await act(async () => {
+        await result.current.fetchFiles(undefined, { forceRefresh: true });
+      });
+
+      // The cache is bypassed (getCachedItems is not consulted again) and the
+      // server listing wins, replacing the stale cached item.
+      expect(listAllObjects).toHaveBeenCalledTimes(1);
+      expect(result.current.displayedFiles.map((f) => f.name)).toEqual(['fresh.txt']);
+    });
+
+    it('still consults the cache on a plain fetchFiles() call (default forceRefresh: false)', async () => {
+      listAllObjects.mockResolvedValue(emptyListing);
+      getCachedItems.mockResolvedValue([
+        { id: 'cached.txt', key: 'cached.txt', name: 'cached.txt', size: 1 },
+      ]);
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      getCachedItems.mockClear();
+
+      await act(async () => {
+        await result.current.fetchFiles();
+      });
+
+      expect(getCachedItems).toHaveBeenCalledTimes(1);
+      expect(listAllObjects).not.toHaveBeenCalled();
+    });
+  });
+
   describe('setMediaFileUrl immutability', () => {
     it('returns a new array with a new object at the updated index, preserving origin fields', async () => {
       // Fetch with a listing containing TWO previewable media items: the

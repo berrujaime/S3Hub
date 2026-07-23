@@ -114,6 +114,32 @@ export default function ConnectionSelectScreen({ navigation }) {
     );
   };
 
+  // First-run empty state (Task 5.8): shown via FlatList's ListEmptyComponent
+  // instead of a blank list when there are no saved connections yet. The
+  // hint points at the add FAB rather than duplicating its action, since the
+  // FAB itself is the only way to add a connection from this screen.
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons
+        name="cloud-off-outline"
+        size={64}
+        color={theme.colors.onSurfaceVariant}
+      />
+      <Text
+        variant="titleMedium"
+        style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
+      >
+        {i18n.t('noConnectionsTitle')}
+      </Text>
+      <Text
+        variant="bodyMedium"
+        style={[styles.emptyHint, { color: theme.colors.onSurfaceVariant }]}
+      >
+        {i18n.t('noConnectionsHint')}
+      </Text>
+    </View>
+  );
+
   return (
     <View
       style={[
@@ -121,18 +147,24 @@ export default function ConnectionSelectScreen({ navigation }) {
         { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
       ]}
     >
-      <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>
+      <Text
+        variant="headlineLarge"
+        accessibilityRole="header"
+        style={[styles.title, { color: theme.colors.onBackground }]}
+      >
         {i18n.t('selectConnection')}
       </Text>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
         renderItem={renderConnectionItem}
+        ListEmptyComponent={renderEmptyState}
       />
       <FAB
         style={styles.fab}
         icon="plus"
         onPress={handleAddConnection}
+        accessibilityLabel={i18n.t('addConnection')}
       />
     </View>
   );
@@ -155,6 +187,20 @@ const styles = StyleSheet.create({
   },
   regionTag: {
     marginTop: 2,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 64,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyHint: {
+    marginTop: 8,
+    textAlign: 'center',
   },
   logo: {
     width: 32,

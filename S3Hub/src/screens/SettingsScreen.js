@@ -71,7 +71,11 @@ export default function SettingsScreen() {
                 { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
             ]}
         >
-            <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.onBackground }]}>{i18n.t('settings')}</Text>
+            <Text
+                variant="headlineLarge"
+                accessibilityRole="header"
+                style={[styles.title, { color: theme.colors.onBackground }]}
+            >{i18n.t('settings')}</Text>
 
             <Text style={[styles.label, { color: theme.colors.onBackground }]}>{i18n.t('selectLanguage')}</Text>
             <View style={pickerContainerStyle}>

@@ -151,7 +151,10 @@ export default function BucketSelectScreen({ navigation }) {
 
   return (
     <View style={containerStyle}>
-      <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.title, { color: theme.colors.onBackground }]}
+      >
         {i18n.t('selectBucket')}
       </Text>
       <FlatList

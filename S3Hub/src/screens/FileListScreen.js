@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import {
@@ -82,6 +83,7 @@ export default function FileListScreen() {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Mutual exclusion for the batch operation handlers below (upload,
   // download-selected, delete-selected, modal-delete): only one may run at
   // a time. This both prevents a double-tap from starting two overlapping
@@ -131,6 +133,21 @@ export default function FileListScreen() {
 
   const numColumns = viewMode === 'grid' ? width >= 1024 ? 4 : width >= 768 ? 3 : 2 : 1;
   const itemSize = width / numColumns;
+
+  // Pull-to-refresh (Task 5.8): re-fetches the current path bypassing the
+  // AsyncStorage list cache (`forceRefresh`, see useFileList.fetchFiles), so
+  // a manual pull recovers from e.g. a transient network loss instead of
+  // silently re-rendering the same cached items.
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchFiles(undefined, { forceRefresh: true });
+    } finally {
+      if (isMounted.current) {
+        setRefreshing(false);
+      }
+    }
+  }, [fetchFiles]);
 
   // handleFolderPress/handleItemPress/handleItemSelect/handleItemLongPress
   // are wrapped in useCallback (Task 5.7) so their identity stays stable
@@ -903,6 +920,14 @@ export default function FileListScreen() {
           numColumns={numColumns}
           key={`${viewMode}-${numColumns}`}
           contentContainerStyle={styles.flatListContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
           onEndReached={loadMoreFiles}
           onEndReachedThreshold={0.5}
           // getItemLayout only applies to the grid: list-view row heights

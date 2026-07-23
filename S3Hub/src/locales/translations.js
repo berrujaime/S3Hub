@@ -66,6 +66,11 @@ const en = {
     partialDownload: '%{done} of %{total} downloaded.',
     partialDelete: '%{done} of %{total} deleted.',
     logout: 'Log out',
+    noConnectionsTitle: 'No connections yet',
+    noConnectionsHint: 'Tap the + button below to add your first connection.',
+    addConnection: 'Add connection',
+    showSecretKey: 'Show secret key',
+    hideSecretKey: 'Hide secret key',
   }
 
 const es = {
@@ -133,6 +138,11 @@ const es = {
     partialDownload: '%{done} de %{total} descargados.',
     partialDelete: '%{done} de %{total} eliminados.',
     logout: 'Cerrar sesión',
+    noConnectionsTitle: 'Aún no tienes conexiones',
+    noConnectionsHint: 'Toca el botón + de abajo para añadir tu primera conexión.',
+    addConnection: 'Añadir conexión',
+    showSecretKey: 'Mostrar clave secreta',
+    hideSecretKey: 'Ocultar clave secreta',
   }
 
 const i18n = new I18n({en, es});

@@ -14,6 +14,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import ConnectionSelectScreen from '../ConnectionSelectScreen';
 import { AuthContext } from '../../context/AuthContext';
 import { darkTheme } from '../../theme/theme';
+import i18n from '../../locales/translations';
 
 // Explicit factory (same rationale as BucketSelectScreen.test.js /
 // SettingsScreen.test.js): AuthContext's module-level import of
@@ -36,7 +37,10 @@ const OTHER_CONNECTION = {
   accessKey: 'AKIA-OTHER',
 };
 
-const renderScreen = ({ currentConnection = ACTIVE_CONNECTION } = {}) => {
+const renderScreen = ({
+  currentConnection = ACTIVE_CONNECTION,
+  connections = [ACTIVE_CONNECTION, OTHER_CONNECTION],
+} = {}) => {
   const navigation = { navigate: jest.fn() };
   const setActiveConnection = jest.fn().mockResolvedValue(undefined);
   const deleteConnection = jest.fn();
@@ -44,7 +48,7 @@ const renderScreen = ({ currentConnection = ACTIVE_CONNECTION } = {}) => {
     <PaperProvider theme={darkTheme}>
       <AuthContext.Provider
         value={{
-          connections: [ACTIVE_CONNECTION, OTHER_CONNECTION],
+          connections,
           currentConnection,
           setActiveConnection,
           deleteConnection,
@@ -87,5 +91,23 @@ describe('ConnectionSelectScreen connection selection', () => {
     await waitFor(() => expect(setActiveConnection).toHaveBeenCalledWith(ACTIVE_CONNECTION));
 
     expect(navigation.navigate).toHaveBeenCalledWith('BucketsTab');
+  });
+});
+
+// Task 5.8: on first run (no saved connections) the screen used to render a
+// blank list under the title, with nothing pointing the user at the add FAB.
+describe('ConnectionSelectScreen first-run empty state', () => {
+  it('shows the empty-state title and hint when there are no connections', () => {
+    renderScreen({ currentConnection: null, connections: [] });
+
+    expect(screen.getByText(i18n.t('noConnectionsTitle'))).toBeTruthy();
+    expect(screen.getByText(i18n.t('noConnectionsHint'))).toBeTruthy();
+  });
+
+  it('does not show the empty state when connections exist', () => {
+    renderScreen();
+
+    expect(screen.queryByText(i18n.t('noConnectionsTitle'))).toBeNull();
+    expect(screen.queryByText(i18n.t('noConnectionsHint'))).toBeNull();
   });
 });
