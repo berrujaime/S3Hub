@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef } from "react";
+import React, { useEffect, useState, useContext, useRef, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -132,52 +132,90 @@ export default function FileListScreen() {
   const numColumns = viewMode === 'grid' ? width >= 1024 ? 4 : width >= 768 ? 3 : 2 : 1;
   const itemSize = width / numColumns;
 
-  const handleFolderPress = (folder) => {
-    if (selectedFiles.length > 0) {
-      // If in selection mode, toggle selection
-      toggleSelection(folder.id);
-    }
-    else {
-      enterFolder(folder.name);
-      clearSelection(); // Deselect files when changing folder
-    }
-  };
-
-  const handleItemPress = async (id) => {
-    if (selectedFiles.length > 0) {
-      toggleSelection(id);
-    } else {
-      const mediaIndex = mediaFiles.findIndex(f => f.id === id);
-      if (mediaIndex !== -1) {
-        // If URL is not preloaded because preview is off, load it now
-        if (!mediaFiles[mediaIndex].url) {
-          try {
-            const url = await getSignedUrl(currentConnection, currentBucket, mediaFiles[mediaIndex].key);
-            setMediaFileUrl(mediaIndex, url);
-          } catch (error) {
-            // Log the error identity only — never the full error — since a
-            // signed URL is a bearer credential.
-            console.error('Error loading media URL on demand:', error?.name || error?.code, error?.message);
-          }
-        }
-        setCurrentMediaIndex(mediaIndex);
-        setIsModalVisible(true);
+  // handleFolderPress/handleItemPress/handleItemSelect/handleItemLongPress
+  // are wrapped in useCallback (Task 5.7) so their identity stays stable
+  // across FileListScreen re-renders that don't touch their own
+  // dependencies — required for the FileItem React.memo below to actually
+  // skip re-renders instead of always seeing a "new" onPress/onLongPress
+  // prop. Logic is unchanged from the original plain function bodies.
+  // NOTE: these still change identity whenever `selectedFiles` or
+  // `mediaFiles` changes (selection/list state), which is inherent to what
+  // the handlers do — memo still helps on every OTHER re-render (e.g.
+  // upload/delete progress ticks, unrelated screen state).
+  const handleFolderPress = useCallback(
+    (folder) => {
+      if (selectedFiles.length > 0) {
+        // If in selection mode, toggle selection
+        toggleSelection(folder.id);
       }
-    }
-  };
+      else {
+        enterFolder(folder.name);
+        clearSelection(); // Deselect files when changing folder
+      }
+    },
+    [selectedFiles, toggleSelection, enterFolder, clearSelection]
+  );
+
+  const handleItemPress = useCallback(
+    async (id) => {
+      if (selectedFiles.length > 0) {
+        toggleSelection(id);
+      } else {
+        const mediaIndex = mediaFiles.findIndex(f => f.id === id);
+        if (mediaIndex !== -1) {
+          // If URL is not preloaded because preview is off, load it now
+          if (!mediaFiles[mediaIndex].url) {
+            try {
+              const url = await getSignedUrl(currentConnection, currentBucket, mediaFiles[mediaIndex].key);
+              setMediaFileUrl(mediaIndex, url);
+            } catch (error) {
+              // Log the error identity only — never the full error — since a
+              // signed URL is a bearer credential.
+              console.error('Error loading media URL on demand:', error?.name || error?.code, error?.message);
+            }
+          }
+          setCurrentMediaIndex(mediaIndex);
+          setIsModalVisible(true);
+        }
+      }
+    },
+    [selectedFiles, toggleSelection, mediaFiles, currentConnection, currentBucket, setMediaFileUrl]
+  );
 
   // The FlatList passes an item; route folders and media to the right handler.
-  const handleItemSelect = (item) => {
-    if (item.isFolder) {
-      handleFolderPress(item);
-    } else {
-      handleItemPress(item.id);
-    }
-  };
+  const handleItemSelect = useCallback(
+    (item) => {
+      if (item.isFolder) {
+        handleFolderPress(item);
+      } else {
+        handleItemPress(item.id);
+      }
+    },
+    [handleFolderPress, handleItemPress]
+  );
 
-  const handleItemLongPress = (item) => {
-    toggleSelection(item.id);
-  };
+  const handleItemLongPress = useCallback(
+    (item) => {
+      toggleSelection(item.id);
+    },
+    [toggleSelection]
+  );
+
+  // Fixed-size grid row layout (Task 5.7): in grid mode every cell is a
+  // square TouchableOpacity of (itemSize - 16) with an 8px margin on all
+  // sides (see FileItem's itemContainer usage), so each cell's full
+  // margin-box is (itemSize - 16) + 8 + 8 = itemSize on both axes, and
+  // numColumns of them exactly fill `width` (itemSize = width / numColumns).
+  // That makes every row exactly `itemSize` tall, so FlatList can compute
+  // offsets without measuring. Only valid for the grid — list-view rows are
+  // not fixed height — so it's applied conditionally below.
+  const gridItemLayout = useCallback(
+    (data, index) => {
+      const row = Math.floor(index / numColumns);
+      return { length: itemSize, offset: row * itemSize, index };
+    },
+    [itemSize, numColumns]
+  );
 
   const handleUpload = async () => {
     // A second tap while an upload/download/delete is already running is a
@@ -864,6 +902,24 @@ export default function FileListScreen() {
           contentContainerStyle={styles.flatListContent}
           onEndReached={loadMoreFiles}
           onEndReachedThreshold={0.5}
+          // getItemLayout only applies to the grid: list-view row heights
+          // are content-driven (text can wrap), so `undefined` there falls
+          // back to FlatList's normal measured layout (unchanged behavior).
+          getItemLayout={viewMode === 'grid' ? gridItemLayout : undefined}
+          // windowSize trimmed from the default 21 screens' worth of
+          // content to 5: each row can hold expensive CachedImage/
+          // CachedVideo content, so keeping fewer off-screen rows mounted
+          // reduces memory/CPU without starving the pre-render window needed
+          // for smooth scroll.
+          windowSize={5}
+          // Android-beneficial: unmounts off-screen native views, which
+          // matters here since rows can hold images/videos. The classic iOS
+          // caveat is content disappearing when clipped views sit inside
+          // scale/opacity-animated or `position: absolute`-outside-bounds
+          // ancestors; FileItem's absolutely-positioned children (checkbox/
+          // play-icon overlays) are always inside their own row's bounds, so
+          // that failure mode doesn't apply here.
+          removeClippedSubviews={true}
         />
       )}
 

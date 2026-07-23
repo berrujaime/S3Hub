@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Alert, AppState } from 'react-native';
 import { listAllObjects, getSignedUrl } from '../services/s3Service';
 import { PAGE_SIZE } from '../config/cacheConfig';
@@ -287,9 +287,19 @@ export default function useFileList(currentConnection, currentBucket) {
   // Filter the already-loaded items client-side by name (case-insensitive).
   // No new S3 requests are triggered. Existing sorting is preserved.
   const trimmedQuery = searchQuery.trim().toLowerCase();
-  const visibleFiles = trimmedQuery
-    ? sortFiles(fullFiles.filter((file) => file.name.toLowerCase().includes(trimmedQuery)))
-    : displayedFiles;
+  // useMemo (Task 5.7): the filter+sort below is O(n log n) with string
+  // comparisons, but before this it re-ran on EVERY render of this hook
+  // (i.e. every FileListScreen render — upload/delete progress ticks,
+  // selection changes, modal open/close, etc.), not just when the search
+  // query or the underlying file lists actually changed. Keyed on the true
+  // inputs of the computation itself: trimmedQuery (what's searched),
+  // fullFiles (what a non-empty query searches over), and displayedFiles
+  // (what's returned verbatim when there is no query).
+  const visibleFiles = useMemo(() => {
+    return trimmedQuery
+      ? sortFiles(fullFiles.filter((file) => file.name.toLowerCase().includes(trimmedQuery)))
+      : displayedFiles;
+  }, [trimmedQuery, fullFiles, displayedFiles]);
   const showNoResults = trimmedQuery !== '' && visibleFiles.length === 0;
 
   return {

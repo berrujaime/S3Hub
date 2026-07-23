@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, Modal, FlatList, Text, Dimensions } from 'react-native';
+import { View, StyleSheet, Modal, FlatList, Text, useWindowDimensions } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
@@ -44,6 +44,14 @@ const MediaViewerModal = ({
   theme,
 }) => {
   const flatListRef = useRef(null);
+  // useWindowDimensions (Task 5.7) instead of a module-load Dimensions.get:
+  // the latter is read once when this module first loads and never updates,
+  // so rotating the device left the paging FlatList's page width/height
+  // (getItemLayout, onMomentumScrollEnd's page-index math) and the full-
+  // screen media size stuck at the orientation the app started in. All
+  // three now derive from this single hook call so they stay consistent
+  // with each other and with the live screen size.
+  const { width, height } = useWindowDimensions();
 
   // Keep the paging FlatList in sync with the current media index.
   useEffect(() => {
@@ -52,16 +60,39 @@ const MediaViewerModal = ({
     }
   }, [visible, currentMediaIndex]);
 
-  const onViewableItemsChanged = ({ viewableItems }) => {
+  // FlatList throws "Changing onViewableItemsChanged on the fly is not
+  // supported" if this prop's identity changes after mount, so the value
+  // actually passed to FlatList must never change — hence the useRef below
+  // instead of a plain function/inline object. `onReachEnd` itself is NOT
+  // stabilized by the parent (FileListScreen recreates it every render), so
+  // the ref's body reads the latest one indirectly through
+  // `onReachEndRef`, kept in sync by the effect beneath it.
+  const onReachEndRef = useRef(onReachEnd);
+  useEffect(() => {
+    onReachEndRef.current = onReachEnd;
+  }, [onReachEnd]);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length) {
       const lastIndex = viewableItems[viewableItems.length - 1].index;
-      onReachEnd(lastIndex);
+      onReachEndRef.current(lastIndex);
     }
-  };
+  }).current;
+
+  // Same "changing on the fly" restriction applies to viewabilityConfig;
+  // this value is static anyway, but a literal object still gets a new
+  // identity every render, so it's pinned via useRef too.
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
   if (!(visible && mediaFiles.length > 0)) {
     return null;
   }
+
+  // width-derived: recomputed every render from the live useWindowDimensions
+  // value, kept out of the static StyleSheet below (which is evaluated once
+  // at module load and would otherwise go stale on rotation).
+  const fullMediaStyle = { width: width * 0.9, height: height * 0.6 };
+  const modalMediaContainerStyle = [styles.modalMediaContainer, { width, height }];
 
   return (
     <Modal
@@ -116,17 +147,17 @@ const MediaViewerModal = ({
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id}
           onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+          viewabilityConfig={viewabilityConfig}
           initialScrollIndex={currentMediaIndex}
           getItemLayout={(data, index) => (
-            {length: Dimensions.get('window').width, offset: Dimensions.get('window').width * index, index}
+            {length: width, offset: width * index, index}
           )}
           renderItem={({ item, index }) => (
-            <View style={styles.modalMediaContainer}>
+            <View style={modalMediaContainerStyle}>
               {item.isVideo ? (
                 <CachedVideo
                   source={{ uri: item.url }}
-                  style={styles.fullMedia}
+                  style={fullMediaStyle}
                   resizeMode="contain"
                   shouldPlay={currentMediaIndex === index && visible}
                   useNativeControls={true}
@@ -135,7 +166,7 @@ const MediaViewerModal = ({
               ) : (
                 <CachedImage
                   source={{ uri: item.url }}
-                  style={styles.fullMedia}
+                  style={fullMediaStyle}
                   resizeMode="contain"
                   cacheKey={itemCacheKey(item)}
                 />
@@ -144,7 +175,7 @@ const MediaViewerModal = ({
           )}
           onMomentumScrollEnd={(event) => {
             const index = Math.round(
-              event.nativeEvent.contentOffset.x / Dimensions.get('window').width
+              event.nativeEvent.contentOffset.x / width
             );
             onIndexChange(index);
           }}
@@ -199,13 +230,12 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   modalShareButton: {},
-  fullMedia: {
-    width: Dimensions.get('window').width * 0.9,
-    height: Dimensions.get('window').height * 0.6,
-  },
+  // fullMedia/modalMediaContainer no longer live here: their width/height
+  // came from a module-load Dimensions.get('window') that never updated on
+  // rotation. They're now computed per-render from useWindowDimensions as
+  // fullMediaStyle/modalMediaContainerStyle above the render function; only
+  // the dimension-independent properties stay in this static StyleSheet.
   modalMediaContainer: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
     justifyContent: 'center',
     alignItems: 'center',
   },

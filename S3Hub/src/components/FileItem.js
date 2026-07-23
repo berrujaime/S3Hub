@@ -21,6 +21,15 @@ const GENERIC_FILE_ICONS = {
 // in either grid or list view. Extracted verbatim from FileListScreen's
 // renderItem. The parent decides folder-vs-item behavior: onPress(item) and
 // onLongPress(item).
+//
+// Wrapped in React.memo (Task 5.7): the grid/list FlatList re-renders every
+// row on any FileListScreen state change (e.g. upload/delete progress
+// ticks) unless each row's props are unchanged. `onPress`/`onLongPress` are
+// stabilized with useCallback at the call site (FileListScreen) so memo can
+// actually hit; `isSelected` is a plain boolean (safe for shallow compare)
+// but is inherently per-item-unstable in the sense that it flips whenever
+// selection state changes for THIS item — memo still helps every other item
+// in the grid on that same render.
 const FileItem = ({
   item,
   index,
@@ -383,4 +392,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FileItem;
+export default React.memo(FileItem);
