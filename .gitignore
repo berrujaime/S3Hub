@@ -78,7 +78,6 @@ build/
 # -----------------------------------
 
 # Archivo de Lock de NPM y Yarn
-package-lock.json
 yarn.lock
 
 # Carpetas de Reportes de Pruebas
