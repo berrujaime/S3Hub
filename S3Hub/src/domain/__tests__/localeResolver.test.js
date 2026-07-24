@@ -3,9 +3,7 @@ import { resolveLocale, SUPPORTED_LOCALES, DEFAULT_LOCALE } from '../localeResol
 describe('resolveLocale', () => {
   describe('stored preference wins', () => {
     it('returns the stored locale when it is supported, regardless of device locale', () => {
-      expect(
-        resolveLocale({ storedLocale: 'es', deviceLocale: 'en-US' })
-      ).toBe('es');
+      expect(resolveLocale({ storedLocale: 'es', deviceLocale: 'en-US' })).toBe('es');
     });
 
     it('returns the stored locale even when there is no device locale at all', () => {
@@ -15,9 +13,7 @@ describe('resolveLocale', () => {
     it('falls through to device locale when the stored locale is unsupported', () => {
       // Defends against a corrupted/legacy stored value; the stored
       // preference is trusted only if it is one we actually ship.
-      expect(
-        resolveLocale({ storedLocale: 'fr', deviceLocale: 'es-MX' })
-      ).toBe('es');
+      expect(resolveLocale({ storedLocale: 'fr', deviceLocale: 'es-MX' })).toBe('es');
     });
   });
 
@@ -50,7 +46,7 @@ describe('resolveLocale', () => {
         deviceLocale: 'de-DE',
         supportedLocales: ['de', 'fr'],
         defaultLocale: 'fr',
-      })
+      }),
     ).toBe('de');
 
     expect(
@@ -59,7 +55,7 @@ describe('resolveLocale', () => {
         deviceLocale: 'it-IT',
         supportedLocales: ['de', 'fr'],
         defaultLocale: 'fr',
-      })
+      }),
     ).toBe('fr');
   });
 

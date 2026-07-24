@@ -56,7 +56,7 @@ const renderScreen = ({
       >
         <ConnectionSelectScreen navigation={navigation} />
       </AuthContext.Provider>
-    </PaperProvider>
+    </PaperProvider>,
   );
   return { navigation, setActiveConnection };
 };

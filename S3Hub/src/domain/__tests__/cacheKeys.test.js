@@ -12,9 +12,7 @@ describe('getCacheKey', () => {
 
   it('uses the connection id when given a connection object', () => {
     const connection = { id: '1717000000000', accessKey: 'AK', name: 'My Connection' };
-    expect(getCacheKey(connection, 'bucket', 'path/')).toBe(
-      'files_1717000000000_bucket_path/'
-    );
+    expect(getCacheKey(connection, 'bucket', 'path/')).toBe('files_1717000000000_bucket_path/');
   });
 
   it('does not collide for different connections sharing a bucket name and path', () => {
@@ -172,7 +170,7 @@ describe('mediaCacheKey', () => {
   it('does not throw and stays stable for missing/undefined inputs', () => {
     expect(() => mediaCacheKey(undefined, undefined, undefined)).not.toThrow();
     expect(mediaCacheKey(undefined, undefined, undefined)).toBe(
-      mediaCacheKey(undefined, undefined, undefined)
+      mediaCacheKey(undefined, undefined, undefined),
     );
   });
 
@@ -180,7 +178,7 @@ describe('mediaCacheKey', () => {
     const connA = deriveConnectionId({ service: 'aws', accessKey: 'AK1' });
     const connB = deriveConnectionId({ service: 'aws', accessKey: 'AK2' });
     expect(mediaCacheKey(connA, 'photos', 'trip/1.jpg')).not.toBe(
-      mediaCacheKey(connB, 'photos', 'trip/1.jpg')
+      mediaCacheKey(connB, 'photos', 'trip/1.jpg'),
     );
   });
 });
@@ -224,7 +222,10 @@ describe('reconcileCurrentConnection', () => {
     const listEntry = { id: 'explicit-id', service: 'aws', accessKey: 'AK-1' };
     const connections = [listEntry];
 
-    const result = reconcileCurrentConnection({ id: 'explicit-id', service: 'aws', accessKey: 'AK-1' }, connections);
+    const result = reconcileCurrentConnection(
+      { id: 'explicit-id', service: 'aws', accessKey: 'AK-1' },
+      connections,
+    );
 
     expect(result).toBe(listEntry);
   });

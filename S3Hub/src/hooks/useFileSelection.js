@@ -30,10 +30,7 @@ export default function useFileSelection() {
     setSelectedFiles([]);
   }, []);
 
-  const isSelected = useCallback(
-    (id) => selectedFiles.includes(id),
-    [selectedFiles]
-  );
+  const isSelected = useCallback((id) => selectedFiles.includes(id), [selectedFiles]);
 
   return { selectedFiles, toggleSelection, selectAll, clearSelection, isSelected };
 }

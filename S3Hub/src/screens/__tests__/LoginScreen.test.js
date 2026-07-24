@@ -53,7 +53,7 @@ const renderScreen = (navigationOverrides = {}) => {
       <AuthContext.Provider value={{ addConnection, setActiveConnection }}>
         <LoginScreen navigation={navigation} />
       </AuthContext.Provider>
-    </PaperProvider>
+    </PaperProvider>,
   );
   return { navigation, addConnection, setActiveConnection };
 };
@@ -72,9 +72,7 @@ describe('LoginScreen keyboard avoidance', () => {
     renderScreen();
 
     const keyboardAvoidingView = screen.UNSAFE_getByType(KeyboardAvoidingView);
-    expect(keyboardAvoidingView.props.behavior).toBe(
-      Platform.OS === 'ios' ? 'padding' : 'height'
-    );
+    expect(keyboardAvoidingView.props.behavior).toBe(Platform.OS === 'ios' ? 'padding' : 'height');
   });
 
   it('nests a ScrollView inside the KeyboardAvoidingView configured to stay scrollable and keep taps working with the keyboard open', () => {
@@ -153,16 +151,12 @@ describe('LoginScreen credential field hardening', () => {
     expect(getCredentialInputs()[1].props.secureTextEntry).toBe(true);
 
     fireEvent.press(screen.getByLabelText(i18n.t('showSecretKey')));
-    await waitFor(() =>
-      expect(getCredentialInputs()[1].props.secureTextEntry).toBe(false)
-    );
+    await waitFor(() => expect(getCredentialInputs()[1].props.secureTextEntry).toBe(false));
 
     // The toggle flips back: the label now announces "hide", and pressing it
     // re-masks the field.
     fireEvent.press(screen.getByLabelText(i18n.t('hideSecretKey')));
-    await waitFor(() =>
-      expect(getCredentialInputs()[1].props.secureTextEntry).toBe(true)
-    );
+    await waitFor(() => expect(getCredentialInputs()[1].props.secureTextEntry).toBe(true));
   });
 
   it('disables autocorrect and autocomplete on both credential fields', () => {

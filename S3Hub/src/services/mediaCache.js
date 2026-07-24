@@ -58,9 +58,7 @@ export const clearEntireCache = async () => {
     await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
 
     const allKeys = await AsyncStorage.getAllKeys();
-    const fileListCacheKeys = allKeys.filter((key) =>
-      key.startsWith(FILE_LIST_CACHE_KEY_PREFIX)
-    );
+    const fileListCacheKeys = allKeys.filter((key) => key.startsWith(FILE_LIST_CACHE_KEY_PREFIX));
     if (fileListCacheKeys.length > 0) {
       await AsyncStorage.multiRemove(fileListCacheKeys);
     }

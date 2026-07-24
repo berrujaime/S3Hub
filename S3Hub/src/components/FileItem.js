@@ -80,10 +80,7 @@ const FileItem = ({
         <Text style={{ color: theme.colors.onSurface }}>{item.name}</Text>
         {isSelected && (
           <View style={styles.checkboxContainer}>
-            <Checkbox
-              status="checked"
-              style={styles.checkbox}
-            />
+            <Checkbox status="checked" style={styles.checkbox} />
           </View>
         )}
       </TouchableOpacity>
@@ -98,12 +95,9 @@ const FileItem = ({
           accessibilityRole="button"
           accessibilityLabel={item.name}
           accessibilityState={{ selected: isSelected }}
-          style={[
-            styles.itemContainer,
-            { width: itemSize - 16, height: itemSize - 16, margin: 8 },
-          ]}
+          style={[styles.itemContainer, { width: itemSize - 16, height: itemSize - 16, margin: 8 }]}
         >
-          {(preview === 'true') ? (
+          {preview === 'true' ? (
             item.url ? (
               <View style={styles.videoContainer}>
                 <CachedVideo
@@ -126,7 +120,9 @@ const FileItem = ({
             // When preview is off: show placeholder icon + file name (grid only)
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <IconButton icon="video-outline" size={50} />
-              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
+              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+                {item.name}
+              </Text>
             </View>
           )}
           {isSelected && (
@@ -147,7 +143,7 @@ const FileItem = ({
           accessibilityState={{ selected: isSelected }}
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
-          {(preview === 'true') ? (
+          {preview === 'true' ? (
             item.url ? (
               <View style={styles.listVideoContainer}>
                 <CachedVideo
@@ -168,7 +164,12 @@ const FileItem = ({
             )
           ) : (
             // In list view, only the placeholder icon is shown
-            <View style={[styles.listVideoContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+            <View
+              style={[
+                styles.listVideoContainer,
+                { justifyContent: 'center', alignItems: 'center' },
+              ]}
+            >
               <IconButton icon="video-outline" size={30} />
             </View>
           )}
@@ -192,12 +193,9 @@ const FileItem = ({
           accessibilityRole="button"
           accessibilityLabel={item.name}
           accessibilityState={{ selected: isSelected }}
-          style={[
-            styles.itemContainer,
-            { width: itemSize - 16, height: itemSize - 16, margin: 8 },
-          ]}
+          style={[styles.itemContainer, { width: itemSize - 16, height: itemSize - 16, margin: 8 }]}
         >
-          {(preview === 'true') ? (
+          {preview === 'true' ? (
             item.url ? (
               <CachedImage
                 style={[
@@ -220,7 +218,9 @@ const FileItem = ({
             // When preview is off: show placeholder icon + file name (grid only)
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <IconButton icon="image-outline" size={50} />
-              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
+              <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+                {item.name}
+              </Text>
             </View>
           )}
           {isSelected && (
@@ -241,7 +241,7 @@ const FileItem = ({
           accessibilityState={{ selected: isSelected }}
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
-          {(preview === 'true') ? (
+          {preview === 'true' ? (
             item.url ? (
               <CachedImage
                 style={styles.listImage}
@@ -280,13 +280,14 @@ const FileItem = ({
           accessibilityRole="button"
           accessibilityLabel={item.name}
           accessibilityState={{ selected: isSelected }}
-          style={[
-            styles.itemContainer,
-            { width: itemSize - 16, height: itemSize - 16, margin: 8 },
-          ]}
+          style={[styles.itemContainer, { width: itemSize - 16, height: itemSize - 16, margin: 8 }]}
         >
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <MaterialCommunityIcons name={genericIconName} size={50} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name={genericIconName}
+              size={50}
+              color={theme.colors.onSurface}
+            />
             <Text style={{ textAlign: 'center', color: theme.colors.onSurface }}>{item.name}</Text>
           </View>
           {isSelected && (
@@ -308,7 +309,11 @@ const FileItem = ({
           style={[styles.listItemContainer, { borderColor: theme.colors.outline }]}
         >
           <View style={[styles.listImage, { justifyContent: 'center', alignItems: 'center' }]}>
-            <MaterialCommunityIcons name={genericIconName} size={30} color={theme.colors.onSurface} />
+            <MaterialCommunityIcons
+              name={genericIconName}
+              size={30}
+              color={theme.colors.onSurface}
+            />
           </View>
           <View style={styles.listTextContainer}>
             <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>

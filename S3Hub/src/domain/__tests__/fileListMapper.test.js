@@ -82,10 +82,13 @@ describe('isPreviewableMediaType', () => {
 
 describe('sortFiles', () => {
   it('returns a new array (does not mutate input)', () => {
-    const input = [{ name: 'b', isFolder: false }, { name: 'a', isFolder: false }];
+    const input = [
+      { name: 'b', isFolder: false },
+      { name: 'a', isFolder: false },
+    ];
     const result = sortFiles(input);
     expect(result).not.toBe(input);
-    expect(input.map(i => i.name)).toEqual(['b', 'a']);
+    expect(input.map((i) => i.name)).toEqual(['b', 'a']);
   });
 
   it('places folders before files', () => {
@@ -104,7 +107,7 @@ describe('sortFiles', () => {
       { name: 'alpha', isFolder: true },
       { name: 'beta', isFolder: true },
     ];
-    expect(sortFiles(input).map(i => i.name)).toEqual(['alpha', 'beta', 'zeta']);
+    expect(sortFiles(input).map((i) => i.name)).toEqual(['alpha', 'beta', 'zeta']);
   });
 
   it('places images before videos', () => {
@@ -123,7 +126,7 @@ describe('sortFiles', () => {
       { name: 'a.jpg', isFolder: false, isVideo: false },
       { name: 'b.jpg', isFolder: false, isVideo: false },
     ];
-    expect(sortFiles(input).map(i => i.name)).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
+    expect(sortFiles(input).map((i) => i.name)).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
   });
 
   it('sorts videos alphabetically among themselves', () => {
@@ -131,7 +134,7 @@ describe('sortFiles', () => {
       { name: 'z.mp4', isFolder: false, isVideo: true },
       { name: 'a.mp4', isFolder: false, isVideo: true },
     ];
-    expect(sortFiles(input).map(i => i.name)).toEqual(['a.mp4', 'z.mp4']);
+    expect(sortFiles(input).map((i) => i.name)).toEqual(['a.mp4', 'z.mp4']);
   });
 
   it('orders folders, then images, then videos overall', () => {
@@ -141,7 +144,7 @@ describe('sortFiles', () => {
       { name: 'folderB', isFolder: true },
       { name: 'folderA', isFolder: true },
     ];
-    expect(sortFiles(input).map(i => i.name)).toEqual([
+    expect(sortFiles(input).map((i) => i.name)).toEqual([
       'folderA',
       'folderB',
       'image.jpg',
@@ -168,17 +171,13 @@ describe('parseObjects', () => {
   it('derives folder rows from commonPrefixes, stripping the current prefix', () => {
     const listing = { contents: [], commonPrefixes: ['sub/'] };
     const result = parseObjects(listing, '');
-    expect(result).toEqual([
-      { id: 'sub/', key: 'sub/', name: 'sub', isFolder: true },
-    ]);
+    expect(result).toEqual([{ id: 'sub/', key: 'sub/', name: 'sub', isFolder: true }]);
   });
 
   it('builds folder rows relative to a non-root currentPath', () => {
     const listing = { contents: [], commonPrefixes: ['root/sub/'] };
     const result = parseObjects(listing, 'root/');
-    expect(result).toEqual([
-      { id: 'root/sub/', key: 'root/sub/', name: 'sub', isFolder: true },
-    ]);
+    expect(result).toEqual([{ id: 'root/sub/', key: 'root/sub/', name: 'sub', isFolder: true }]);
   });
 
   it('preserves the given commonPrefixes order for multiple folders', () => {
@@ -200,10 +199,46 @@ describe('parseObjects', () => {
     };
     const result = parseObjects(listing, '');
     expect(result).toEqual([
-      { id: 'photo.jpg', key: 'photo.jpg', name: 'photo.jpg', size: 100, isFolder: false, isVideo: false, mediaType: 'image', url: null },
-      { id: 'notes.txt', key: 'notes.txt', name: 'notes.txt', size: 50, isFolder: false, isVideo: false, mediaType: 'document', url: null },
-      { id: 'clip.mp4', key: 'clip.mp4', name: 'clip.mp4', size: 200, isFolder: false, isVideo: true, mediaType: 'video', url: null },
-      { id: 'archive.zip', key: 'archive.zip', name: 'archive.zip', size: 300, isFolder: false, isVideo: false, mediaType: 'archive', url: null },
+      {
+        id: 'photo.jpg',
+        key: 'photo.jpg',
+        name: 'photo.jpg',
+        size: 100,
+        isFolder: false,
+        isVideo: false,
+        mediaType: 'image',
+        url: null,
+      },
+      {
+        id: 'notes.txt',
+        key: 'notes.txt',
+        name: 'notes.txt',
+        size: 50,
+        isFolder: false,
+        isVideo: false,
+        mediaType: 'document',
+        url: null,
+      },
+      {
+        id: 'clip.mp4',
+        key: 'clip.mp4',
+        name: 'clip.mp4',
+        size: 200,
+        isFolder: false,
+        isVideo: true,
+        mediaType: 'video',
+        url: null,
+      },
+      {
+        id: 'archive.zip',
+        key: 'archive.zip',
+        name: 'archive.zip',
+        size: 300,
+        isFolder: false,
+        isVideo: false,
+        mediaType: 'archive',
+        url: null,
+      },
     ]);
   });
 
@@ -281,7 +316,12 @@ describe('parseObjects', () => {
     const listing = { contents: [], commonPrefixes: ['My Photos + Vidéos/'] };
     const result = parseObjects(listing, '');
     expect(result).toEqual([
-      { id: 'My Photos + Vidéos/', key: 'My Photos + Vidéos/', name: 'My Photos + Vidéos', isFolder: true },
+      {
+        id: 'My Photos + Vidéos/',
+        key: 'My Photos + Vidéos/',
+        name: 'My Photos + Vidéos',
+        isFolder: true,
+      },
     ]);
   });
 
@@ -351,9 +391,7 @@ describe('stampItemOrigin', () => {
   });
 
   it('overwrites stale origin fields from a previous stamp', () => {
-    const items = [
-      { id: 'a.jpg', key: 'a.jpg', connectionId: 'oldConn', bucket: 'oldBucket' },
-    ];
+    const items = [{ id: 'a.jpg', key: 'a.jpg', connectionId: 'oldConn', bucket: 'oldBucket' }];
     const [stamped] = stampItemOrigin(items, 'newConn', 'newBucket');
     expect(stamped.connectionId).toBe('newConn');
     expect(stamped.bucket).toBe('newBucket');
@@ -429,7 +467,12 @@ describe('stripVolatileFields', () => {
     ];
     const result = stripVolatileFields(items);
     expect(result[0]).toEqual({ id: 'sub/', key: 'sub/', name: 'sub', isFolder: true });
-    expect(result[1]).toEqual({ id: 'notes.txt', key: 'notes.txt', name: 'notes.txt', mediaType: 'document' });
+    expect(result[1]).toEqual({
+      id: 'notes.txt',
+      key: 'notes.txt',
+      name: 'notes.txt',
+      mediaType: 'document',
+    });
   });
 
   it('returns a new array with new item objects and never mutates the input', () => {

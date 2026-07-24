@@ -52,7 +52,7 @@ function ThemedApp() {
   const systemScheme = useColorScheme();
 
   // Resolve the 'system' preference to a concrete scheme.
-  const resolvedScheme = theme === 'system' ? (systemScheme || 'light') : theme;
+  const resolvedScheme = theme === 'system' ? systemScheme || 'light' : theme;
   const isDark = resolvedScheme === 'dark';
   const selectedTheme = isDark ? darkTheme : lightTheme;
 
@@ -122,9 +122,7 @@ export default function App() {
     // block forever — Paper/RN fall back to a system font.
     const loaderTheme = systemScheme === 'dark' ? darkTheme : lightTheme;
     return (
-      <View
-        style={[styles.loadingContainer, { backgroundColor: loaderTheme.colors.background }]}
-      >
+      <View style={[styles.loadingContainer, { backgroundColor: loaderTheme.colors.background }]}>
         <ActivityIndicator size="large" color={loaderTheme.colors.primary} />
       </View>
     );

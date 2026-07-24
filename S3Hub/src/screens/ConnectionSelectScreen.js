@@ -17,7 +17,8 @@ export default function ConnectionSelectScreen({ navigation }) {
   // screen sits directly under the status bar, so insets.top replaces the
   // old hardcoded marginTop (Task 5.3).
   const insets = useSafeAreaInsets();
-  const { connections, currentConnection, setActiveConnection, deleteConnection } = useContext(AuthContext);
+  const { connections, currentConnection, setActiveConnection, deleteConnection } =
+    useContext(AuthContext);
 
   const handleConnectionSelect = async (connection) => {
     // Compare by `id` (stable per Tasks 1.5/1.6), not `accessKey` (not
@@ -39,20 +40,16 @@ export default function ConnectionSelectScreen({ navigation }) {
 
   const handleDeleteConnection = (connection) => {
     const provider = getProvider(connection.service);
-    Alert.alert(
-      i18n.t('deleteConnection'),
-      `${i18n.t('deleteConnection')} ${provider.name}?`,
-      [
-        { text: i18n.t('cancel'), style: 'cancel' },
-        {
-          text: i18n.t('delete'),
-          style: 'destructive',
-          onPress: () => {
-            deleteConnection(connection.id);
-          },
+    Alert.alert(i18n.t('deleteConnection'), `${i18n.t('deleteConnection')} ${provider.name}?`, [
+      { text: i18n.t('cancel'), style: 'cancel' },
+      {
+        text: i18n.t('delete'),
+        style: 'destructive',
+        onPress: () => {
+          deleteConnection(connection.id);
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const renderConnectionItem = ({ item }) => {
@@ -97,10 +94,7 @@ export default function ConnectionSelectScreen({ navigation }) {
           right={(props) => (
             <View style={styles.actions}>
               {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
-              <IconButton
-                icon="delete"
-                onPress={() => handleDeleteConnection(item)}
-              />
+              <IconButton icon="delete" onPress={() => handleDeleteConnection(item)} />
             </View>
           )}
         />
@@ -125,10 +119,7 @@ export default function ConnectionSelectScreen({ navigation }) {
         size={64}
         color={theme.colors.onSurfaceVariant}
       />
-      <Text
-        variant="titleMedium"
-        style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
-      >
+      <Text variant="titleMedium" style={[styles.emptyTitle, { color: theme.colors.onSurface }]}>
         {i18n.t('noConnectionsTitle')}
       </Text>
       <Text

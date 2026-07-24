@@ -13,9 +13,7 @@ import { mediaCacheKey } from '../domain/cacheKeys';
 // new bucket's namespace. An item without origin fields skips disk caching
 // entirely (null cacheKey) rather than guessing a namespace.
 const itemCacheKey = (item) =>
-  item.connectionId && item.bucket
-    ? mediaCacheKey(item.connectionId, item.bucket, item.key)
-    : null;
+  item.connectionId && item.bucket ? mediaCacheKey(item.connectionId, item.bucket, item.key) : null;
 
 // Full-screen media viewer with horizontal paging. Extracted verbatim from
 // FileListScreen's modal. The parent owns the media list, the current index,
@@ -95,11 +93,7 @@ const MediaViewerModal = ({
   const modalMediaContainerStyle = [styles.modalMediaContainer, { width, height }];
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent={true} onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalHeader}>
           <IconButton
@@ -149,9 +143,7 @@ const MediaViewerModal = ({
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           initialScrollIndex={currentMediaIndex}
-          getItemLayout={(data, index) => (
-            {length: width, offset: width * index, index}
-          )}
+          getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
           renderItem={({ item, index }) => (
             <View style={modalMediaContainerStyle}>
               {item.isVideo ? (
@@ -174,21 +166,22 @@ const MediaViewerModal = ({
             </View>
           )}
           onMomentumScrollEnd={(event) => {
-            const index = Math.round(
-              event.nativeEvent.contentOffset.x / width
-            );
+            const index = Math.round(event.nativeEvent.contentOffset.x / width);
             onIndexChange(index);
           }}
           style={{ flex: 1 }}
         />
 
         {mediaFiles[currentMediaIndex] && (
-          <View style={[styles.infoContainer, { backgroundColor: theme.colors.secondaryContainer }]}>
+          <View
+            style={[styles.infoContainer, { backgroundColor: theme.colors.secondaryContainer }]}
+          >
             <Text style={[styles.infoText, { color: theme.colors.onSecondaryContainer }]}>
               {i18n.t('fileName')}: {mediaFiles[currentMediaIndex].name}
             </Text>
             <Text style={[styles.infoText, { color: theme.colors.onSecondaryContainer }]}>
-              {i18n.t('fileSize')}: {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
+              {i18n.t('fileSize')}:{' '}
+              {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
             </Text>
           </View>
         )}
@@ -218,8 +211,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
   },
-  modalCloseButton: {
-  },
+  modalCloseButton: {},
   modalRightButtons: {
     flexDirection: 'row',
   },

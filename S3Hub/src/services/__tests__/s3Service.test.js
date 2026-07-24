@@ -45,9 +45,7 @@ test('listAllObjects loops until IsTruncated is false', async () => {
 });
 
 test('listAllObjects throws when truncated page lacks a continuation token', async () => {
-  const client = makeClient([
-    { Contents: [{ Key: '1' }], IsTruncated: true },
-  ]);
+  const client = makeClient([{ Contents: [{ Key: '1' }], IsTruncated: true }]);
   getS3Client.mockReturnValue(client);
   await expect(listAllObjects(connection, 'bucket', { prefix: 'p/' })).rejects.toThrow();
 });

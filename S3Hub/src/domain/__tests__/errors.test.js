@@ -17,9 +17,9 @@ describe('mapS3Error', () => {
     });
 
     it("maps httpStatusCode 403 to 'errorAccessDenied'", () => {
-      expect(
-        mapS3Error({ name: 'Forbidden', $metadata: { httpStatusCode: 403 } })
-      ).toBe('errorAccessDenied');
+      expect(mapS3Error({ name: 'Forbidden', $metadata: { httpStatusCode: 403 } })).toBe(
+        'errorAccessDenied',
+      );
     });
   });
 
@@ -29,9 +29,9 @@ describe('mapS3Error', () => {
     });
 
     it("maps httpStatusCode 404 to 'errorBucketNotFound'", () => {
-      expect(
-        mapS3Error({ name: 'NotFound', $metadata: { httpStatusCode: 404 } })
-      ).toBe('errorBucketNotFound');
+      expect(mapS3Error({ name: 'NotFound', $metadata: { httpStatusCode: 404 } })).toBe(
+        'errorBucketNotFound',
+      );
     });
   });
 
@@ -54,7 +54,7 @@ describe('mapS3Error', () => {
 
     it("maps a message containing 'offline' to 'errorNetwork'", () => {
       expect(mapS3Error({ message: 'The Internet connection appears to be offline.' })).toBe(
-        'errorNetwork'
+        'errorNetwork',
       );
     });
   });
@@ -75,9 +75,9 @@ describe('mapS3Error', () => {
 
   describe('generic / fallback', () => {
     it("maps an unknown named error (with metadata) to 'errorGeneric'", () => {
-      expect(
-        mapS3Error({ name: 'InternalError', $metadata: { httpStatusCode: 500 } })
-      ).toBe('errorGeneric');
+      expect(mapS3Error({ name: 'InternalError', $metadata: { httpStatusCode: 500 } })).toBe(
+        'errorGeneric',
+      );
     });
 
     it("maps an unknown no-status error with a non-network message to 'errorGeneric' (previously mis-mapped to errorNetwork)", () => {
@@ -86,7 +86,7 @@ describe('mapS3Error', () => {
 
     it("maps a plain Error with no name/$metadata match (e.g. the listAllObjects truncation guard) to 'errorGeneric'", () => {
       expect(
-        mapS3Error(new Error('S3 listing reported truncation without a continuation token'))
+        mapS3Error(new Error('S3 listing reported truncation without a continuation token')),
       ).toBe('errorGeneric');
     });
 
@@ -101,9 +101,9 @@ describe('mapS3Error', () => {
 
   describe('precedence', () => {
     it('prefers the error name over the http status code', () => {
-      expect(
-        mapS3Error({ name: 'NoSuchBucket', $metadata: { httpStatusCode: 403 } })
-      ).toBe('errorBucketNotFound');
+      expect(mapS3Error({ name: 'NoSuchBucket', $metadata: { httpStatusCode: 403 } })).toBe(
+        'errorBucketNotFound',
+      );
     });
   });
 });

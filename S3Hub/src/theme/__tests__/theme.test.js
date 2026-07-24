@@ -5,43 +5,37 @@ import { contrastRatio } from '../../domain/colorContrast';
 describe('lightTheme / darkTheme (Deep storage palette)', () => {
   it('gives the light theme an AA-compliant onPrimary/primary pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(lightTheme.colors.onPrimary, lightTheme.colors.primary)
+      contrastRatio(lightTheme.colors.onPrimary, lightTheme.colors.primary),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the dark theme an AA-compliant onPrimary/primary pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(darkTheme.colors.onPrimary, darkTheme.colors.primary)
+      contrastRatio(darkTheme.colors.onPrimary, darkTheme.colors.primary),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the light theme an AA-compliant onSurface/surface pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(lightTheme.colors.onSurface, lightTheme.colors.surface)
+      contrastRatio(lightTheme.colors.onSurface, lightTheme.colors.surface),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the dark theme an AA-compliant onSurface/surface pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(darkTheme.colors.onSurface, darkTheme.colors.surface)
+      contrastRatio(darkTheme.colors.onSurface, darkTheme.colors.surface),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the dark theme an AA-compliant onSurfaceVariant/surfaceVariant pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(
-        darkTheme.colors.onSurfaceVariant,
-        darkTheme.colors.surfaceVariant
-      )
+      contrastRatio(darkTheme.colors.onSurfaceVariant, darkTheme.colors.surfaceVariant),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the light theme an AA-compliant onSurfaceVariant/surfaceVariant pair (>= 4.5:1)', () => {
     expect(
-      contrastRatio(
-        lightTheme.colors.onSurfaceVariant,
-        lightTheme.colors.surfaceVariant
-      )
+      contrastRatio(lightTheme.colors.onSurfaceVariant, lightTheme.colors.surfaceVariant),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -105,9 +99,7 @@ describe('lightTheme / darkTheme (Deep storage palette)', () => {
   });
 
   it('overrides the light elevation ramp instead of inheriting MD3LightTheme\'s purple-tinted default (Task 4.4 — this is what adaptNavigationTheme reads as react-navigation\'s "card")', () => {
-    expect(lightTheme.colors.elevation.level2).not.toBe(
-      MD3LightTheme.colors.elevation.level2
-    );
+    expect(lightTheme.colors.elevation.level2).not.toBe(MD3LightTheme.colors.elevation.level2);
   });
 
   it('exposes a light elevation ramp that moves monotonically away from the pure-white surface, staying in the neutral slate family', () => {
@@ -137,9 +129,7 @@ describe('lightTheme / darkTheme (Deep storage palette)', () => {
     expect(lightTheme.colors.secondaryContainer).toBeTruthy();
     expect(darkTheme.colors.secondary).toBeTruthy();
     expect(darkTheme.colors.secondaryContainer).toBeTruthy();
-    expect(lightTheme.colors.secondaryContainer).not.toBe(
-      darkTheme.colors.secondaryContainer
-    );
+    expect(lightTheme.colors.secondaryContainer).not.toBe(darkTheme.colors.secondaryContainer);
   });
 
   it('no longer exposes the legacy accent alias (Task 4.4 rewired its last consumers onto real tokens)', () => {
@@ -161,7 +151,14 @@ describe('lightTheme / darkTheme fonts (Task 4.2 type scale)', () => {
 
   it('maps display/headline roles to the Space Grotesk bold weight in both themes', () => {
     for (const theme of [lightTheme, darkTheme]) {
-      for (const role of ['displayLarge', 'displayMedium', 'displaySmall', 'headlineLarge', 'headlineMedium', 'headlineSmall']) {
+      for (const role of [
+        'displayLarge',
+        'displayMedium',
+        'displaySmall',
+        'headlineLarge',
+        'headlineMedium',
+        'headlineSmall',
+      ]) {
         expect(theme.fonts[role].fontFamily).toBe(SPACE_GROTESK_BOLD);
       }
     }
@@ -189,11 +186,21 @@ describe('lightTheme / darkTheme fonts (Task 4.2 type scale)', () => {
   it('does not pair a per-weight fontFamily with a numeric fontWeight (Android double-bold risk)', () => {
     for (const theme of [lightTheme, darkTheme]) {
       for (const role of [
-        'displayLarge', 'displayMedium', 'displaySmall',
-        'headlineLarge', 'headlineMedium', 'headlineSmall',
-        'titleLarge', 'titleMedium', 'titleSmall',
-        'labelLarge', 'labelMedium', 'labelSmall',
-        'bodyLarge', 'bodyMedium', 'bodySmall',
+        'displayLarge',
+        'displayMedium',
+        'displaySmall',
+        'headlineLarge',
+        'headlineMedium',
+        'headlineSmall',
+        'titleLarge',
+        'titleMedium',
+        'titleSmall',
+        'labelLarge',
+        'labelMedium',
+        'labelSmall',
+        'bodyLarge',
+        'bodyMedium',
+        'bodySmall',
       ]) {
         expect(theme.fonts[role].fontWeight).toBe('normal');
       }

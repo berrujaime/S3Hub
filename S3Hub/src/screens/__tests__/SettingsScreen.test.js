@@ -35,7 +35,7 @@ const renderScreen = (overrides = {}) => {
       <AuthContext.Provider value={value}>
         <SettingsScreen />
       </AuthContext.Provider>
-    </PaperProvider>
+    </PaperProvider>,
   );
   return { logout };
 };

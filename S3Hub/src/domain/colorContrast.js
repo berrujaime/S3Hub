@@ -34,11 +34,7 @@ function linearizeChannel(channel8bit) {
 
 // WCAG relative luminance: https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
 function relativeLuminance([r, g, b]) {
-  return (
-    0.2126 * linearizeChannel(r) +
-    0.7152 * linearizeChannel(g) +
-    0.0722 * linearizeChannel(b)
-  );
+  return 0.2126 * linearizeChannel(r) + 0.7152 * linearizeChannel(g) + 0.0722 * linearizeChannel(b);
 }
 
 /**

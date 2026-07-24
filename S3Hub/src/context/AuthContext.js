@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [currentBucket, setCurrentBucket] = useState(null);
   const [language, setLanguage] = useState(i18n.locale || 'en');
   const [isLoading, setIsLoading] = useState(true);
-  const [preview, setPreview] = useState("true");
+  const [preview, setPreview] = useState('true');
   const [theme, setTheme] = useState('system');
 
   const setActiveConnection = useCallback(async (connection) => {
@@ -48,31 +48,37 @@ export const AuthProvider = ({ children }) => {
     await connectionRepository.saveTheme(newTheme);
   }, []);
 
-  const addConnection = useCallback(async (connection) => {
-    const newConnections = [...connections, connection];
-    setConnections(newConnections);
-    await connectionRepository.saveConnections(newConnections);
-    await setActiveConnection(connection);
-  }, [connections, setActiveConnection]);
+  const addConnection = useCallback(
+    async (connection) => {
+      const newConnections = [...connections, connection];
+      setConnections(newConnections);
+      await connectionRepository.saveConnections(newConnections);
+      await setActiveConnection(connection);
+    },
+    [connections, setActiveConnection],
+  );
 
-  const deleteConnection = useCallback(async (id) => {
-    const updatedConnections = connections.filter(conn => conn.id !== id);
+  const deleteConnection = useCallback(
+    async (id) => {
+      const updatedConnections = connections.filter((conn) => conn.id !== id);
 
-    setConnections(updatedConnections);
+      setConnections(updatedConnections);
 
-    await connectionRepository.deleteConnection(id);
+      await connectionRepository.deleteConnection(id);
 
-    if (currentConnection && currentConnection.id === id) {
-      if (updatedConnections.length > 0) {
-        await setActiveConnection(updatedConnections[0]);
-      } else {
-        setCurrentConnection(null);
-        await connectionRepository.clearCurrentConnection();
-        setCurrentBucket(null);
-        await connectionRepository.clearCurrentBucket();
+      if (currentConnection && currentConnection.id === id) {
+        if (updatedConnections.length > 0) {
+          await setActiveConnection(updatedConnections[0]);
+        } else {
+          setCurrentConnection(null);
+          await connectionRepository.clearCurrentConnection();
+          setCurrentBucket(null);
+          await connectionRepository.clearCurrentBucket();
+        }
       }
-    }
-  }, [connections, currentConnection, setActiveConnection]);
+    },
+    [connections, currentConnection, setActiveConnection],
+  );
 
   // Logs the user out of the currently active connection: clears
   // currentConnection/currentBucket (in memory and persisted), so a restart
@@ -109,7 +115,7 @@ export const AuthProvider = ({ children }) => {
           // as its `connections` counterpart. See
           // domain/cacheKeys.reconcileCurrentConnection for the full rules.
           setCurrentConnection(
-            reconcileCurrentConnection(storedCurrentConnection, storedConnections)
+            reconcileCurrentConnection(storedCurrentConnection, storedConnections),
           );
         }
 
@@ -145,7 +151,7 @@ export const AuthProvider = ({ children }) => {
         const storedTheme = await connectionRepository.getTheme();
         setTheme(storedTheme || 'system');
       } catch (error) {
-        console.error("Error loading stored data:", error);
+        console.error('Error loading stored data:', error);
       } finally {
         setIsLoading(false); // Finish loading
       }
@@ -154,43 +160,42 @@ export const AuthProvider = ({ children }) => {
     loadStoredData();
   }, []);
 
-  const value = useMemo(() => ({
-    connections,
-    currentConnection,
-    currentBucket,
-    language,
-    isLoading,
-    preview,
-    theme,
-    addConnection,
-    setActiveConnection,
-    setCurrentBucket: setCurrentBucketFunction,
-    deleteConnection,
-    logout,
-    changeLanguage,
-    changePreview,
-    changeTheme,
-  }), [
-    connections,
-    currentConnection,
-    currentBucket,
-    language,
-    isLoading,
-    preview,
-    theme,
-    addConnection,
-    setActiveConnection,
-    setCurrentBucketFunction,
-    deleteConnection,
-    logout,
-    changeLanguage,
-    changePreview,
-    changeTheme,
-  ]);
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      connections,
+      currentConnection,
+      currentBucket,
+      language,
+      isLoading,
+      preview,
+      theme,
+      addConnection,
+      setActiveConnection,
+      setCurrentBucket: setCurrentBucketFunction,
+      deleteConnection,
+      logout,
+      changeLanguage,
+      changePreview,
+      changeTheme,
+    }),
+    [
+      connections,
+      currentConnection,
+      currentBucket,
+      language,
+      isLoading,
+      preview,
+      theme,
+      addConnection,
+      setActiveConnection,
+      setCurrentBucketFunction,
+      deleteConnection,
+      logout,
+      changeLanguage,
+      changePreview,
+      changeTheme,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

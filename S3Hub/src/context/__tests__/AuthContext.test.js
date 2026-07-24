@@ -53,8 +53,7 @@ const CONNECTION_B = { id: 'connB', service: 'aws', accessKey: 'AKIA-B' };
 
 const wrapper = ({ children }) => <AuthProvider>{children}</AuthProvider>;
 
-const renderAuthContext = () =>
-  renderHook(() => React.useContext(AuthContext), { wrapper });
+const renderAuthContext = () => renderHook(() => React.useContext(AuthContext), { wrapper });
 
 describe('AuthContext', () => {
   beforeEach(() => {
@@ -94,7 +93,7 @@ describe('AuthContext', () => {
       expect(result.current.connections.map((c) => c.id)).toEqual(['connB']);
       expect(connectionRepository.deleteConnection).toHaveBeenCalledWith('connA');
       expect(connectionRepository.saveCurrentConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'connB' })
+        expect.objectContaining({ id: 'connB' }),
       );
       expect(connectionRepository.clearCurrentConnection).not.toHaveBeenCalled();
     });

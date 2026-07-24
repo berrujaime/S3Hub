@@ -73,7 +73,7 @@ export default function BucketSelectScreen({ navigation }) {
         }
       }
     } catch (error) {
-      console.error("Error fetching the buckets:", error);
+      console.error('Error fetching the buckets:', error);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     } finally {
       setLoading(false);
@@ -95,7 +95,7 @@ export default function BucketSelectScreen({ navigation }) {
       await setCurrentBucket(bucket.Name);
       navigation.navigate('FilesTab');
     } catch (error) {
-      console.error("Error selecting the bucket:", error);
+      console.error('Error selecting the bucket:', error);
       Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
     }
   };
@@ -113,9 +113,7 @@ export default function BucketSelectScreen({ navigation }) {
         description={() => <RegionTag value={activeRegionLabel} />}
         onPress={() => handleBucketSelect(item)}
         left={(props) => <List.Icon {...props} icon="bucket" />}
-        right={() => (
-          selectedBucket === item.Name ? <List.Icon icon="check" /> : null
-        )}
+        right={() => (selectedBucket === item.Name ? <List.Icon icon="check" /> : null)}
         style={
           selectedBucket === item.Name
             ? [styles.selectedItem, { backgroundColor: theme.colors.secondaryContainer }]
@@ -151,10 +149,7 @@ export default function BucketSelectScreen({ navigation }) {
 
   return (
     <View style={containerStyle}>
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: theme.colors.onBackground }]}
-      >
+      <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.onBackground }]}>
         {i18n.t('selectBucket')}
       </Text>
       <FlatList

@@ -1,36 +1,19 @@
 // src/domain/__tests__/providers.test.js
-import {
-  PROVIDERS,
-  PROVIDER_LIST,
-  getProvider,
-} from '../providers';
+import { PROVIDERS, PROVIDER_LIST, getProvider } from '../providers';
 
 describe('providers registry', () => {
   describe('descriptor shape', () => {
     it('exposes every provider with the required descriptor fields', () => {
-      const expectedIds = [
-        'aws',
-        'storj',
-        'r2',
-        'b2',
-        'wasabi',
-        'do',
-        'gcs',
-        'custom',
-      ];
+      const expectedIds = ['aws', 'storj', 'r2', 'b2', 'wasabi', 'do', 'gcs', 'custom'];
 
       expect(Object.keys(PROVIDERS).sort()).toEqual([...expectedIds].sort());
-      expect(PROVIDER_LIST.map((p) => p.id).sort()).toEqual(
-        [...expectedIds].sort()
-      );
+      expect(PROVIDER_LIST.map((p) => p.id).sort()).toEqual([...expectedIds].sort());
 
       PROVIDER_LIST.forEach((provider) => {
         expect(typeof provider.id).toBe('string');
         expect(typeof provider.name).toBe('string');
         expect(typeof provider.forcePathStyle).toBe('boolean');
-        expect(
-          provider.regions === null || Array.isArray(provider.regions)
-        ).toBe(true);
+        expect(provider.regions === null || Array.isArray(provider.regions)).toBe(true);
         expect(Array.isArray(provider.fields)).toBe(true);
         expect(typeof provider.defaultRegion).toBe('string');
         expect(typeof provider.buildEndpoint).toBe('function');
@@ -139,59 +122,55 @@ describe('providers registry', () => {
   describe('buildEndpoint', () => {
     it('builds the AWS endpoint from the region', () => {
       expect(PROVIDERS.aws.buildEndpoint({ region: 'eu-west-1' })).toBe(
-        'https://s3.eu-west-1.amazonaws.com'
+        'https://s3.eu-west-1.amazonaws.com',
       );
       expect(PROVIDERS.aws.buildEndpoint({ region: 'us-east-1' })).toBe(
-        'https://s3.us-east-1.amazonaws.com'
+        'https://s3.us-east-1.amazonaws.com',
       );
     });
 
     it('builds the fixed Storj gateway endpoint regardless of region', () => {
       expect(PROVIDERS.storj.buildEndpoint({ region: 'eu1' })).toBe(
-        'https://gateway.storjshare.io'
+        'https://gateway.storjshare.io',
       );
-      expect(PROVIDERS.storj.buildEndpoint({})).toBe(
-        'https://gateway.storjshare.io'
-      );
+      expect(PROVIDERS.storj.buildEndpoint({})).toBe('https://gateway.storjshare.io');
     });
 
     it('builds the R2 endpoint from the accountId', () => {
-      expect(
-        PROVIDERS.r2.buildEndpoint({ accountId: 'abc123' })
-      ).toBe('https://abc123.r2.cloudflarestorage.com');
+      expect(PROVIDERS.r2.buildEndpoint({ accountId: 'abc123' })).toBe(
+        'https://abc123.r2.cloudflarestorage.com',
+      );
     });
 
     it('builds the Backblaze B2 endpoint from the region', () => {
       expect(PROVIDERS.b2.buildEndpoint({ region: 'us-west-002' })).toBe(
-        'https://s3.us-west-002.backblazeb2.com'
+        'https://s3.us-west-002.backblazeb2.com',
       );
     });
 
     it('builds the Wasabi endpoint from the region', () => {
       expect(PROVIDERS.wasabi.buildEndpoint({ region: 'eu-central-1' })).toBe(
-        'https://s3.eu-central-1.wasabisys.com'
+        'https://s3.eu-central-1.wasabisys.com',
       );
     });
 
     it('builds the DigitalOcean Spaces endpoint from the region', () => {
       expect(PROVIDERS.do.buildEndpoint({ region: 'fra1' })).toBe(
-        'https://fra1.digitaloceanspaces.com'
+        'https://fra1.digitaloceanspaces.com',
       );
     });
 
     it('builds the fixed Google Cloud Storage endpoint', () => {
       expect(PROVIDERS.gcs.buildEndpoint({ region: 'auto' })).toBe(
-        'https://storage.googleapis.com'
+        'https://storage.googleapis.com',
       );
-      expect(PROVIDERS.gcs.buildEndpoint({})).toBe(
-        'https://storage.googleapis.com'
-      );
+      expect(PROVIDERS.gcs.buildEndpoint({})).toBe('https://storage.googleapis.com');
     });
 
     it('returns the user-supplied endpoint for custom, undefined when missing', () => {
-      expect(
-        PROVIDERS.custom.buildEndpoint({ endpoint: 'https://minio.local:9000' })
-      ).toBe('https://minio.local:9000');
+      expect(PROVIDERS.custom.buildEndpoint({ endpoint: 'https://minio.local:9000' })).toBe(
+        'https://minio.local:9000',
+      );
       expect(PROVIDERS.custom.buildEndpoint({})).toBeUndefined();
     });
   });

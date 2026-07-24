@@ -236,14 +236,14 @@ export default function LoginScreen({ navigation }) {
       style={styles.keyboardAvoidingView}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View
           style={[
             styles.container,
-            { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
+            {
+              backgroundColor: theme.colors.background,
+              paddingTop: insets.top + SCREEN_TOP_SPACING,
+            },
           ]}
         >
           <Text

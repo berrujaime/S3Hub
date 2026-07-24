@@ -130,8 +130,7 @@ export const stampItemOrigin = (items, connectionId, bucket) =>
 // operation, so callers cheaply re-derive `url` after hydration instead of
 // ever caching it (see hooks/useFileList).
 // Returns a new array of new objects; never mutates the input.
-export const stripVolatileFields = (items) =>
-  (items ?? []).map(({ url, ...rest }) => rest);
+export const stripVolatileFields = (items) => (items ?? []).map(({ url, ...rest }) => rest);
 
 // True when an item's stamped fetch-time origin (connectionId, bucket — see
 // stampItemOrigin above) matches the given connection id and bucket. Used to

@@ -5,7 +5,7 @@ function with16KPageSize(config) {
     const props = config.modResults;
 
     const existingIndex = props.findIndex(
-      (p) => p.key === 'android.experimental.16kPageSizeNativeLibs'
+      (p) => p.key === 'android.experimental.16kPageSizeNativeLibs',
     );
 
     if (existingIndex >= 0) {

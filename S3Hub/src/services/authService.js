@@ -1,6 +1,6 @@
 // src/services/authService.js
-import { ListBucketsCommand } from "@aws-sdk/client-s3";
-import { getS3Client } from "./s3Client";
+import { ListBucketsCommand } from '@aws-sdk/client-s3';
+import { getS3Client } from './s3Client';
 
 /**
  * Validates credentials by attempting to list buckets. Any response that

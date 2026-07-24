@@ -11,15 +11,8 @@ import {
   stripVolatileFields,
 } from '../domain/fileListMapper';
 import { getCacheKey } from '../domain/cacheKeys';
-import {
-  getCachedItems,
-  setCachedItems,
-  removeCachedItems,
-} from '../data/fileCacheRepository';
-import {
-  initializeMediaCache,
-  clearEntireCache,
-} from '../services/mediaCache';
+import { getCachedItems, setCachedItems, removeCachedItems } from '../data/fileCacheRepository';
+import { initializeMediaCache, clearEntireCache } from '../services/mediaCache';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
 
@@ -42,8 +35,12 @@ const attachSignedUrls = async (items, connection, bucket) => {
           .catch((error) => {
             // Log the error identity only — never the full error — since a
             // signed URL is a bearer credential.
-            console.error('Error getting the signed URL:', error?.name || error?.code, error?.message);
-          })
+            console.error(
+              'Error getting the signed URL:',
+              error?.name || error?.code,
+              error?.message,
+            );
+          }),
       );
     }
   });
@@ -94,7 +91,7 @@ export default function useFileList(currentConnection, currentBucket) {
           // items to this connection+bucket, and entries written before origin
           // stamping existed lack the fields entirely.
           const sortedItems = sortFiles(
-            stampItemOrigin(cachedItems, currentConnection?.id, currentBucket)
+            stampItemOrigin(cachedItems, currentConnection?.id, currentBucket),
           );
           // The cache never stores `url` (see stripVolatileFields below), so
           // previewable items always need a freshly-signed URL here.
@@ -104,7 +101,9 @@ export default function useFileList(currentConnection, currentBucket) {
           }
           setFullFiles(sortedItems);
           setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
-          setMediaFiles(sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
+          setMediaFiles(
+            sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)),
+          );
           setLoading(false);
           setPage(1);
           return; // Exit early to avoid fetching from server.
@@ -129,7 +128,7 @@ export default function useFileList(currentConnection, currentBucket) {
         let items = stampItemOrigin(
           parseObjects(listing, currentPath),
           currentConnection?.id,
-          currentBucket
+          currentBucket,
         );
 
         // Fetch the signed URLs for previewable (image/video) items in parallel.
@@ -161,7 +160,7 @@ export default function useFileList(currentConnection, currentBucket) {
         }
       }
     },
-    [currentConnection, currentBucket, currentPath]
+    [currentConnection, currentBucket, currentPath],
   );
 
   const loadMoreFiles = useCallback(() => {
@@ -180,7 +179,7 @@ export default function useFileList(currentConnection, currentBucket) {
     (name) => {
       setCurrentPath(currentPath + name + '/');
     },
-    [currentPath]
+    [currentPath],
   );
 
   const goBack = useCallback(() => {
@@ -197,13 +196,11 @@ export default function useFileList(currentConnection, currentBucket) {
       setFullFiles(updatedFullFiles);
       setDisplayedFiles(updatedFullFiles.slice(0, page * PAGE_SIZE));
     },
-    [fullFiles, page]
+    [fullFiles, page],
   );
 
   const refreshAfterMutation = useCallback(async () => {
-    await removeCachedItems(
-      getCacheKey(currentConnection, currentBucket, currentPath)
-    );
+    await removeCachedItems(getCacheKey(currentConnection, currentBucket, currentPath));
     await fetchFiles();
   }, [currentConnection, currentBucket, currentPath, fetchFiles]);
 
@@ -224,10 +221,7 @@ export default function useFileList(currentConnection, currentBucket) {
       appState.current = nextAppState;
     };
 
-    const subscription = AppState.addEventListener(
-      'change',
-      handleAppStateChange
-    );
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
       isMounted.current = false;

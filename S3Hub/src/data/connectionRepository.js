@@ -121,8 +121,7 @@ async function writeSplit(connections) {
   for (const conn of withIds) {
     const { meta, secret } = toStorageEntry(conn);
     metas.push(meta);
-    const hasSecretMaterial =
-      secret.accessKey !== undefined || secret.secretKey !== undefined;
+    const hasSecretMaterial = secret.accessKey !== undefined || secret.secretKey !== undefined;
     if (hasSecretMaterial) {
       await SecureStore.setItemAsync(SECRET_PREFIX + meta.id, JSON.stringify(secret));
     }

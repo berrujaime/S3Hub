@@ -12,7 +12,7 @@ function withAndroidPageSize(config) {
     };
 
     const existingIndex = app['property']?.findIndex(
-      (prop) => prop.$['android:name'] === 'android.hardware.page_size'
+      (prop) => prop.$['android:name'] === 'android.hardware.page_size',
     );
 
     if (existingIndex !== undefined && existingIndex >= 0) {

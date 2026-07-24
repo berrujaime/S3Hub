@@ -59,8 +59,7 @@ export const PROVIDERS = {
     regions: null,
     fields: ['accountId'],
     defaultRegion: 'auto',
-    buildEndpoint: ({ accountId }) =>
-      `https://${accountId}.r2.cloudflarestorage.com`,
+    buildEndpoint: ({ accountId }) => `https://${accountId}.r2.cloudflarestorage.com`,
     brandColor: '#F6821F',
   },
   b2: {
@@ -132,5 +131,4 @@ export const PROVIDER_LIST = Object.values(PROVIDERS);
  * @param {string} [id]
  * @returns {Provider}
  */
-export const getProvider = (id) =>
-  (id && PROVIDERS[id]) || PROVIDERS.custom;
+export const getProvider = (id) => (id && PROVIDERS[id]) || PROVIDERS.custom;

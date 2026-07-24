@@ -47,7 +47,7 @@ const renderScreen = () => {
       <AuthContext.Provider value={{ currentConnection: CONNECTION, setCurrentBucket }}>
         <BucketSelectScreen navigation={navigation} />
       </AuthContext.Provider>
-    </PaperProvider>
+    </PaperProvider>,
   );
   return { navigation, setCurrentBucket };
 };
@@ -61,9 +61,7 @@ const findParentsOfTestId = (node, testID, parent = null, results = []) => {
     return results;
   }
   if (node.props && node.props.testID === testID) results.push(parent);
-  (node.children || []).forEach((child) =>
-    findParentsOfTestId(child, testID, node, results)
-  );
+  (node.children || []).forEach((child) => findParentsOfTestId(child, testID, node, results));
   return results;
 };
 
@@ -119,9 +117,7 @@ describe('BucketSelectScreen provider spine stacking', () => {
     await screen.findByText('bucket-a');
 
     screen.getAllByTestId('provider-spine').forEach((spine) => {
-      expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(
-        PROVIDERS.aws.brandColor
-      );
+      expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(PROVIDERS.aws.brandColor);
     });
   });
 });
@@ -147,7 +143,7 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
         <AuthContext.Provider value={{ currentConnection: connection, setCurrentBucket }}>
           <BucketSelectScreen navigation={navigation} />
         </AuthContext.Provider>
-      </PaperProvider>
+      </PaperProvider>,
     );
 
   beforeEach(() => {
@@ -169,12 +165,10 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
     // effect re-runs (fetchBuckets refreshes) but must NOT re-navigate.
     rerender(
       <PaperProvider theme={darkTheme}>
-        <AuthContext.Provider
-          value={{ currentConnection: { ...connectionA }, setCurrentBucket }}
-        >
+        <AuthContext.Provider value={{ currentConnection: { ...connectionA }, setCurrentBucket }}>
           <BucketSelectScreen navigation={navigation} />
         </AuthContext.Provider>
-      </PaperProvider>
+      </PaperProvider>,
     );
 
     await waitFor(() => expect(listBuckets).toHaveBeenCalledTimes(2));
@@ -187,7 +181,7 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
         <AuthContext.Provider value={{ currentConnection: connectionB, setCurrentBucket }}>
           <BucketSelectScreen navigation={navigation} />
         </AuthContext.Provider>
-      </PaperProvider>
+      </PaperProvider>,
     );
 
     await waitFor(() => expect(navigation.navigate).toHaveBeenCalledTimes(2));
@@ -215,12 +209,10 @@ describe('BucketSelectScreen single-bucket auto-navigation guard', () => {
     navigation.isFocused.mockReturnValue(true);
     rerender(
       <PaperProvider theme={darkTheme}>
-        <AuthContext.Provider
-          value={{ currentConnection: { ...connectionA }, setCurrentBucket }}
-        >
+        <AuthContext.Provider value={{ currentConnection: { ...connectionA }, setCurrentBucket }}>
           <BucketSelectScreen navigation={navigation} />
         </AuthContext.Provider>
-      </PaperProvider>
+      </PaperProvider>,
     );
 
     await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('FilesTab'));

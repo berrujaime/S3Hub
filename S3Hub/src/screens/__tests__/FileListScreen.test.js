@@ -95,7 +95,7 @@ const renderScreen = (fetchFiles) => {
       >
         <FileListScreen />
       </AuthContext.Provider>
-    </PaperProvider>
+    </PaperProvider>,
   );
 };
 
@@ -177,9 +177,7 @@ describe('FileListScreen upload (DocumentPicker)', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     renderScreen(jest.fn().mockResolvedValue(undefined));
 
-    const uploadFab = screen
-      .UNSAFE_getAllByType(FAB)
-      .find((fab) => fab.props.icon === 'upload');
+    const uploadFab = screen.UNSAFE_getAllByType(FAB).find((fab) => fab.props.icon === 'upload');
     expect(uploadFab).toBeTruthy();
 
     await act(async () => {

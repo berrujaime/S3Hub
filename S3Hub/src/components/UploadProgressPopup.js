@@ -24,11 +24,7 @@ const UploadProgressPopup = ({ progress, operation }) => {
       <Text style={styles.popupText}>
         {operation}: {Math.round(progress * 100)}%
       </Text>
-      <ProgressBar
-        progress={progress}
-        color={theme.colors.primary}
-        style={styles.progressBar}
-      />
+      <ProgressBar progress={progress} color={theme.colors.primary} style={styles.progressBar} />
     </Surface>
   );
 };

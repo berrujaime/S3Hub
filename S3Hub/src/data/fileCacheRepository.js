@@ -33,10 +33,7 @@ export const getCachedItems = async (cacheKey) => {
 // Persist the items for a key, stamping the current time as the timestamp.
 export const setCachedItems = async (cacheKey, items) => {
   try {
-    await AsyncStorage.setItem(
-      cacheKey,
-      JSON.stringify({ timestamp: Date.now(), items })
-    );
+    await AsyncStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items }));
   } catch (error) {
     console.error('Error writing cached items:', error);
   }

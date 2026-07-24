@@ -52,13 +52,7 @@ const CachedVideo = ({ source, style, cacheKey, ...props }) => {
   if (!videoUri) {
     return <ActivityIndicator style={{ flex: 1 }} />;
   } else {
-    return (
-      <Video
-        source={{ uri: videoUri }}
-        style={style}
-        {...props}
-      />
-    );
+    return <Video source={{ uri: videoUri }} style={style} {...props} />;
   }
 };
 

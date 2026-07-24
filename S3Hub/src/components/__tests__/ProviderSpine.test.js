@@ -15,43 +15,33 @@ describe('ProviderSpine', () => {
     renderWithTheme(<ProviderSpine providerId="aws" />);
     const spine = screen.getByTestId('provider-spine');
 
-    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(
-      PROVIDERS.aws.brandColor
-    );
+    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(PROVIDERS.aws.brandColor);
   });
 
   it('falls back to the theme primary color for an unknown provider id', () => {
     renderWithTheme(<ProviderSpine providerId="not-a-real-provider" />);
     const spine = screen.getByTestId('provider-spine');
 
-    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(
-      darkTheme.colors.primary
-    );
+    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(darkTheme.colors.primary);
   });
 
   it('falls back to the theme primary color for the custom provider (no brandColor)', () => {
     renderWithTheme(<ProviderSpine providerId="custom" />);
     const spine = screen.getByTestId('provider-spine');
 
-    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(
-      darkTheme.colors.primary
-    );
+    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(darkTheme.colors.primary);
   });
 
   it('falls back to the theme primary color when no providerId is given at all', () => {
     renderWithTheme(<ProviderSpine />);
     const spine = screen.getByTestId('provider-spine');
 
-    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(
-      darkTheme.colors.primary
-    );
+    expect(StyleSheet.flatten(spine.props.style).backgroundColor).toBe(darkTheme.colors.primary);
   });
 
   it('does not intercept touches (row remains pressable underneath it)', () => {
     renderWithTheme(<ProviderSpine providerId="aws" />);
-    expect(screen.getByTestId('provider-spine').props.pointerEvents).toBe(
-      'none'
-    );
+    expect(screen.getByTestId('provider-spine').props.pointerEvents).toBe('none');
   });
 });
 

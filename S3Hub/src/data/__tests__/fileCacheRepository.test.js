@@ -2,11 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CACHE_EXPIRATION } from '../../config/cacheConfig';
-import {
-  getCachedItems,
-  setCachedItems,
-  removeCachedItems,
-} from '../fileCacheRepository';
+import { getCachedItems, setCachedItems, removeCachedItems } from '../fileCacheRepository';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -15,7 +11,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 const CACHE_KEY = 'connection::bucket::path/';
-const ITEMS = [{ key: 'a.txt', isFolder: false }, { key: 'sub/', isFolder: true }];
+const ITEMS = [
+  { key: 'a.txt', isFolder: false },
+  { key: 'sub/', isFolder: true },
+];
 
 describe('fileCacheRepository', () => {
   beforeEach(() => {
@@ -33,7 +32,7 @@ describe('fileCacheRepository', () => {
       const now = 1_000_000;
       jest.spyOn(Date, 'now').mockReturnValue(now);
       AsyncStorage.getItem.mockResolvedValue(
-        JSON.stringify({ timestamp: now - 1000, items: ITEMS })
+        JSON.stringify({ timestamp: now - 1000, items: ITEMS }),
       );
 
       const result = await getCachedItems(CACHE_KEY);
@@ -46,7 +45,7 @@ describe('fileCacheRepository', () => {
       const now = 10 * CACHE_EXPIRATION;
       jest.spyOn(Date, 'now').mockReturnValue(now);
       AsyncStorage.getItem.mockResolvedValue(
-        JSON.stringify({ timestamp: now - CACHE_EXPIRATION - 1, items: ITEMS })
+        JSON.stringify({ timestamp: now - CACHE_EXPIRATION - 1, items: ITEMS }),
       );
 
       const result = await getCachedItems(CACHE_KEY);
@@ -88,7 +87,7 @@ describe('fileCacheRepository', () => {
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         CACHE_KEY,
-        JSON.stringify({ timestamp: now, items: ITEMS })
+        JSON.stringify({ timestamp: now, items: ITEMS }),
       );
     });
 

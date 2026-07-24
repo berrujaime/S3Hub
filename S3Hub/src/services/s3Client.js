@@ -1,6 +1,6 @@
 // src/services/s3Client.js
-import { S3Client } from "@aws-sdk/client-s3";
-import { getProvider } from "../domain/providers";
+import { S3Client } from '@aws-sdk/client-s3';
+import { getProvider } from '../domain/providers';
 
 /**
  * Configure the S3Client instance.
@@ -18,7 +18,7 @@ export const getS3Client = (connection) => {
 
   const provider = getProvider(connection.service);
   const endpoint = provider.buildEndpoint(connection) || connection.endpoint;
-  const region = connection.region || provider.defaultRegion || "us-east-1";
+  const region = connection.region || provider.defaultRegion || 'us-east-1';
 
   const s3Client = new S3Client({
     region,

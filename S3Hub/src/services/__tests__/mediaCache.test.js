@@ -54,7 +54,7 @@ describe('clearEntireCache', () => {
     expect(AsyncStorage.multiRemove).toHaveBeenCalledTimes(1);
     const removedKeys = AsyncStorage.multiRemove.mock.calls[0][0];
     expect(removedKeys.sort()).toEqual(
-      ['files_conn1_bucket1_', 'files_conn1_bucket1_photos/'].sort()
+      ['files_conn1_bucket1_', 'files_conn1_bucket1_photos/'].sort(),
     );
     expect(AsyncStorage.clear).not.toHaveBeenCalled();
   });
@@ -64,14 +64,8 @@ describe('clearEntireCache', () => {
 
     await clearEntireCache();
 
-    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
-      CACHE_DIR,
-      { idempotent: true }
-    );
-    expect(FileSystem.makeDirectoryAsync).toHaveBeenCalledWith(
-      CACHE_DIR,
-      { intermediates: true }
-    );
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(CACHE_DIR, { idempotent: true });
+    expect(FileSystem.makeDirectoryAsync).toHaveBeenCalledWith(CACHE_DIR, { intermediates: true });
   });
 
   // Routed item (Task 6.1, code review): some AsyncStorage backends warn or
@@ -152,13 +146,10 @@ describe('initializeMediaCache', () => {
     });
     expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
       `${CACHE_DIR}ns1/fresh.jpg`,
-      expect.anything()
+      expect.anything(),
     );
     // The namespace dir still holds the fresh file, so it must survive.
-    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
-      `${CACHE_DIR}ns1/`,
-      expect.anything()
-    );
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(`${CACHE_DIR}ns1/`, expect.anything());
   });
 
   it('deletes a cached file when modificationTime is missing, rather than treating it as immortal', async () => {
@@ -202,7 +193,7 @@ describe('initializeMediaCache', () => {
     });
     expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
       `${CACHE_DIR}broken.jpg`,
-      expect.anything()
+      expect.anything(),
     );
     expect(console.error).toHaveBeenCalled();
   });

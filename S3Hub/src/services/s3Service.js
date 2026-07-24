@@ -6,9 +6,9 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl as getAWSSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getS3Client } from "./s3Client";
+} from '@aws-sdk/client-s3';
+import { getSignedUrl as getAWSSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getS3Client } from './s3Client';
 import { S3_DELETE_BATCH_SIZE } from '../config/s3Config';
 
 /**
@@ -23,7 +23,7 @@ export const listBuckets = async (connection) => {
     const response = await s3Client.send(command);
     return response.Buckets;
   } catch (error) {
-    console.error("Error listing buckets:", error);
+    console.error('Error listing buckets:', error);
     throw error;
   }
 };
@@ -45,7 +45,7 @@ export const listObjects = async (connection, bucketName, prefix = '') => {
     const response = await s3Client.send(command);
     return response;
   } catch (error) {
-    console.error("Error listing objects:", error);
+    console.error('Error listing objects:', error);
     throw error;
   }
 };
@@ -70,7 +70,7 @@ export const getSignedUrl = async (connection, bucketName, key) => {
     // Log the error identity only: `error` (and, more importantly, `url`,
     // which is deliberately never in scope here) must never be logged in
     // full — a presigned URL is a bearer credential.
-    console.error("Error obtaining the signed URL:", error?.name || error?.code, error?.message);
+    console.error('Error obtaining the signed URL:', error?.name || error?.code, error?.message);
     throw error;
   }
 };
@@ -92,7 +92,7 @@ export const deleteFile = async (connection, bucketName, key) => {
     const response = await s3Client.send(command);
     return response;
   } catch (error) {
-    console.error("Error deleting the file:", error);
+    console.error('Error deleting the file:', error);
     throw error;
   }
 };
@@ -143,7 +143,11 @@ export const getPresignedUploadUrl = async (connection, bucketName, key, mimeTyp
   } catch (error) {
     // See getSignedUrl above: never log the full error (or the URL itself)
     // for a presigned-URL operation — a signed URL is a bearer credential.
-    console.error('Error obtaining the presigned upload URL:', error?.name || error?.code, error?.message);
+    console.error(
+      'Error obtaining the presigned upload URL:',
+      error?.name || error?.code,
+      error?.message,
+    );
     throw error;
   }
 };
@@ -181,7 +185,11 @@ export const uploadEmptyFolder = async (connection, bucketName, folderKey) => {
  * @param {string} [options.continuationToken] - Optional token for pagination.
  * @returns {Promise<Object>} Object with contents, commonPrefixes, nextContinuationToken, and isTruncated.
  */
-export async function listObjectsPage(connection, bucket, { prefix = '', delimiter, continuationToken } = {}) {
+export async function listObjectsPage(
+  connection,
+  bucket,
+  { prefix = '', delimiter, continuationToken } = {},
+) {
   const client = getS3Client(connection);
   const input = { Bucket: bucket, Prefix: prefix };
   if (delimiter) input.Delimiter = delimiter;
@@ -209,7 +217,11 @@ export async function listAllObjects(connection, bucket, { prefix = '', delimite
   const commonPrefixes = [];
   let continuationToken;
   do {
-    const page = await listObjectsPage(connection, bucket, { prefix, delimiter, continuationToken });
+    const page = await listObjectsPage(connection, bucket, {
+      prefix,
+      delimiter,
+      continuationToken,
+    });
     contents.push(...page.contents);
     commonPrefixes.push(...page.commonPrefixes);
     if (page.isTruncated && !page.nextContinuationToken) {
@@ -281,4 +293,3 @@ export async function listAllUnderPrefix(connection, bucket, prefix) {
   const { contents } = await listAllObjects(connection, bucket, { prefix });
   return contents;
 }
-

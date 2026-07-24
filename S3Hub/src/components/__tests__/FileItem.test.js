@@ -41,7 +41,7 @@ const renderItem = (item, isSelected) =>
   render(
     <PaperProvider theme={darkTheme}>
       <FileItem item={item} isSelected={isSelected} {...baseProps} />
-    </PaperProvider>
+    </PaperProvider>,
   );
 
 describe('FileItem accessibility', () => {
@@ -74,7 +74,7 @@ describe('FileItem accessibility', () => {
         isVideo: false,
         mediaType: 'document',
       },
-      true
+      true,
     );
 
     await waitFor(() => {
@@ -96,7 +96,7 @@ describe('FileItem accessibility', () => {
         isVideo: false,
         mediaType: 'archive',
       },
-      false
+      false,
     );
 
     await waitFor(() => {

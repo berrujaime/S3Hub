@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef, useCallback } from "react";
+import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -10,8 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
-} from "react-native";
-import { AuthContext } from "../context/AuthContext";
+} from 'react-native';
+import { AuthContext } from '../context/AuthContext';
 import {
   getSignedUrl,
   deleteFile,
@@ -19,10 +19,19 @@ import {
   listAllUnderPrefix,
   getPresignedUploadUrl,
   uploadEmptyFolder,
-} from "../services/s3Service";
-import { FAB, Button, IconButton, Dialog, Portal, TextInput, Searchbar, useTheme } from 'react-native-paper';
+} from '../services/s3Service';
+import {
+  FAB,
+  Button,
+  IconButton,
+  Dialog,
+  Portal,
+  TextInput,
+  Searchbar,
+  useTheme,
+} from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as DocumentPicker from "expo-document-picker";
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
@@ -46,9 +55,7 @@ import { SCREEN_TOP_SPACING } from '../theme/spacing';
 // new bucket's namespace. Returns null (callers skip the disk cache) when
 // an item lacks origin fields rather than guessing a namespace.
 const itemCacheKey = (item) =>
-  item.connectionId && item.bucket
-    ? mediaCacheKey(item.connectionId, item.bucket, item.key)
-    : null;
+  item.connectionId && item.bucket ? mediaCacheKey(item.connectionId, item.bucket, item.key) : null;
 
 export default function FileListScreen() {
   const { currentConnection, currentBucket, preview } = useContext(AuthContext);
@@ -131,7 +138,7 @@ export default function FileListScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentConnection, currentBucket, currentPath]);
 
-  const numColumns = viewMode === 'grid' ? width >= 1024 ? 4 : width >= 768 ? 3 : 2 : 1;
+  const numColumns = viewMode === 'grid' ? (width >= 1024 ? 4 : width >= 768 ? 3 : 2) : 1;
   const itemSize = width / numColumns;
 
   // Pull-to-refresh (Task 5.8): re-fetches the current path bypassing the
@@ -164,13 +171,12 @@ export default function FileListScreen() {
       if (selectedFiles.length > 0) {
         // If in selection mode, toggle selection
         toggleSelection(folder.id);
-      }
-      else {
+      } else {
         enterFolder(folder.name);
         clearSelection(); // Deselect files when changing folder
       }
     },
-    [selectedFiles, toggleSelection, enterFolder, clearSelection]
+    [selectedFiles, toggleSelection, enterFolder, clearSelection],
   );
 
   const handleItemPress = useCallback(
@@ -178,17 +184,25 @@ export default function FileListScreen() {
       if (selectedFiles.length > 0) {
         toggleSelection(id);
       } else {
-        const mediaIndex = mediaFiles.findIndex(f => f.id === id);
+        const mediaIndex = mediaFiles.findIndex((f) => f.id === id);
         if (mediaIndex !== -1) {
           // If URL is not preloaded because preview is off, load it now
           if (!mediaFiles[mediaIndex].url) {
             try {
-              const url = await getSignedUrl(currentConnection, currentBucket, mediaFiles[mediaIndex].key);
+              const url = await getSignedUrl(
+                currentConnection,
+                currentBucket,
+                mediaFiles[mediaIndex].key,
+              );
               setMediaFileUrl(mediaIndex, url);
             } catch (error) {
               // Log the error identity only — never the full error — since a
               // signed URL is a bearer credential.
-              console.error('Error loading media URL on demand:', error?.name || error?.code, error?.message);
+              console.error(
+                'Error loading media URL on demand:',
+                error?.name || error?.code,
+                error?.message,
+              );
             }
           }
           setCurrentMediaIndex(mediaIndex);
@@ -196,7 +210,7 @@ export default function FileListScreen() {
         }
       }
     },
-    [selectedFiles, toggleSelection, mediaFiles, currentConnection, currentBucket, setMediaFileUrl]
+    [selectedFiles, toggleSelection, mediaFiles, currentConnection, currentBucket, setMediaFileUrl],
   );
 
   // The FlatList passes an item; route folders and media to the right handler.
@@ -208,14 +222,14 @@ export default function FileListScreen() {
         handleItemPress(item.id);
       }
     },
-    [handleFolderPress, handleItemPress]
+    [handleFolderPress, handleItemPress],
   );
 
   const handleItemLongPress = useCallback(
     (item) => {
       toggleSelection(item.id);
     },
-    [toggleSelection]
+    [toggleSelection],
   );
 
   // Fixed-size grid row layout (Task 5.7): in grid mode every cell is a
@@ -234,7 +248,7 @@ export default function FileListScreen() {
   // distinct rows onto the same offset and corrupt the windowing math.
   const gridItemLayout = useCallback(
     (data, index) => ({ length: itemSize, offset: index * itemSize, index }),
-    [itemSize]
+    [itemSize],
   );
 
   const handleUpload = async () => {
@@ -274,13 +288,18 @@ export default function FileListScreen() {
             let key = currentPath + fileName;
 
             // Handle duplicate file names by appending a timestamp
-            const existingFile = fullFiles.find(f => f.key === key);
+            const existingFile = fullFiles.find((f) => f.key === key);
             if (existingFile) {
               const timestamp = Date.now();
               key = `${currentPath}${fileName}_${timestamp}`;
             }
 
-            const uploadUrl = await getPresignedUploadUrl(currentConnection, currentBucket, key, mimeType);
+            const uploadUrl = await getPresignedUploadUrl(
+              currentConnection,
+              currentBucket,
+              key,
+              mimeType,
+            );
 
             // Upload the file using uploadAsync to allow background upload
             const uploadResult = await FileSystem.uploadAsync(uploadUrl, fileUri, {
@@ -300,10 +319,9 @@ export default function FileListScreen() {
             // case, mapS3Error's status branch maps it (403 ->
             // errorAccessDenied, ...).
             if (uploadResult.status < 200 || uploadResult.status >= 300) {
-              throw Object.assign(
-                new Error(`Upload failed with HTTP ${uploadResult.status}`),
-                { $metadata: { httpStatusCode: uploadResult.status } }
-              );
+              throw Object.assign(new Error(`Upload failed with HTTP ${uploadResult.status}`), {
+                $metadata: { httpStatusCode: uploadResult.status },
+              });
             }
 
             uploadedFiles += 1;
@@ -340,7 +358,7 @@ export default function FileListScreen() {
         } else if (uploadedFiles > 0) {
           Alert.alert(
             i18n.t('error'),
-            i18n.t('partialUpload', { done: uploadedFiles, total: totalFiles })
+            i18n.t('partialUpload', { done: uploadedFiles, total: totalFiles }),
           );
         } else {
           Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
@@ -371,10 +389,7 @@ export default function FileListScreen() {
     if (file.url) {
       return file.url;
     }
-    if (
-      currentConnection &&
-      matchesOrigin(file, currentConnection.id, currentBucket)
-    ) {
+    if (currentConnection && matchesOrigin(file, currentConnection.id, currentBucket)) {
       return getSignedUrl(currentConnection, currentBucket, file.key);
     }
     return null;
@@ -416,7 +431,11 @@ export default function FileListScreen() {
             }
           }
         } catch (error) {
-          console.error('Error downloading selected item:', error?.name || error?.code, error?.message);
+          console.error(
+            'Error downloading selected item:',
+            error?.name || error?.code,
+            error?.message,
+          );
           lastError = error;
         }
       }
@@ -426,7 +445,7 @@ export default function FileListScreen() {
       } else if (succeededItems > 0) {
         Alert.alert(
           i18n.t('error'),
-          i18n.t('partialDownload', { done: succeededItems, total: totalItems })
+          i18n.t('partialDownload', { done: succeededItems, total: totalItems }),
         );
       } else {
         Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
@@ -461,10 +480,7 @@ export default function FileListScreen() {
       // Ensure directory exists before downloading
       await ensureDirectoryExists(tempFileUri);
 
-      const downloadObject = FileSystem.createDownloadResumable(
-        uri,
-        tempFileUri
-      );
+      const downloadObject = FileSystem.createDownloadResumable(uri, tempFileUri);
       const response = await downloadObject.downloadAsync();
 
       // Save to gallery
@@ -477,8 +493,8 @@ export default function FileListScreen() {
       console.error('Error downloading file:', error?.name || error?.code, error?.message);
       return false;
     } finally {
-      await FileSystem.deleteAsync(tempFileUri, { idempotent: true }).catch(
-        (error) => console.error("Error deleting temp download file:", error)
+      await FileSystem.deleteAsync(tempFileUri, { idempotent: true }).catch((error) =>
+        console.error('Error deleting temp download file:', error),
       );
     }
   };
@@ -553,7 +569,7 @@ export default function FileListScreen() {
           [
             { text: i18n.t('cancel'), style: 'cancel', onPress: () => resolve(false) },
             { text: i18n.t('delete'), style: 'destructive', onPress: () => resolve(true) },
-          ]
+          ],
         );
       });
 
@@ -584,7 +600,11 @@ export default function FileListScreen() {
           if (!currentConnection || !matchesOrigin(file, currentConnection.id, currentBucket)) {
             // no-op: counted as a failure via processedItems below.
           } else if (file.isFolder) {
-            const { errors: deleteErrors } = await deleteFolderRecursive(currentConnection, currentBucket, file.key);
+            const { errors: deleteErrors } = await deleteFolderRecursive(
+              currentConnection,
+              currentBucket,
+              file.key,
+            );
             if (deleteErrors.length > 0) {
               // Per-object S3 delete errors carry a `Code`, not a `name` —
               // reshape so mapS3Error (which reads `.name`) can look it up.
@@ -620,7 +640,7 @@ export default function FileListScreen() {
       } else if (succeededItems > 0) {
         Alert.alert(
           i18n.t('error'),
-          i18n.t('partialDelete', { done: succeededItems, total: totalItems })
+          i18n.t('partialDelete', { done: succeededItems, total: totalItems }),
         );
       } else {
         Alert.alert(i18n.t('error'), i18n.t(mapS3Error(lastError)));
@@ -670,7 +690,7 @@ export default function FileListScreen() {
             },
           ],
           currentConnection?.id,
-          currentBucket
+          currentBucket,
         );
         addFolderOptimistic(newFolder);
       }
@@ -688,9 +708,7 @@ export default function FileListScreen() {
       if (!currentMedia) return;
 
       const cacheKey = itemCacheKey(currentMedia);
-      const localUri = cacheKey
-        ? await getCachedFileUri(cacheKey, currentMedia.url)
-        : null;
+      const localUri = cacheKey ? await getCachedFileUri(cacheKey, currentMedia.url) : null;
 
       if (localUri) {
         await Sharing.shareAsync(localUri);
@@ -715,9 +733,7 @@ export default function FileListScreen() {
       if (!currentMedia) return;
 
       const cacheKey = itemCacheKey(currentMedia);
-      const localUri = cacheKey
-        ? await getCachedFileUri(cacheKey, currentMedia.url)
-        : null;
+      const localUri = cacheKey ? await getCachedFileUri(cacheKey, currentMedia.url) : null;
       if (!localUri) {
         Alert.alert(i18n.t('error'), i18n.t('downloadError'));
         return;
@@ -745,14 +761,10 @@ export default function FileListScreen() {
       if (!currentMedia) return;
 
       const confirm = await new Promise((resolve) => {
-        Alert.alert(
-          i18n.t('delete'),
-          `${i18n.t('delete')} "${currentMedia.name}"?`,
-          [
-            { text: i18n.t('cancel'), style: 'cancel', onPress: () => resolve(false) },
-            { text: i18n.t('delete'), style: 'destructive', onPress: () => resolve(true) },
-          ]
-        );
+        Alert.alert(i18n.t('delete'), `${i18n.t('delete')} "${currentMedia.name}"?`, [
+          { text: i18n.t('cancel'), style: 'cancel', onPress: () => resolve(false) },
+          { text: i18n.t('delete'), style: 'destructive', onPress: () => resolve(true) },
+        ]);
       });
 
       if (!confirm) return;
@@ -832,10 +844,7 @@ export default function FileListScreen() {
           operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')}
         />
       )}
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: theme.colors.onBackground }]}
-      >
+      <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.onBackground }]}>
         {i18n.t('filesIn')} {currentBucket}
       </Text>
 
@@ -1043,8 +1052,8 @@ const styles = StyleSheet.create({
   },
   loader: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,

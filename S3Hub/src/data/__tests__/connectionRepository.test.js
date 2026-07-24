@@ -49,7 +49,7 @@ beforeEach(() => {
   repo.__resetMigrationStateForTests();
 
   SecureStore.getItemAsync.mockImplementation(async (key) =>
-    secureStoreData.has(key) ? secureStoreData.get(key) : null
+    secureStoreData.has(key) ? secureStoreData.get(key) : null,
   );
   SecureStore.setItemAsync.mockImplementation(async (key, value) => {
     secureStoreData.set(key, value);
@@ -59,7 +59,7 @@ beforeEach(() => {
   });
 
   AsyncStorage.getItem.mockImplementation(async (key) =>
-    asyncStorageData.has(key) ? asyncStorageData.get(key) : null
+    asyncStorageData.has(key) ? asyncStorageData.get(key) : null,
   );
   AsyncStorage.setItem.mockImplementation(async (key, value) => {
     asyncStorageData.set(key, value);
@@ -93,7 +93,7 @@ describe('connectionRepository', () => {
       asyncStorageData.set(META_KEY, JSON.stringify([meta]));
       secureStoreData.set(
         SECRET_PREFIX + 'abc',
-        JSON.stringify({ accessKey: 'AK', secretKey: 'SK' })
+        JSON.stringify({ accessKey: 'AK', secretKey: 'SK' }),
       );
 
       const result = await repo.getConnections();
@@ -237,7 +237,7 @@ describe('connectionRepository', () => {
       expect(a).toEqual(b);
       // The secret must have been written exactly once, not twice.
       const secretWrites = SecureStore.setItemAsync.mock.calls.filter(([key]) =>
-        key.startsWith(SECRET_PREFIX)
+        key.startsWith(SECRET_PREFIX),
       );
       expect(secretWrites).toHaveLength(1);
     });
@@ -250,7 +250,7 @@ describe('connectionRepository', () => {
       await repo.getCurrentConnection();
 
       const legacyReads = SecureStore.getItemAsync.mock.calls.filter(
-        ([key]) => key === LEGACY_CONNECTIONS_KEY || key === LEGACY_CURRENT_CONNECTION_KEY
+        ([key]) => key === LEGACY_CONNECTIONS_KEY || key === LEGACY_CURRENT_CONNECTION_KEY,
       );
       expect(legacyReads).toHaveLength(0);
     });
@@ -269,7 +269,7 @@ describe('connectionRepository', () => {
       await repo.saveConnections(connections);
 
       const secretWrites = SecureStore.setItemAsync.mock.calls.filter(([key]) =>
-        key.startsWith(SECRET_PREFIX)
+        key.startsWith(SECRET_PREFIX),
       );
       expect(secretWrites).toHaveLength(20);
       for (const [, value] of secretWrites) {
@@ -307,11 +307,11 @@ describe('connectionRepository', () => {
       // Healthy split storage on disk.
       asyncStorageData.set(
         META_KEY,
-        JSON.stringify([{ id: 'good', service: 'aws', preview: false }])
+        JSON.stringify([{ id: 'good', service: 'aws', preview: false }]),
       );
       secureStoreData.set(
         SECRET_PREFIX + 'good',
-        JSON.stringify({ accessKey: 'AK', secretKey: 'SK' })
+        JSON.stringify({ accessKey: 'AK', secretKey: 'SK' }),
       );
 
       // Simulate a TRANSIENT keychain failure: the first read of this one
@@ -331,10 +331,7 @@ describe('connectionRepository', () => {
 
       // …and the user then adds a connection, which re-saves the whole list
       // (exactly what AuthContext.addConnection does).
-      await repo.saveConnections([
-        ...degraded,
-        { id: 'new', accessKey: 'AK2', secretKey: 'SK2' },
-      ]);
+      await repo.saveConnections([...degraded, { id: 'new', accessKey: 'AK2', secretKey: 'SK2' }]);
 
       // The still-healthy on-disk secret must be UNTOUCHED — never clobbered
       // with an empty value — while healthy connections are written normally.
@@ -390,7 +387,7 @@ describe('connectionRepository', () => {
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(CURRENT_CONNECTION_ID_KEY, 'c1');
       // The secret must never be duplicated into a second SecureStore value.
       const currentConnectionSecretWrite = SecureStore.setItemAsync.mock.calls.find(
-        ([key]) => key === LEGACY_CURRENT_CONNECTION_KEY
+        ([key]) => key === LEGACY_CURRENT_CONNECTION_KEY,
       );
       expect(currentConnectionSecretWrite).toBeUndefined();
     });
@@ -402,7 +399,7 @@ describe('connectionRepository', () => {
       const result = await repo.getCurrentConnection();
 
       expect(result).toEqual(
-        expect.objectContaining({ id: 'c1', accessKey: 'AK', secretKey: 'SK', region: 'r1' })
+        expect.objectContaining({ id: 'c1', accessKey: 'AK', secretKey: 'SK', region: 'r1' }),
       );
     });
 
@@ -438,16 +435,14 @@ describe('connectionRepository', () => {
 
       expect(secureStoreData.has(LEGACY_CURRENT_CONNECTION_KEY)).toBe(false);
       const expectedId = deriveConnectionId(legacyCurrent);
-      expect(current).toEqual(
-        expect.objectContaining({ id: expectedId, accessKey: 'AK-current' })
-      );
+      expect(current).toEqual(expect.objectContaining({ id: expectedId, accessKey: 'AK-current' }));
       expect(asyncStorageData.get(CURRENT_CONNECTION_ID_KEY)).toBe(expectedId);
     });
 
     it('drops a legacy current connection that matches nothing in the migrated list (resolves to no active connection)', async () => {
       secureStoreData.set(
         LEGACY_CURRENT_CONNECTION_KEY,
-        JSON.stringify({ service: 'aws', accessKey: 'stale', region: 'us-east-1' })
+        JSON.stringify({ service: 'aws', accessKey: 'stale', region: 'us-east-1' }),
       );
       // No legacy 'connections' blob at all — the stale current matches nothing.
 

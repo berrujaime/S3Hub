@@ -18,11 +18,7 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useFileList from '../useFileList';
 import { PAGE_SIZE } from '../../config/cacheConfig';
 import { listAllObjects, getSignedUrl } from '../../services/s3Service';
-import {
-  getCachedItems,
-  setCachedItems,
-  removeCachedItems,
-} from '../../data/fileCacheRepository';
+import { getCachedItems, setCachedItems, removeCachedItems } from '../../data/fileCacheRepository';
 import { initializeMediaCache, clearEntireCache } from '../../services/mediaCache';
 
 // Explicit factories (rather than bare `jest.mock(path)` automocking): these
@@ -126,7 +122,7 @@ describe('useFileList', () => {
         });
       });
       await waitFor(() =>
-        expect(result.current.displayedFiles.map((f) => f.name)).toEqual(['bravo.txt'])
+        expect(result.current.displayedFiles.map((f) => f.name)).toEqual(['bravo.txt']),
       );
 
       // The STALE, previous-path fetch resolves after that.
@@ -170,7 +166,7 @@ describe('useFileList', () => {
 
       const { result, rerender } = renderHook(
         ({ connection, bucket }) => useFileList(connection, bucket),
-        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } }
+        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } },
       );
       await waitFor(() => expect(result.current.loading).toBe(false));
       clearEntireCache.mockClear();
@@ -186,7 +182,7 @@ describe('useFileList', () => {
 
       const { result, rerender } = renderHook(
         ({ connection, bucket }) => useFileList(connection, bucket),
-        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } }
+        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } },
       );
       await waitFor(() => expect(result.current.loading).toBe(false));
       clearEntireCache.mockClear();
@@ -213,7 +209,7 @@ describe('useFileList', () => {
 
       const { result, rerender } = renderHook(
         ({ connection, bucket }) => useFileList(connection, bucket),
-        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } }
+        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } },
       );
       await waitFor(() => expect(result.current.loading).toBe(false));
       // Initial mount: prevOriginRef starts at the "no connection" sentinel,
@@ -268,7 +264,7 @@ describe('useFileList', () => {
       // The window extends over fullFiles in sorted order: the first item of
       // page 2 is the (PAGE_SIZE+1)-th document, not a refetched/reshuffled one.
       expect(result.current.displayedFiles[PAGE_SIZE].name).toBe(
-        `doc-${String(PAGE_SIZE).padStart(2, '0')}.txt`
+        `doc-${String(PAGE_SIZE).padStart(2, '0')}.txt`,
       );
 
       act(() => result.current.loadMoreFiles());
@@ -372,10 +368,7 @@ describe('useFileList', () => {
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       // Verify mediaFiles has both items, in sorted order, with origin fields.
-      expect(result.current.mediaFiles.map((f) => f.name)).toEqual([
-        'image.jpg',
-        'photo2.png',
-      ]);
+      expect(result.current.mediaFiles.map((f) => f.name)).toEqual(['image.jpg', 'photo2.png']);
       const firstItem = result.current.mediaFiles[0];
       expect(firstItem.connectionId).toBe('connA');
       expect(firstItem.bucket).toBe('bucket-a');

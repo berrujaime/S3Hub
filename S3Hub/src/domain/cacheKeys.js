@@ -7,8 +7,7 @@
 // each have a bucket with the same name). Accepts either a connection object
 // (uses its `id`) or a raw id/string.
 export const getCacheKey = (connection, bucket, path) => {
-  const connectionId =
-    connection && typeof connection === 'object' ? connection.id : connection;
+  const connectionId = connection && typeof connection === 'object' ? connection.id : connection;
   return `files_${connectionId}_${bucket}_${path}`;
 };
 
@@ -67,7 +66,7 @@ const fnv1a = (seed, str) => {
 export const deriveConnectionId = (connection) => {
   const conn = connection || {};
   const parts = [conn.service, conn.accessKey, conn.region, conn.endpoint].map((value) =>
-    value === undefined || value === null ? '' : String(value)
+    value === undefined || value === null ? '' : String(value),
   );
   const signature = JSON.stringify(parts);
   const h1 = fnv1a(FNV_SEED_A, signature).toString(36);
@@ -111,7 +110,7 @@ export const deriveConnectionId = (connection) => {
 // extension can never smuggle an unsafe character back into the segment.
 export const mediaCacheKey = (connectionId, bucket, key) => {
   const parts = [connectionId, bucket, key].map((value) =>
-    value === undefined || value === null ? '' : String(value)
+    value === undefined || value === null ? '' : String(value),
   );
   const signature = JSON.stringify(parts);
   const h1 = fnv1a(FNV_SEED_A, signature).toString(36);
