@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
-import { Checkbox, IconButton, useTheme } from 'react-native-paper';
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Checkbox, IconButton, Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';

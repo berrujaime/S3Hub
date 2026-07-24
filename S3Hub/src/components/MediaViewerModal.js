@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, Modal, FlatList, Text, useWindowDimensions } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import { View, StyleSheet, Modal, FlatList, useWindowDimensions } from 'react-native';
+import { IconButton, Text } from 'react-native-paper';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
 import i18n from '../locales/translations';

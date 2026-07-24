@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Text,
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
@@ -28,6 +27,7 @@ import {
   Portal,
   TextInput,
   Searchbar,
+  Text,
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -837,7 +837,11 @@ export default function FileListScreen() {
           operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')}
         />
       )}
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.onBackground }]}>
+      <Text
+        variant="headlineSmall"
+        accessibilityRole="header"
+        style={[styles.title, { color: theme.colors.onBackground }]}
+      >
         {i18n.t('filesIn')} {currentBucket}
       </Text>
 
