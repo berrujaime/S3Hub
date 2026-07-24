@@ -15,12 +15,16 @@
 // rationale as BucketSelectScreen.test.js / LoginScreen.test.js: it wraps
 // AsyncStorage/expo-secure-store, native modules that don't load outside a
 // device runtime) so each test can assert on exactly which persistence calls
-// AuthContext makes.
+// AuthContext makes. data/deviceLocale (expo-localization) is mocked the
+// same way -- see the "startup locale resolution" tests below for the
+// device-locale-as-default behavior itself; domain/__tests__/localeResolver
+// covers the underlying decision's branches exhaustively.
 
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AuthContext, AuthProvider } from '../AuthContext';
 import * as connectionRepository from '../../data/connectionRepository';
+import { getDeviceLocale } from '../../data/deviceLocale';
 
 jest.mock('../../data/connectionRepository', () => ({
   getConnections: jest.fn(),
@@ -40,6 +44,10 @@ jest.mock('../../data/connectionRepository', () => ({
   saveTheme: jest.fn(),
 }));
 
+jest.mock('../../data/deviceLocale', () => ({
+  getDeviceLocale: jest.fn(),
+}));
+
 const CONNECTION_A = { id: 'connA', service: 'aws', accessKey: 'AKIA-A' };
 const CONNECTION_B = { id: 'connB', service: 'aws', accessKey: 'AKIA-B' };
 
@@ -55,6 +63,7 @@ describe('AuthContext', () => {
     connectionRepository.getCurrentConnection.mockResolvedValue(null);
     connectionRepository.getCurrentBucket.mockResolvedValue(null);
     connectionRepository.getLanguage.mockResolvedValue('en');
+    getDeviceLocale.mockReturnValue('en');
     connectionRepository.getPreview.mockResolvedValue('true');
     connectionRepository.getTheme.mockResolvedValue('system');
     connectionRepository.saveConnections.mockResolvedValue(undefined);
@@ -131,6 +140,48 @@ describe('AuthContext', () => {
       expect(connectionRepository.saveConnections).not.toHaveBeenCalled();
       expect(connectionRepository.clearCurrentConnection).toHaveBeenCalled();
       expect(connectionRepository.clearCurrentBucket).toHaveBeenCalled();
+    });
+  });
+
+  describe('startup locale resolution', () => {
+    it('uses the device locale as the default on a fresh install (no stored preference)', async () => {
+      // Fresh install on an es-device: nothing stored yet, so the device
+      // locale (which is supported) becomes the language, and is persisted
+      // so it becomes the user's explicit preference from here on.
+      connectionRepository.getLanguage.mockResolvedValue(null);
+      getDeviceLocale.mockReturnValue('es');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.language).toBe('es');
+      expect(connectionRepository.saveLanguage).toHaveBeenCalledWith('es');
+    });
+
+    it('falls back to en on a fresh install when the device locale is unsupported', async () => {
+      // Fresh install on an fr-device: the app only ships en/es, so it
+      // falls back to the default rather than an untranslated locale.
+      connectionRepository.getLanguage.mockResolvedValue(null);
+      getDeviceLocale.mockReturnValue('fr');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.language).toBe('en');
+      expect(connectionRepository.saveLanguage).toHaveBeenCalledWith('en');
+    });
+
+    it('keeps the stored preference even when the device locale differs', async () => {
+      // Existing user with a stored 'es' preference on an en-device: the
+      // stored choice must win, and nothing gets re-persisted.
+      connectionRepository.getLanguage.mockResolvedValue('es');
+      getDeviceLocale.mockReturnValue('en');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.language).toBe('es');
+      expect(connectionRepository.saveLanguage).not.toHaveBeenCalled();
     });
   });
 });

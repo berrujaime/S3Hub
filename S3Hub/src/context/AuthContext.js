@@ -3,7 +3,9 @@
 import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import i18n from '../locales/translations';
 import * as connectionRepository from '../data/connectionRepository';
+import { getDeviceLocale } from '../data/deviceLocale';
 import { reconcileCurrentConnection } from '../domain/cacheKeys';
+import { resolveLocale } from '../domain/localeResolver';
 
 export const AuthContext = createContext();
 
@@ -116,15 +118,23 @@ export const AuthProvider = ({ children }) => {
           setCurrentBucket(storedCurrentBucket);
         }
 
+        // A stored preference always wins; absent one, the device's current
+        // locale is used as the default (falling back to 'en' if the
+        // device is set to a language the app doesn't ship translations
+        // for). See domain/localeResolver for the pure decision and
+        // data/deviceLocale for the expo-localization adapter.
         const storedLanguage = await connectionRepository.getLanguage();
-        if (storedLanguage) {
-          setLanguage(storedLanguage);
-          i18n.locale = storedLanguage;
-        } else {
-          // Set default language
-          setLanguage(i18n.locale || 'en');
-          i18n.locale = i18n.locale || 'en';
-          await connectionRepository.saveLanguage(i18n.locale || 'en');
+        const resolvedLanguage = resolveLocale({
+          storedLocale: storedLanguage,
+          deviceLocale: getDeviceLocale(),
+        });
+        setLanguage(resolvedLanguage);
+        i18n.locale = resolvedLanguage;
+        if (!storedLanguage) {
+          // First run (or the stored value was unsupported/corrupt):
+          // persist the resolved default so it becomes the user's explicit
+          // preference from here on, matching the previous behavior.
+          await connectionRepository.saveLanguage(resolvedLanguage);
         }
 
         const storedPreview = await connectionRepository.getPreview();

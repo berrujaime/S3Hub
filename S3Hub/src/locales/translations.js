@@ -147,8 +147,16 @@ const es = {
 
 const i18n = new I18n({en, es});
 
-// Detect and configure the language
+// Only 'en' and 'es' ship translations (see domain/localeResolver.js,
+// which is the single source of truth for that list). `fallbacks: true`
+// means any key missing from the active locale renders from
+// `defaultLocale` instead of the raw key; `defaultLocale` is set explicitly
+// here (rather than relying on i18n-js's own "en" default) so that intent
+// is visible in one place. The actual startup locale -- stored user
+// preference, else the device's locale if supported, else this default --
+// is resolved in AuthContext via domain/localeResolver + data/deviceLocale
+// and applied by setting `i18n.locale` there and in AppNavigator.
 i18n.fallbacks = true;
-//i18n.locale = Localization.languageCode || 'en';
+i18n.defaultLocale = 'en';
 
 export default i18n;
