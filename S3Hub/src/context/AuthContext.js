@@ -137,9 +137,13 @@ export const AuthProvider = ({ children }) => {
         setLanguage(resolvedLanguage);
         i18n.locale = resolvedLanguage;
         if (!storedLanguage) {
-          // First run (or the stored value was unsupported/corrupt):
-          // persist the resolved default so it becomes the user's explicit
-          // preference from here on, matching the previous behavior.
+          // This guard only fires on a genuine first run (nothing was ever
+          // stored): persist the resolved default so it becomes the user's
+          // explicit preference from here on, matching the previous
+          // behavior. A stored-but-unsupported/corrupt value takes the
+          // OTHER branch -- resolveLocale still re-resolves a safe locale
+          // for this launch, but it is deliberately NOT rewritten here, so
+          // it gets re-resolved again on every subsequent launch too.
           await connectionRepository.saveLanguage(resolvedLanguage);
         }
 
