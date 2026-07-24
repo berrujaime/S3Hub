@@ -832,7 +832,10 @@ export default function FileListScreen() {
           operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')}
         />
       )}
-      <Text style={[styles.title, { color: theme.colors.onBackground }]}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.title, { color: theme.colors.onBackground }]}
+      >
         {i18n.t('filesIn')} {currentBucket}
       </Text>
 

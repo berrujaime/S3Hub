@@ -43,6 +43,12 @@ jest.mock('../../services/mediaCache', () => ({
   CACHE_DIR: '/tmp/',
 }));
 jest.mock('expo-av', () => ({ Video: 'Video' }));
+// expo-notifications logs a console.warn about Expo Go / SDK 53 push support
+// at import time, polluting the test output. scheduleNotificationAsync is
+// the only member FileListScreen calls (the upload-complete notification).
+jest.mock('expo-notifications', () => ({
+  scheduleNotificationAsync: jest.fn(),
+}));
 // Explicit factory (same rationale as the mocks above): a bare
 // `jest.mock('../../hooks/useFileList')` automock still requires the REAL
 // module first to introspect its shape, which pulls in fileCacheRepository ->
