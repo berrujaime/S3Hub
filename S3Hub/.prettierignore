@@ -1,3 +1,4 @@
 docs/
 *.aab
 package-lock.json
+plugin/
