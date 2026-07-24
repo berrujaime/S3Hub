@@ -74,6 +74,16 @@ test('deleteObjects splits 2500 keys into 3 DeleteObjectsCommand calls and aggre
   expect(result.errors).toEqual([{ Key: 'file-1500.txt', Code: 'AccessDenied' }]);
 });
 
+test('deleteObjects is a no-op for an empty key list: sends no S3 command and resolves cleanly', async () => {
+  const client = makeClient([]); // No page queued: any send() call would throw "undefined" here.
+  getS3Client.mockReturnValue(client);
+
+  const result = await deleteObjects(connection, 'bucket', []);
+
+  expect(client.send).not.toHaveBeenCalled();
+  expect(result).toEqual({ deleted: 0, errors: [] });
+});
+
 test('deleteFolderRecursive lists all pages (no delimiter) then deletes every object found', async () => {
   const client = makeClient([
     { Contents: [{ Key: 'folder/a.txt' }], IsTruncated: true, NextContinuationToken: 'T1' },

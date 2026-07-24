@@ -74,6 +74,26 @@ describe('clearEntireCache', () => {
     );
   });
 
+  // Routed item (Task 6.1, code review): some AsyncStorage backends warn or
+  // reject on a zero-length multiRemove batch, so the `files_` filter
+  // finding nothing must skip the call entirely rather than calling
+  // multiRemove([]).
+  it('does not call AsyncStorage.multiRemove when there are no files_-prefixed keys to remove', async () => {
+    AsyncStorage.getAllKeys.mockResolvedValue(['connections_meta', 'currentConnectionId']);
+
+    await clearEntireCache();
+
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+  });
+
+  it('does not call AsyncStorage.multiRemove when getAllKeys itself returns an empty list', async () => {
+    AsyncStorage.getAllKeys.mockResolvedValue([]);
+
+    await clearEntireCache();
+
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+  });
+
   it('logs and does not throw when clearing fails', async () => {
     AsyncStorage.getAllKeys.mockRejectedValue(new Error('getAllKeys failure'));
 

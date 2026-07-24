@@ -197,6 +197,43 @@ describe('useFileList', () => {
     });
   });
 
+  // Routed item (Task 6.1, code review): logging out (connection/bucket go
+  // to null/undefined) and then logging back into the EXACT SAME connection
+  // and bucket must still clear the cache and re-list from the server. The
+  // mount-effect's `prevOriginRef` only clears when the (connectionId,
+  // bucket) pair actually changes since the previous run -- without the
+  // explicit reset in the "no active connection" branch (see useFileList.js),
+  // logging out and back into the same connection would look like a no-op
+  // origin change on re-login (old ref value === new value) and silently
+  // suppress both the cache clear and the safety semantics it protects.
+  describe('(d) logout then re-login into the SAME connection/bucket', () => {
+    it('clears the cache and re-lists from the server again on re-login, even though the origin is unchanged from before logout', async () => {
+      listAllObjects.mockResolvedValue(emptyListing);
+
+      const { result, rerender } = renderHook(
+        ({ connection, bucket }) => useFileList(connection, bucket),
+        { initialProps: { connection: CONNECTION_A, bucket: 'bucket-a' } }
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      // Initial mount: prevOriginRef starts at the "no connection" sentinel,
+      // so this first real connection/bucket already counts as a change.
+      expect(clearEntireCache).toHaveBeenCalledTimes(1);
+
+      // Logout: AuthContext nulls out both connection and bucket.
+      rerender({ connection: null, bucket: null });
+      await waitFor(() => expect(result.current.fullFiles).toEqual([]));
+      clearEntireCache.mockClear();
+      listAllObjects.mockClear();
+
+      // Re-login into the SAME connection and bucket as before logout.
+      rerender({ connection: CONNECTION_A, bucket: 'bucket-a' });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(clearEntireCache).toHaveBeenCalledTimes(1);
+      expect(listAllObjects).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // Task 5.8: pull-to-refresh must recover from a network loss even while
   // the AsyncStorage list cache is still "fresh" -- a plain fetchFiles()
   // call would hit the cache-hit branch and silently re-render the same
