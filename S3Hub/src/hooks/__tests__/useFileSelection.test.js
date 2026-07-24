@@ -62,6 +62,25 @@ describe('useFileSelection', () => {
       act(() => result.current.selectAll(shownFiles));
       expect(result.current.selectedFiles).toEqual(['a', 'b', 'c']);
     });
+
+    // Roll-up 2 (whole-branch review): selectAll must compare MEMBERSHIP,
+    // not just count. A length-only check (`prevSelected.length ===
+    // shownFiles.length`) is fooled whenever a same-size-but-different
+    // selection is already in place -- e.g. select N items, then a search
+    // filters the list down to exactly N OTHER items -- and wrongly treats
+    // pressing select-all as a toggle-OFF (clearing the selection) instead
+    // of selecting the currently shown files.
+    it('selects the shown files (does not clear) when the current selection is the same size but a different set of ids', () => {
+      const { result } = renderHook(() => useFileSelection());
+      act(() => result.current.toggleSelection('a'));
+      act(() => result.current.toggleSelection('b'));
+      expect(result.current.selectedFiles).toEqual(['a', 'b']);
+
+      const otherShownFiles = [{ id: 'c' }, { id: 'd' }];
+      act(() => result.current.selectAll(otherShownFiles));
+
+      expect(result.current.selectedFiles).toEqual(['c', 'd']);
+    });
   });
 
   it('clearSelection empties a non-empty selection', () => {

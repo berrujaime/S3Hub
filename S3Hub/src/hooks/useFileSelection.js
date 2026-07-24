@@ -16,10 +16,18 @@ export default function useFileSelection() {
     });
   }, []);
 
-  // Select all currently shown items, or clear if everything is already selected.
+  // Select all currently shown items, or clear if every shown item is
+  // already selected. Compares MEMBERSHIP, not just count: a length-only
+  // check (`prevSelected.length === shownFiles.length`) is wrongly satisfied
+  // whenever the current selection happens to be the same SIZE as the shown
+  // set but a DIFFERENT set of ids -- e.g. select N items, then a search
+  // filters the list down to exactly N other items -- which would toggle
+  // the selection off instead of selecting the shown files.
   const selectAll = useCallback((shownFiles) => {
     setSelectedFiles((prevSelected) => {
-      if (prevSelected.length === shownFiles.length) {
+      const prevSelectedSet = new Set(prevSelected);
+      const allShownAlreadySelected = shownFiles.every((file) => prevSelectedSet.has(file.id));
+      if (allShownAlreadySelected) {
         return [];
       }
       return shownFiles.map((file) => file.id);
