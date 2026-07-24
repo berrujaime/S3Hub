@@ -29,28 +29,6 @@ export const listBuckets = async (connection) => {
 };
 
 /**
- * Lists the objects within a bucket.
- * @param {Object} connection - User connection data.
- * @param {string} bucketName - Bucket name.
- * @param {string} [prefix] - Optional prefix to filter objects.
- * @returns {Object} AWS S3 response.
- */
-export const listObjects = async (connection, bucketName, prefix = '') => {
-  try {
-    const s3Client = getS3Client(connection);
-    const command = new ListObjectsV2Command({
-      Bucket: bucketName,
-      Prefix: prefix,
-    });
-    const response = await s3Client.send(command);
-    return response;
-  } catch (error) {
-    console.error('Error listing objects:', error);
-    throw error;
-  }
-};
-
-/**
  * Gets a signed URL for an object in S3.
  * @param {Object} connection - User connection data.
  * @param {string} bucketName - Bucket name.
@@ -93,31 +71,6 @@ export const deleteFile = async (connection, bucketName, key) => {
     return response;
   } catch (error) {
     console.error('Error deleting the file:', error);
-    throw error;
-  }
-};
-
-/**
- * Deletes multiple files from an S3 bucket.
- * @param {Object} connection - User connection data.
- * @param {string} bucketName - Bucket name.
- * @param {Array} objects - Array of objects with Key properties to delete.
- * @returns {Object} AWS S3 response.
- */
-export const deleteFiles = async (connection, bucketName, objects) => {
-  try {
-    const s3Client = getS3Client(connection);
-    const command = new DeleteObjectsCommand({
-      Bucket: bucketName,
-      Delete: {
-        Objects: objects,
-        Quiet: false,
-      },
-    });
-    const response = await s3Client.send(command);
-    return response;
-  } catch (error) {
-    console.error('Error deleting files:', error);
     throw error;
   }
 };
