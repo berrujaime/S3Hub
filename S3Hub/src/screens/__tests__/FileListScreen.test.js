@@ -15,11 +15,19 @@
 import React from 'react';
 import { FlatList, Alert, Dimensions } from 'react-native';
 import { render, screen, act } from '@testing-library/react-native';
-import { Provider as PaperProvider, FAB } from 'react-native-paper';
+import {
+  Provider as PaperProvider,
+  FAB,
+  Button,
+  TextInput as PaperTextInput,
+} from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import FileListScreen from '../FileListScreen';
 import { AuthContext } from '../../context/AuthContext';
 import useFileList from '../../hooks/useFileList';
+import { getPresignedUploadUrl, uploadEmptyFolder } from '../../services/s3Service';
+import i18n from '../../locales/translations';
 import { darkTheme } from '../../theme/theme';
 
 // Explicit factories (same rationale as BucketSelectScreen.test.js /
@@ -55,6 +63,16 @@ jest.mock('expo-notifications', () => ({
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
 }));
+// Explicit factory (same rationale as the mocks above): expo-file-system's
+// native module doesn't load outside a device runtime. Only the members
+// FileListScreen's upload/download paths call are provided.
+jest.mock('expo-file-system', () => ({
+  uploadAsync: jest.fn(),
+  FileSystemUploadType: { BINARY_CONTENT: 'BINARY_CONTENT' },
+  cacheDirectory: 'file:///cache/',
+  createDownloadResumable: jest.fn(),
+  deleteAsync: jest.fn(),
+}));
 // Explicit factory (same rationale as the mocks above): a bare
 // `jest.mock('../../hooks/useFileList')` automock still requires the REAL
 // module first to introspect its shape, which pulls in fileCacheRepository ->
@@ -68,8 +86,11 @@ const CONNECTION = {
   accessKey: 'AKIA-TEST',
 };
 
+// Returns the mock object handed to useFileList so callers can assert on
+// individual hook functions (e.g. refreshAfterMutation) without needing an
+// explicit override for every test.
 const renderScreen = (fetchFiles) => {
-  useFileList.mockReturnValue({
+  const mocks = {
     fullFiles: [],
     displayedFiles: [],
     mediaFiles: [],
@@ -83,10 +104,10 @@ const renderScreen = (fetchFiles) => {
     loadMoreFiles: jest.fn(),
     enterFolder: jest.fn(),
     goBack: jest.fn(),
-    addFolderOptimistic: jest.fn(),
-    refreshAfterMutation: jest.fn(),
+    refreshAfterMutation: jest.fn().mockResolvedValue(undefined),
     setMediaFileUrl: jest.fn(),
-  });
+  };
+  useFileList.mockReturnValue(mocks);
 
   render(
     <PaperProvider theme={darkTheme}>
@@ -97,6 +118,8 @@ const renderScreen = (fetchFiles) => {
       </AuthContext.Provider>
     </PaperProvider>,
   );
+
+  return mocks;
 };
 
 describe('FileListScreen pull-to-refresh', () => {
@@ -186,5 +209,79 @@ describe('FileListScreen upload (DocumentPicker)', () => {
 
     expect(DocumentPicker.getDocumentAsync).toHaveBeenCalledTimes(1);
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+});
+
+// Important I-1 (whole-branch review): both the upload FAB and create-folder
+// dialog must invalidate the AsyncStorage file-list cache, not just refresh
+// in-memory state -- otherwise the next cache-served load (e.g. leaving and
+// re-entering the folder) resurrects the pre-mutation snapshot and the
+// newly-uploaded file/folder appears to have vanished. refreshAfterMutation
+// (hooks/useFileList.js) drops the cache entry before refetching; a plain
+// fetchFiles() call (the pre-fix upload path) or a local-state-only
+// addFolderOptimistic (the pre-fix folder path, since removed as dead code)
+// does not.
+describe('FileListScreen cache invalidation after mutations (Important I-1)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('calls refreshAfterMutation (not just fetchFiles) after a successful upload', async () => {
+    DocumentPicker.getDocumentAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/test.txt', name: 'test.txt', mimeType: 'text/plain' }],
+    });
+    getPresignedUploadUrl.mockResolvedValue('https://upload.example/url');
+    FileSystem.uploadAsync.mockResolvedValue({ status: 200 });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const mocks = renderScreen(jest.fn().mockResolvedValue(undefined));
+
+    const uploadFab = screen.UNSAFE_getAllByType(FAB).find((fab) => fab.props.icon === 'upload');
+    await act(async () => {
+      await uploadFab.props.onPress();
+    });
+
+    expect(mocks.refreshAfterMutation).toHaveBeenCalledTimes(1);
+    // The pre-fix code called fetchFiles() directly here instead, which
+    // leaves a still-fresh AsyncStorage cache entry in place -- the very
+    // next cache-served load would serve the stale (pre-upload) snapshot.
+    // See hooks/useFileList.js's fetchFiles cache-hit branch.
+    expect(mocks.fetchFiles).not.toHaveBeenCalled();
+  });
+
+  it('calls refreshAfterMutation after a successful folder creation', async () => {
+    uploadEmptyFolder.mockResolvedValue({});
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const mocks = renderScreen(jest.fn().mockResolvedValue(undefined));
+
+    const createFolderFab = screen
+      .UNSAFE_getAllByType(FAB)
+      .find((fab) => fab.props.icon === 'folder-plus');
+    await act(async () => {
+      createFolderFab.props.onPress();
+    });
+
+    const folderNameInput = screen.UNSAFE_getByType(PaperTextInput);
+    await act(async () => {
+      folderNameInput.props.onChangeText('New Folder');
+    });
+
+    const createButton = screen
+      .UNSAFE_getAllByType(Button)
+      .find((button) => button.props.children === i18n.t('create'));
+    expect(createButton).toBeTruthy();
+
+    await act(async () => {
+      await createButton.props.onPress();
+    });
+
+    expect(uploadEmptyFolder).toHaveBeenCalledWith(CONNECTION, 'bucket-a', 'New Folder/');
+    expect(mocks.refreshAfterMutation).toHaveBeenCalledTimes(1);
   });
 });

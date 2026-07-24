@@ -42,7 +42,7 @@ import MediaViewerModal from '../components/MediaViewerModal';
 import i18n from '../locales/translations';
 import { ensureDirectoryExists, getCachedFileUri } from '../services/mediaCache';
 import { mediaCacheKey } from '../domain/cacheKeys';
-import { matchesOrigin, stampItemOrigin } from '../domain/fileListMapper';
+import { matchesOrigin } from '../domain/fileListMapper';
 import { mapS3Error } from '../domain/errors';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
@@ -74,7 +74,6 @@ export default function FileListScreen() {
     loadMoreFiles,
     enterFolder,
     goBack,
-    addFolderOptimistic,
     refreshAfterMutation,
     setMediaFileUrl,
   } = useFileList(currentConnection, currentBucket);
@@ -336,8 +335,13 @@ export default function FileListScreen() {
           }
         }
 
-        // After all uploads are complete, refetch the file list to ensure synchronization
-        await fetchFiles();
+        // After all uploads are complete, drop the file-list cache entry and
+        // refetch (same as both delete paths below) so the newly-uploaded
+        // files are visible immediately and on the next cache-served load --
+        // a plain fetchFiles() would hit the still-fresh AsyncStorage cache
+        // and silently keep serving the pre-upload snapshot (see
+        // hooks/useFileList.js's fetchFiles cache-hit branch).
+        await refreshAfterMutation();
 
         if (isMounted.current) {
           setIsUploading(false);
@@ -675,24 +679,13 @@ export default function FileListScreen() {
         setIsDialogVisible(false);
         setNewFolderName('');
 
-        // Update local state and cache incrementally. Stamped with the
-        // current (connectionId, bucket) like every other listed item (see
-        // domain/fileListMapper.stampItemOrigin) so an immediate download of
-        // this folder passes the matchesOrigin guard in downloadFolder
-        // instead of being treated as a stale-origin item.
-        const [newFolder] = stampItemOrigin(
-          [
-            {
-              id: folderKey, // Unique identifier for folder
-              key: folderKey,
-              name: newFolderName.trim(),
-              isFolder: true,
-            },
-          ],
-          currentConnection?.id,
-          currentBucket,
-        );
-        addFolderOptimistic(newFolder);
+        // Drop the file-list cache entry and refetch (same as both delete
+        // paths and the upload path above) so the new folder is visible
+        // immediately and on the next cache-served load. An optimistic
+        // local-state-only update would leave the AsyncStorage cache
+        // pointing at the pre-creation snapshot, which the next cache-served
+        // load (e.g. leaving and re-entering this folder) would resurrect.
+        await refreshAfterMutation();
       }
 
       Alert.alert(i18n.t('success'), i18n.t('folderCreated'));

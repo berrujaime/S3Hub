@@ -54,7 +54,10 @@ export default function useFileList(currentConnection, currentBucket) {
   const [fullFiles, setFullFiles] = useState([]);
   const [displayedFiles, setDisplayedFiles] = useState([]);
   const [mediaFiles, setMediaFiles] = useState([]);
-  const [page, setPage] = useState(1);
+  // The page number itself is never read directly -- loadMoreFiles below
+  // uses the functional setPage((prevPage) => ...) form -- only the setter
+  // is needed here.
+  const [, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,15 +193,6 @@ export default function useFileList(currentConnection, currentBucket) {
     }
   }, [currentPath]);
 
-  const addFolderOptimistic = useCallback(
-    (folder) => {
-      const updatedFullFiles = sortFiles([...fullFiles, folder]);
-      setFullFiles(updatedFullFiles);
-      setDisplayedFiles(updatedFullFiles.slice(0, page * PAGE_SIZE));
-    },
-    [fullFiles, page],
-  );
-
   const refreshAfterMutation = useCallback(async () => {
     await removeCachedItems(getCacheKey(currentConnection, currentBucket, currentPath));
     await fetchFiles();
@@ -315,7 +309,6 @@ export default function useFileList(currentConnection, currentBucket) {
     loadMoreFiles,
     enterFolder,
     goBack,
-    addFolderOptimistic,
     refreshAfterMutation,
     setMediaFileUrl,
   };
