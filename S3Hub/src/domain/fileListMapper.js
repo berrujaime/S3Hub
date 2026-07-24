@@ -59,7 +59,14 @@ export const parseObjects = (listing, currentPath) => {
   const { contents, commonPrefixes } = listing;
 
   (contents ?? []).forEach((object) => {
-    const key = object.Key;
+    const key = object?.Key;
+
+    // Skip malformed entries (a null/undefined element, or one without a
+    // usable Key) instead of throwing: this app lists arbitrary
+    // S3-compatible providers (Storj, R2, B2, Wasabi, MinIO via custom
+    // endpoints), whose responses are not guaranteed to be as well-formed
+    // as AWS's own, and one bad row must never crash the whole listing.
+    if (typeof key !== 'string') return;
 
     // Ignore the S3 "folder marker" object that represents currentPath itself.
     if (key === currentPath) return;
@@ -80,6 +87,11 @@ export const parseObjects = (listing, currentPath) => {
 
   // Append folders (derived from CommonPrefixes) after the files.
   (commonPrefixes ?? []).forEach((prefix) => {
+    // Skip malformed entries, mirroring the contents guard above. The
+    // caller (listObjectsPage) has already flattened CommonPrefixes to
+    // plain strings, so anything non-string here is a bad row to drop.
+    if (typeof prefix !== 'string') return;
+
     const relative = prefix.substring(currentPath.length);
     const name = relative.endsWith('/') ? relative.slice(0, -1) : relative;
     items.push({

@@ -285,26 +285,13 @@ describe('parseObjects', () => {
     ]);
   });
 
-  // Routed item (Task 6.1, code review): a null/undefined entry in
-  // Contents/CommonPrefixes, or an entry missing Key/Prefix, must not crash
-  // parseObjects — it should filter the bad entry out deterministically.
-  //
-  // GENUINE PRODUCT BUG FOUND, NOT FIXED HERE (test-only task — see
-  // .superpowers/sdd/task-6.1-report.md for the full write-up). parseObjects
-  // currently THROWS instead of skipping the bad entry:
-  //   - null/undefined entry in `contents`      -> TypeError: Cannot read
-  //     properties of null (reading 'Key')            [fileListMapper.js:62]
-  //   - `contents` entry missing `Key`           -> TypeError: Cannot read
-  //     properties of undefined (reading 'substring') [fileListMapper.js:72]
-  //   - null/undefined entry in `commonPrefixes` -> TypeError: Cannot read
-  //     properties of null (reading 'substring')      [fileListMapper.js:83]
-  // Reproduced directly (outside this suite) with a throwaway probe test;
-  // all three threw before being reverted. Kept skipped — not failing the
-  // suite — until product code is fixed under its own task. The expected
-  // post-fix contract asserted below (skip the bad entry, keep the rest,
-  // deterministic order) is what a fix should satisfy; do not delete this
-  // without re-verifying against that fix.
-  it.skip('does not crash on a null/undefined contents entry or one missing Key (BUG: currently throws, see task-6.1-report.md)', () => {
+  // A malformed listing entry (null/undefined, or a contents entry missing
+  // Key) must be skipped deterministically, never crash the whole parse:
+  // this app talks to arbitrary S3-COMPATIBLE providers (Storj, R2, B2,
+  // Wasabi, MinIO via custom endpoints), whose responses are not guaranteed
+  // to be as well-formed as AWS's own — one bad row must not take down the
+  // entire file list.
+  it('skips null/undefined contents entries and entries missing Key, keeping the rest in order', () => {
     const listing = {
       contents: [null, undefined, { Size: 5 }, { Key: 'a.jpg', Size: 1 }],
       commonPrefixes: [],
@@ -314,7 +301,7 @@ describe('parseObjects', () => {
     expect(result.map((i) => i.key)).toEqual(['a.jpg']);
   });
 
-  it.skip('does not crash on a null/undefined commonPrefixes entry (BUG: currently throws, see task-6.1-report.md)', () => {
+  it('skips null/undefined commonPrefixes entries, keeping the rest in order', () => {
     const listing = { contents: [], commonPrefixes: [null, undefined, 'sub/'] };
     expect(() => parseObjects(listing, '')).not.toThrow();
     const result = parseObjects(listing, '');
