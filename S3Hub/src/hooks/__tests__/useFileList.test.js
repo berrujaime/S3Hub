@@ -16,6 +16,7 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useFileList from '../useFileList';
+import { PAGE_SIZE } from '../../config/cacheConfig';
 import { listAllObjects, getSignedUrl } from '../../services/s3Service';
 import {
   getCachedItems,
@@ -231,6 +232,70 @@ describe('useFileList', () => {
 
       expect(clearEntireCache).toHaveBeenCalledTimes(1);
       expect(listAllObjects).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Brief Step 2 "client-side pagination bound" (Task 6.1 review): the file
+  // list renders only page * PAGE_SIZE items and loadMoreFiles advances that
+  // window over the already-fetched fullFiles WITHOUT any new S3 request.
+  // The `nextItems.length > displayedFiles.length` guard is the bound: once
+  // everything is displayed, further calls must leave state untouched
+  // instead of incrementing `page` forever.
+  describe('loadMoreFiles client-side pagination bound', () => {
+    // 2.5 pages' worth of documents (non-previewable, so no signing round
+    // trips) with zero-padded names, so alphabetical sort order == numeric
+    // order and each page boundary is predictable.
+    const makeContents = (count) =>
+      Array.from({ length: count }, (_, i) => ({
+        Key: `doc-${String(i).padStart(2, '0')}.txt`,
+        Size: i + 1,
+      }));
+
+    it('advances displayedFiles by PAGE_SIZE per call, clamping the final partial page, with no extra fetch', async () => {
+      listAllObjects.mockResolvedValue({
+        contents: makeContents(PAGE_SIZE * 2 + 5),
+        commonPrefixes: [],
+      });
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.fullFiles).toHaveLength(PAGE_SIZE * 2 + 5);
+      expect(result.current.displayedFiles).toHaveLength(PAGE_SIZE);
+
+      act(() => result.current.loadMoreFiles());
+      expect(result.current.displayedFiles).toHaveLength(PAGE_SIZE * 2);
+      // The window extends over fullFiles in sorted order: the first item of
+      // page 2 is the (PAGE_SIZE+1)-th document, not a refetched/reshuffled one.
+      expect(result.current.displayedFiles[PAGE_SIZE].name).toBe(
+        `doc-${String(PAGE_SIZE).padStart(2, '0')}.txt`
+      );
+
+      act(() => result.current.loadMoreFiles());
+      expect(result.current.displayedFiles).toHaveLength(PAGE_SIZE * 2 + 5);
+
+      // Pagination is purely client-side: only the single mount fetch ever
+      // hit the server.
+      expect(listAllObjects).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a no-op once every item is already displayed (stop-at-bound guard)', async () => {
+      listAllObjects.mockResolvedValue({
+        contents: makeContents(5), // fewer than one page
+        commonPrefixes: [],
+      });
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.displayedFiles).toHaveLength(5);
+
+      const displayedBefore = result.current.displayedFiles;
+      act(() => result.current.loadMoreFiles());
+
+      // Same array reference, not just same length: the guard must skip
+      // setDisplayedFiles entirely rather than re-setting an equal slice.
+      expect(result.current.displayedFiles).toBe(displayedBefore);
+      expect(result.current.displayedFiles).toHaveLength(5);
     });
   });
 
