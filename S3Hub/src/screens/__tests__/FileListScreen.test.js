@@ -26,7 +26,9 @@ import * as FileSystem from 'expo-file-system';
 import FileListScreen from '../FileListScreen';
 import { AuthContext } from '../../context/AuthContext';
 import useFileList from '../../hooks/useFileList';
-import { getPresignedUploadUrl, uploadEmptyFolder } from '../../services/s3Service';
+import { getPresignedUploadUrl, uploadEmptyFolder, getSignedUrl } from '../../services/s3Service';
+import { getCachedFileUri } from '../../services/mediaCache';
+import { openExternally, readTextPreview } from '../../services/fileOpener';
 import i18n from '../../locales/translations';
 import { darkTheme } from '../../theme/theme';
 
@@ -51,7 +53,14 @@ jest.mock('../../services/mediaCache', () => ({
   clearEntireCache: jest.fn(),
   CACHE_DIR: '/tmp/',
 }));
-jest.mock('expo-av', () => ({ Video: 'Video' }));
+jest.mock('expo-av', () => ({ Video: 'Video', Audio: { Sound: { createAsync: jest.fn() } } }));
+// The file-open path (audio/text in-app, everything else to another app) is
+// covered for real in services/__tests__/fileOpener.test.js; here we only
+// assert how FileListScreen ROUTES a tap into it.
+jest.mock('../../services/fileOpener', () => ({
+  openExternally: jest.fn(),
+  readTextPreview: jest.fn(),
+}));
 // expo-notifications logs a console.warn about Expo Go / SDK 53 push support
 // at import time, polluting the test output. scheduleNotificationAsync is
 // the only member FileListScreen calls (the upload-complete notification).
@@ -89,7 +98,7 @@ const CONNECTION = {
 // Returns the mock object handed to useFileList so callers can assert on
 // individual hook functions (e.g. refreshAfterMutation) without needing an
 // explicit override for every test.
-const renderScreen = (fetchFiles) => {
+const renderScreen = (fetchFiles, overrides = {}) => {
   const mocks = {
     fullFiles: [],
     displayedFiles: [],
@@ -106,6 +115,7 @@ const renderScreen = (fetchFiles) => {
     goBack: jest.fn(),
     refreshAfterMutation: jest.fn().mockResolvedValue(undefined),
     setMediaFileUrl: jest.fn(),
+    ...overrides,
   };
   useFileList.mockReturnValue(mocks);
 
@@ -283,5 +293,167 @@ describe('FileListScreen cache invalidation after mutations (Important I-1)', ()
 
     expect(uploadEmptyFolder).toHaveBeenCalledWith(CONNECTION, 'bucket-a', 'New Folder/');
     expect(mocks.refreshAfterMutation).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The reported bug: tapping a zip / txt / mp3 / pdf did NOTHING. handleItemPress
+// only reacted to items present in `mediaFiles` (the previewable image/video
+// subset), so every other type was inert — invisible to the user as anything
+// but a dead row. These tests pin each branch of the new routing.
+describe('FileListScreen opening non-media files', () => {
+  const fileItem = (name, key) => ({
+    id: key,
+    name,
+    key,
+    isFolder: false,
+    // itemCacheKey needs the item's fetch-time origin, or it refuses to cache
+    // (and the open path bails with a download error).
+    connectionId: CONNECTION.id,
+    bucket: 'bucket-a',
+  });
+
+  // Grabs the onPress FileListScreen hands each row and fires it for `item`,
+  // exactly as the FlatList would.
+  const pressItem = async (item) => {
+    const flatList = screen.UNSAFE_getByType(FlatList);
+    const row = flatList.props.renderItem({ item, index: 0 });
+    await act(async () => {
+      await row.props.onPress(item);
+    });
+  };
+
+  const renderWithFile = (item) =>
+    renderScreen(jest.fn().mockResolvedValue(undefined), {
+      visibleFiles: [item],
+      displayedFiles: [item],
+      fullFiles: [item],
+      // Deliberately empty: this item is NOT previewable media, which is the
+      // whole point.
+      mediaFiles: [],
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getSignedUrl.mockResolvedValue('https://signed.example/object');
+    getCachedFileUri.mockResolvedValue('file:///cache/object');
+  });
+
+  it('hands a pdf to another app with the right MIME type', async () => {
+    openExternally.mockResolvedValue(true);
+    const item = fileItem('report.pdf', 'docs/report.pdf');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(getSignedUrl).toHaveBeenCalledWith(CONNECTION, 'bucket-a', 'docs/report.pdf');
+    // Third arg: the object's display name, used for the staged copy handed
+    // to the other app so it shows "report.pdf", not the cache hash.
+    expect(openExternally).toHaveBeenCalledWith(
+      'file:///cache/object',
+      'application/pdf',
+      'report.pdf',
+    );
+  });
+
+  it('hands an archive to another app', async () => {
+    openExternally.mockResolvedValue(true);
+    const item = fileItem('bundle.zip', 'bundle.zip');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(openExternally).toHaveBeenCalledWith(
+      'file:///cache/object',
+      'application/zip',
+      'bundle.zip',
+    );
+  });
+
+  it('explains itself when no installed app handles the type', async () => {
+    openExternally.mockResolvedValue(false);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const item = fileItem('firmware.bin', 'firmware.bin');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(alertSpy).toHaveBeenCalledWith(i18n.t('error'), i18n.t('cannotOpenFile'));
+    alertSpy.mockRestore();
+  });
+
+  it('renders a text file in the in-app viewer instead of leaving the screen', async () => {
+    readTextPreview.mockResolvedValue({ content: 'line one\nline two', truncated: false });
+    const item = fileItem('notes.txt', 'notes.txt');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(readTextPreview).toHaveBeenCalledWith('file:///cache/object');
+    expect(openExternally).not.toHaveBeenCalled();
+    expect(screen.getByTestId('text-viewer-content')).toBeTruthy();
+    expect(screen.getByText('line one\nline two')).toBeTruthy();
+  });
+
+  it('warns that a truncated text preview is partial', async () => {
+    readTextPreview.mockResolvedValue({ content: 'first chunk', truncated: true });
+    const item = fileItem('huge.log', 'huge.log');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(screen.getByText(i18n.t('textTruncated'))).toBeTruthy();
+  });
+
+  it('opens audio in the in-app player rather than another app', async () => {
+    const item = fileItem('song.mp3', 'music/song.mp3');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(openExternally).not.toHaveBeenCalled();
+    expect(readTextPreview).not.toHaveBeenCalled();
+    // The player mounts only while open; its close button carries the label.
+    expect(screen.getByLabelText(i18n.t('close'))).toBeTruthy();
+  });
+
+  it('reports a download failure instead of opening an empty viewer', async () => {
+    getCachedFileUri.mockResolvedValue(null);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const item = fileItem('report.pdf', 'report.pdf');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(alertSpy).toHaveBeenCalledWith(i18n.t('error'), i18n.t('downloadError'));
+    expect(openExternally).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('maps a signing/network failure through the shared error mapper', async () => {
+    getSignedUrl.mockRejectedValue(Object.assign(new Error('nope'), { name: 'AccessDenied' }));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const item = fileItem('report.pdf', 'report.pdf');
+    renderWithFile(item);
+
+    await pressItem(item);
+
+    expect(alertSpy).toHaveBeenCalledWith(i18n.t('error'), i18n.t('errorAccessDenied'));
+    alertSpy.mockRestore();
+  });
+
+  it('still toggles selection instead of opening while in selection mode', async () => {
+    const item = fileItem('report.pdf', 'report.pdf');
+    renderWithFile(item);
+
+    // Enter selection mode via long-press, then tap.
+    const flatList = screen.UNSAFE_getByType(FlatList);
+    const row = flatList.props.renderItem({ item, index: 0 });
+    await act(async () => {
+      row.props.onLongPress(item);
+    });
+    await pressItem(item);
+
+    expect(openExternally).not.toHaveBeenCalled();
+    expect(getSignedUrl).not.toHaveBeenCalled();
   });
 });

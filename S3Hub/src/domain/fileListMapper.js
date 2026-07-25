@@ -1,25 +1,13 @@
 // Pure domain logic for mapping S3 listings into file/folder list items.
 // No React, AWS SDK, or Expo imports — fully unit-testable.
 
-// Extension patterns for each supported mediaType, checked in order.
-const MEDIA_TYPE_PATTERNS = [
-  ['image', /\.(jpg|jpeg|png|gif|bmp|webp|heic|svg)$/i],
-  ['video', /\.(mp4|mov|avi|mkv|webm|m4v)$/i],
-  ['audio', /\.(mp3|wav|aac|flac|ogg|m4a)$/i],
-  ['document', /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|md|rtf|odt)$/i],
-  ['archive', /\.(zip|rar|7z|tar|gz|bz2|tgz)$/i],
-];
+import { classifyKey } from './fileTypes';
 
-// Classifies an object key into a broad file-type category, based on its
-// extension. Returns 'other' for unrecognized extensions or non-string input.
-export const classifyKey = (key) => {
-  if (typeof key !== 'string') {
-    return 'other';
-  }
-
-  const match = MEDIA_TYPE_PATTERNS.find(([, pattern]) => pattern.test(key));
-  return match ? match[0] : 'other';
-};
+// Extension knowledge lives in `domain/fileTypes` (it also has to answer how
+// to OPEN a key and what MIME type it is, and one owner beats three copies of
+// the extension lists). Re-exported here because this module was its original
+// home and callers/tests import it from here.
+export { classifyKey };
 
 // Returns true when a mediaType supports on-demand preview (thumbnail/player).
 // Only image and video items get signed preview URLs; other file types are

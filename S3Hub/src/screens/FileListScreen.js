@@ -39,13 +39,18 @@ import * as Sharing from 'expo-sharing';
 import UploadProgressPopup from '../components/UploadProgressPopup';
 import FileItem from '../components/FileItem';
 import MediaViewerModal from '../components/MediaViewerModal';
+import TextViewerModal from '../components/TextViewerModal';
+import AudioPlayerModal from '../components/AudioPlayerModal';
 import i18n from '../locales/translations';
 import { ensureDirectoryExists, getCachedFileUri } from '../services/mediaCache';
+import { openExternally, readTextPreview } from '../services/fileOpener';
 import { mediaCacheKey } from '../domain/cacheKeys';
 import { matchesOrigin } from '../domain/fileListMapper';
+import { openModeForKey, mimeTypeForKey } from '../domain/fileTypes';
 import { mapS3Error } from '../domain/errors';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
+import ScreenTitle from '../components/ScreenTitle';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 // Cache namespace derived from the ITEM's own fetch-time origin (stamped in
@@ -90,6 +95,15 @@ export default function FileListScreen() {
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // In-app viewers for the non-media types (see handleItemPress). Each holds
+  // its own payload so the modal stays presentational: this screen fetches
+  // and reads, the modal only renders.
+  const [textViewer, setTextViewer] = useState(null);
+  const [audioPlayer, setAudioPlayer] = useState(null);
+  // Set while an object is being signed/downloaded on the way to a viewer or
+  // an external app — a tap on a 50 MB pdf is not instant, and without this
+  // the UI gave no sign anything was happening.
+  const [isOpeningFile, setIsOpeningFile] = useState(false);
   // Mutual exclusion for the batch operation handlers below (upload,
   // download-selected, delete-selected, modal-delete): only one may run at
   // a time. This both prevents a double-tap from starting two overlapping
@@ -178,47 +192,129 @@ export default function FileListScreen() {
     [selectedFiles, toggleSelection, enterFolder, clearSelection],
   );
 
+  // Downloads an object to the media cache and returns its local URI, so a
+  // viewer or another app can be handed real bytes on disk. Returns null when
+  // signing or downloading fails.
+  const downloadToCache = useCallback(
+    async (item) => {
+      const url = await getSignedUrl(currentConnection, currentBucket, item.key);
+      const cacheKey = itemCacheKey(item);
+      if (!cacheKey) {
+        return null;
+      }
+      return getCachedFileUri(cacheKey, url);
+    },
+    [currentConnection, currentBucket],
+  );
+
   const handleItemPress = useCallback(
-    async (id) => {
+    async (item) => {
       if (selectedFiles.length > 0) {
-        toggleSelection(id);
-      } else {
-        const mediaIndex = mediaFiles.findIndex((f) => f.id === id);
-        if (mediaIndex !== -1) {
-          // If URL is not preloaded because preview is off, load it now
-          if (!mediaFiles[mediaIndex].url) {
-            try {
-              const url = await getSignedUrl(
-                currentConnection,
-                currentBucket,
-                mediaFiles[mediaIndex].key,
-              );
-              setMediaFileUrl(mediaIndex, url);
-            } catch (error) {
-              // Log the error identity only — never the full error — since a
-              // signed URL is a bearer credential.
-              console.error(
-                'Error loading media URL on demand:',
-                error?.name || error?.code,
-                error?.message,
-              );
+        toggleSelection(item.id);
+        return;
+      }
+
+      // Image/video keep the existing paging viewer, which needs the item's
+      // index within `mediaFiles` (the previewable subset) rather than the
+      // item itself.
+      const mediaIndex = mediaFiles.findIndex((f) => f.id === item.id);
+      if (mediaIndex !== -1) {
+        // If URL is not preloaded because preview is off, load it now
+        if (!mediaFiles[mediaIndex].url) {
+          try {
+            const url = await getSignedUrl(
+              currentConnection,
+              currentBucket,
+              mediaFiles[mediaIndex].key,
+            );
+            setMediaFileUrl(mediaIndex, url);
+          } catch (error) {
+            // Log the error identity only — never the full error — since a
+            // signed URL is a bearer credential.
+            console.error(
+              'Error loading media URL on demand:',
+              error?.name || error?.code,
+              error?.message,
+            );
+          }
+        }
+        setCurrentMediaIndex(mediaIndex);
+        setIsModalVisible(true);
+        return;
+      }
+
+      // Everything else: audio plays in-app, text renders in-app, and any
+      // other type (pdf, zip, docx, unknown) goes to an app on the device.
+      // Before this, a tap on such a file did nothing at all.
+      setIsOpeningFile(true);
+      try {
+        const localUri = await downloadToCache(item);
+        if (!localUri) {
+          Alert.alert(i18n.t('error'), i18n.t('downloadError'));
+          return;
+        }
+        // The screen may have unmounted (or the user navigated away) during
+        // the download; don't open a viewer on a dead screen.
+        if (!isMounted.current) {
+          return;
+        }
+
+        switch (openModeForKey(item.key)) {
+          case 'audio':
+            setAudioPlayer({ title: item.name, uri: localUri });
+            break;
+          case 'text': {
+            const preview = await readTextPreview(localUri);
+            if (!isMounted.current) {
+              return;
+            }
+            if (!preview) {
+              Alert.alert(i18n.t('error'), i18n.t('errorGeneric'));
+              return;
+            }
+            setTextViewer({
+              title: item.name,
+              content: preview.content,
+              truncated: preview.truncated,
+            });
+            break;
+          }
+          default: {
+            const opened = await openExternally(localUri, mimeTypeForKey(item.key), item.name);
+            if (!opened && isMounted.current) {
+              Alert.alert(i18n.t('error'), i18n.t('cannotOpenFile'));
             }
           }
-          setCurrentMediaIndex(mediaIndex);
-          setIsModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error opening file:', error?.name || error?.code, error?.message);
+        if (isMounted.current) {
+          Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
+        }
+      } finally {
+        if (isMounted.current) {
+          setIsOpeningFile(false);
         }
       }
     },
-    [selectedFiles, toggleSelection, mediaFiles, currentConnection, currentBucket, setMediaFileUrl],
+    [
+      selectedFiles,
+      toggleSelection,
+      mediaFiles,
+      currentConnection,
+      currentBucket,
+      setMediaFileUrl,
+      downloadToCache,
+    ],
   );
 
-  // The FlatList passes an item; route folders and media to the right handler.
+  // The FlatList passes an item; route folders and files to the right handler.
   const handleItemSelect = useCallback(
     (item) => {
       if (item.isFolder) {
         handleFolderPress(item);
       } else {
-        handleItemPress(item.id);
+        handleItemPress(item);
       }
     },
     [handleFolderPress, handleItemPress],
@@ -837,13 +933,26 @@ export default function FileListScreen() {
           operation={isUploading ? i18n.t('uploadProgress') : i18n.t('deleteProgress')}
         />
       )}
-      <Text
-        variant="headlineSmall"
-        accessibilityRole="header"
-        style={[styles.title, { color: theme.colors.onBackground }]}
-      >
+
+      {/* Opening a file has no measurable progress (the download is a single
+          fetch to disk), so this is a blocking spinner rather than the
+          progress popup above. */}
+      {isOpeningFile && (
+        <View
+          testID="opening-file-overlay"
+          style={[styles.openingOverlay, { backgroundColor: theme.colors.backdrop }]}
+        >
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.openingText, { color: theme.colors.onBackground }]}>
+            {i18n.t('openingFile')}
+          </Text>
+        </View>
+      )}
+      {/* Tighter bottom margin than the shared default: the searchbar right
+          below carries its own 8dp gap. */}
+      <ScreenTitle style={styles.title}>
         {i18n.t('filesIn')} {currentBucket}
-      </Text>
+      </ScreenTitle>
 
       <Searchbar
         placeholder={i18n.t('search')}
@@ -1034,6 +1143,28 @@ export default function FileListScreen() {
         onReachEnd={handleModalReachEnd}
         theme={theme}
       />
+
+      {/* In-app viewers for the types this app renders itself. Mounted only
+          while open so each one loads (and, for audio, unloads) with its own
+          payload rather than holding a stale file. */}
+      {textViewer ? (
+        <TextViewerModal
+          visible
+          title={textViewer.title}
+          content={textViewer.content}
+          truncated={textViewer.truncated}
+          onClose={() => setTextViewer(null)}
+        />
+      ) : null}
+
+      {audioPlayer ? (
+        <AudioPlayerModal
+          visible
+          title={audioPlayer.title}
+          uri={audioPlayer.uri}
+          onClose={() => setAudioPlayer(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1041,6 +1172,17 @@ export default function FileListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  // Covers the whole screen (above the list, below nothing) so a second tap
+  // can't start another open while the first is downloading.
+  openingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openingText: {
+    marginTop: 12,
   },
   // Normal-flow child of the create-folder KeyboardAvoidingView; see the
   // comment at the dialog for why this spacer is required on iOS.
@@ -1053,8 +1195,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 24,
-    textAlign: 'center',
     marginBottom: 8,
   },
   searchbar: {
