@@ -27,6 +27,22 @@ export const getCachedFileUri = async (cacheKey, remoteUri) => {
     try {
       await ensureDirectoryExists(path);
       const result = await FileSystem.downloadAsync(remoteUri, path);
+
+      // downloadAsync does NOT reject on an HTTP error: it writes the response
+      // BODY to disk and reports the status here. So a presign failure (403
+      // SignatureDoesNotMatch, an expired signature, AccessDenied) silently
+      // produced a cache entry containing S3's XML error document under the
+      // object's own name and extension — e.g. a "report.pdf" that is really
+      // 200 bytes of XML. Consumers then handed that to a PDF viewer, which
+      // opened and closed again instantly, and the poisoned entry was served
+      // from cache forever after, so retrying never even re-downloaded.
+      if (!isSuccessStatus(result.status)) {
+        // Don't leave the error document behind as a valid-looking cache hit.
+        await FileSystem.deleteAsync(path, { idempotent: true });
+        console.error('Error caching file: HTTP', result.status);
+        return null;
+      }
+
       return result.uri;
     } catch (error) {
       // Log the error identity only — never the full error — since
@@ -37,6 +53,11 @@ export const getCachedFileUri = async (cacheKey, remoteUri) => {
     }
   }
 };
+
+// True for 2xx. A missing/undefined status is treated as success so a mocked
+// or older FileSystem that doesn't report one keeps working.
+const isSuccessStatus = (status) =>
+  status === undefined || status === null || (status >= 200 && status < 300);
 
 // Prefix shared with domain/cacheKeys.getCacheKey: every file-list cache
 // entry is stored under a `files_...` key. Scoping the clear to this prefix

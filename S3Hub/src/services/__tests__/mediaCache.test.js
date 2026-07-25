@@ -7,7 +7,7 @@
 
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearEntireCache, initializeMediaCache, CACHE_DIR } from '../mediaCache';
+import { clearEntireCache, initializeMediaCache, getCachedFileUri, CACHE_DIR } from '../mediaCache';
 import { CACHE_EXPIRATION } from '../../config/cacheConfig';
 
 jest.mock('expo-file-system', () => ({
@@ -246,5 +246,68 @@ describe('initializeMediaCache', () => {
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(`${CACHE_DIR}ns3/`, {
       idempotent: true,
     });
+  });
+});
+
+// Regression: FileSystem.downloadAsync does NOT reject on an HTTP error — it
+// writes the response BODY to disk and reports the status. A presign failure
+// (403 SignatureDoesNotMatch / expired signature / AccessDenied) therefore
+// used to be cached as a file with the object's own name and extension whose
+// content is really S3's XML error document. Handing that to a viewer made it
+// open and close instantly, and the poisoned entry was served from cache
+// forever after, so retrying never re-downloaded.
+describe('getCachedFileUri download-status handling', () => {
+  const CACHE_KEY = 'mabc123.pdf';
+  const PATH = `${CACHE_DIR}${CACHE_KEY}`;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    // Cache miss for the file, but the directory already exists.
+    FileSystem.getInfoAsync.mockImplementation(async (target) =>
+      target === PATH ? { exists: false } : { exists: true },
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('returns the local uri on a 200', async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 200, uri: PATH });
+
+    await expect(getCachedFileUri(CACHE_KEY, 'https://signed.example/o')).resolves.toBe(PATH);
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects a 403 and deletes the error document instead of caching it', async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 403, uri: PATH });
+
+    await expect(getCachedFileUri(CACHE_KEY, 'https://signed.example/o')).resolves.toBeNull();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(PATH, { idempotent: true });
+  });
+
+  it('rejects a 404 the same way', async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 404, uri: PATH });
+
+    await expect(getCachedFileUri(CACHE_KEY, 'https://signed.example/o')).resolves.toBeNull();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(PATH, { idempotent: true });
+  });
+
+  it('never logs the presigned URL, which is a bearer credential', async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 403, uri: PATH });
+
+    await getCachedFileUri(CACHE_KEY, 'https://signed.example/o?X-Amz-Signature=deadbeef');
+
+    const logged = console.error.mock.calls.flat().join(' ');
+    expect(logged).not.toContain('X-Amz-Signature');
+    expect(logged).not.toContain('signed.example');
+  });
+
+  it('serves an existing cache entry without re-downloading', async () => {
+    FileSystem.getInfoAsync.mockResolvedValue({ exists: true });
+
+    await expect(getCachedFileUri(CACHE_KEY, 'https://signed.example/o')).resolves.toBe(PATH);
+    expect(FileSystem.downloadAsync).not.toHaveBeenCalled();
   });
 });
