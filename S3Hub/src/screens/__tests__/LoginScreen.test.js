@@ -169,3 +169,32 @@ describe('LoginScreen credential field hardening', () => {
     });
   });
 });
+
+describe('LoginScreen region input', () => {
+  it('shows the region picker for providers with a fixed region list (storj default)', () => {
+    renderScreen();
+
+    // Menu anchor button: accessibilityLabel is `${selectRegion} ${region}`;
+    // match on the prefix so the registry's default region can change freely.
+    expect(screen.getByLabelText(new RegExp(`^${i18n.t('selectRegion')}`))).toBeTruthy();
+    // ...and its caption.
+    expect(screen.getByText(i18n.t('selectRegion'))).toBeTruthy();
+  });
+
+  it('hides the region control AND its caption for providers without a region choice (custom)', async () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText(`${i18n.t('selectProvider')} Storj`));
+    fireEvent.press(await screen.findByText('Custom / S3-compatible'));
+
+    // No region picker (Menu anchor) and no free-text region input remain;
+    // the connection silently keeps the provider's defaultRegion.
+    expect(screen.queryByLabelText(new RegExp(`^${i18n.t('selectRegion')}`))).toBeNull();
+    // The caption must go with it: rendering the label OUTSIDE the
+    // conditional left a dangling "Select Region:" heading over empty space
+    // for custom/r2/gcs — the control was hidden but its caption wasn't.
+    expect(screen.queryByText(i18n.t('selectRegion'))).toBeNull();
+    // The custom provider's own field (endpoint) does render.
+    expect(screen.getAllByText(i18n.t('endpoint')).length).toBeGreaterThan(0);
+  });
+});

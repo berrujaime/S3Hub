@@ -181,13 +181,27 @@ export default function LoginScreen({ navigation }) {
     });
 
   /**
-   * Renders the region input: a Menu picker when the provider exposes a fixed
-   * region list, or a free-text input when it does not.
-   * @returns {React.ReactElement} The region input element.
+   * Renders the region field — its LABEL INCLUDED — as a Menu picker when the
+   * provider exposes a fixed region list, or nothing at all when it does not
+   * (`regions: null` — r2/gcs/custom). Those providers have no meaningful
+   * region choice; the connection silently keeps the registry's
+   * `defaultRegion` (set on provider change), which the signer needs but
+   * S3-compatible endpoints ignore.
+   *
+   * The label lives HERE rather than at the call site so that hiding the
+   * field hides its caption with it: when it was rendered separately, custom/
+   * r2/gcs showed a dangling "Select Region:" heading over empty space.
+   * @returns {React.ReactElement|null} The region field, or null.
    */
   const renderRegionInput = () => {
-    if (provider.regions) {
-      return (
+    if (!provider.regions) {
+      return null;
+    }
+    return (
+      <>
+        <Text style={[styles.label, { color: theme.colors.onBackground }]}>
+          {i18n.t('selectRegion')}
+        </Text>
         <Menu
           visible={regionMenuVisible}
           onDismiss={closeRegionMenu}
@@ -216,18 +230,7 @@ export default function LoginScreen({ navigation }) {
             />
           ))}
         </Menu>
-      );
-    }
-
-    return (
-      <TextInput
-        label={i18n.t('selectRegion')}
-        value={region}
-        onChangeText={setRegion}
-        mode="outlined"
-        autoCapitalize="none"
-        style={styles.input}
-      />
+      </>
     );
   };
 
@@ -325,9 +328,8 @@ export default function LoginScreen({ navigation }) {
 
           {renderExtraFields()}
 
-          <Text style={[styles.label, { color: theme.colors.onBackground }]}>
-            {i18n.t('selectRegion')}
-          </Text>
+          {/* Label included — renderRegionInput returns null (caption and
+              all) for providers without a region list. */}
           {renderRegionInput()}
 
           <Button mode="contained" onPress={handleLogin} style={styles.button}>
