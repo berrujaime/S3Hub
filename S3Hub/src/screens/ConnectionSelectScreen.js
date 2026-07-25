@@ -2,12 +2,13 @@
 
 import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
-import { Text, List, FAB, IconButton, useTheme } from 'react-native-paper';
+import { Text, FAB, IconButton, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { getProvider } from '../domain/providers';
-import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
+import StorageListRow from '../components/StorageListRow';
+import ScreenTitle from '../components/ScreenTitle';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 import i18n from '../locales/translations';
 
@@ -53,58 +54,44 @@ export default function ConnectionSelectScreen({ navigation }) {
   };
 
   const renderConnectionItem = ({ item }) => {
-    const isActive = currentConnection && currentConnection.id === item.id;
+    // Boolean(), not a bare `&&` chain: with no active connection (right after
+    // logout, or on a fresh install) `currentConnection && ...` evaluates to
+    // null, and a null reaches React Native's accessibilityState as a non-
+    // boolean — "expected dynamic type 'boolean', but had type 'null'".
+    const isActive = Boolean(currentConnection && currentConnection.id === item.id);
     const provider = getProvider(item.service);
     // Region/endpoint tag (provider-spine signature, Task 4.5): most
     // providers store a region; the ones with a free-text/fixed endpoint
     // instead (r2, gcs, custom) store it under `endpoint`.
     const regionLabel = item.region || item.endpoint;
 
-    const renderMark = () =>
-      provider.logo ? (
-        <Image source={provider.logo} style={styles.logo} resizeMode="contain" />
-      ) : (
-        <MaterialCommunityIcons
-          name={provider.icon}
-          size={32}
-          color={theme.colors.onSurface}
-          style={styles.logo}
-        />
-      );
-
     return (
-      <View style={styles.rowWrapper}>
-        <List.Item
-          title={provider.name}
-          description={({ color }) => (
-            <View>
-              {/* A function `description` bypasses Paper's built-in
-                  descriptionNumberOfLines={2} clamp, so each line clamps
-                  itself (1 + 1 = the same 2-line budget as before) to keep
-                  long access keys/endpoints from growing the row unbounded.
-                  RegionTag already clamps to one line internally. */}
-              <Text variant="bodyMedium" numberOfLines={1} style={{ color }}>
-                {i18n.t('accessKey')}: {item.accessKey}
-              </Text>
-              <RegionTag value={regionLabel} style={styles.regionTag} />
-            </View>
-          )}
-          onPress={() => handleConnectionSelect(item)}
-          left={renderMark}
-          right={(props) => (
-            <View style={styles.actions}>
-              {isActive ? <List.Icon {...props} icon="check" color={props.color} /> : null}
-              <IconButton icon="delete" onPress={() => handleDeleteConnection(item)} />
-            </View>
-          )}
-        />
-        {/* Declared AFTER List.Item on purpose: RN paints later siblings on
-            top, so any opaque row background (none today, but
-            BucketSelectScreen's selected-row highlight shows the hazard is
-            real) can never cover the spine. pointerEvents="none" keeps
-            press/ripple on the row unaffected. */}
-        <ProviderSpine providerId={item.service} />
-      </View>
+      <StorageListRow
+        title={provider.name}
+        regionLabel={regionLabel}
+        providerId={item.service}
+        selected={isActive}
+        onPress={() => handleConnectionSelect(item)}
+        renderMark={({ color }) =>
+          provider.logo ? (
+            <Image source={provider.logo} style={styles.logo} resizeMode="contain" />
+          ) : (
+            <MaterialCommunityIcons name={provider.icon} size={24} color={color} />
+          )
+        }
+        renderDetail={({ color }) => (
+          <Text variant="bodyMedium" numberOfLines={1} style={{ color }}>
+            {i18n.t('accessKey')}: {item.accessKey}
+          </Text>
+        )}
+        renderActions={() => (
+          <IconButton
+            icon="delete"
+            onPress={() => handleDeleteConnection(item)}
+            accessibilityLabel={i18n.t('deleteConnection')}
+          />
+        )}
+      />
     );
   };
 
@@ -138,13 +125,7 @@ export default function ConnectionSelectScreen({ navigation }) {
         { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
       ]}
     >
-      <Text
-        variant="headlineLarge"
-        accessibilityRole="header"
-        style={[styles.title, { color: theme.colors.onBackground }]}
-      >
-        {i18n.t('selectConnection')}
-      </Text>
+      <ScreenTitle>{i18n.t('selectConnection')}</ScreenTitle>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
@@ -166,19 +147,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  // Wraps each row so ProviderSpine (position: 'absolute', anchored to this
-  // View) can lay its brand-color bar over the row's left edge without
-  // adding to the row's own width/flex layout or touch target.
-  rowWrapper: {
-    position: 'relative',
-  },
-  regionTag: {
-    marginTop: 2,
-  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -193,14 +161,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  // Sized to match the 24dp MaterialCommunityIcons glyph the icon-based
+  // providers render, so logo and icon providers occupy the same slot inside
+  // StorageListRow's mark box.
   logo: {
-    width: 32,
-    height: 32,
-    marginRight: 8,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: 24,
+    height: 24,
   },
   fab: {
     position: 'absolute',

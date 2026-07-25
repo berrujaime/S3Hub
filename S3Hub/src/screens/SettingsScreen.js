@@ -1,12 +1,13 @@
 // src/screens/SettingsScreen.js
 import React, { useContext } from 'react';
 import { View, StyleSheet, Linking, TouchableOpacity } from 'react-native';
-import { Text, Button, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import i18n from '../locales/translations';
-import { Picker } from '@react-native-picker/picker';
 import Constants from 'expo-constants';
+import ScreenTitle from '../components/ScreenTitle';
+import ThemedSelect from '../components/ThemedSelect';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 export default function SettingsScreen() {
@@ -30,7 +31,6 @@ export default function SettingsScreen() {
   const { language, changeLanguage } = useContext(AuthContext);
   const { preview, changePreview } = useContext(AuthContext);
   const { theme: themePreference, changeTheme } = useContext(AuthContext);
-  const { logout } = useContext(AuthContext);
 
   const privacyPolicyUrl = Constants.expoConfig?.extra?.privacyPolicyUrl;
 
@@ -52,17 +52,10 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-  };
-
-  const pickerColor = theme.colors.onSurface;
-  const pickerContainerStyle = [
-    styles.pickerContainer,
-    { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface },
+  const previewOptions = [
+    { label: i18n.t('optionYes'), value: 'true' },
+    { label: i18n.t('optionNo'), value: 'false' },
   ];
-  const pickerStyle = [styles.picker, { color: pickerColor }];
-  const pickerItemStyle = { color: pickerColor };
 
   return (
     <View
@@ -71,87 +64,40 @@ export default function SettingsScreen() {
         { backgroundColor: theme.colors.background, paddingTop: insets.top + SCREEN_TOP_SPACING },
       ]}
     >
-      <Text
-        variant="headlineLarge"
-        accessibilityRole="header"
-        style={[styles.title, { color: theme.colors.onBackground }]}
-      >
-        {i18n.t('settings')}
-      </Text>
+      <ScreenTitle>{i18n.t('settings')}</ScreenTitle>
 
       <Text style={[styles.label, { color: theme.colors.onBackground }]}>
         {i18n.t('selectLanguage')}
       </Text>
-      <View style={pickerContainerStyle}>
-        <Picker
-          selectedValue={language}
-          onValueChange={(itemValue) => handleLanguageChange(itemValue)}
-          style={pickerStyle}
-          dropdownIconColor={pickerColor}
-          itemStyle={pickerItemStyle}
-        >
-          {languages.map((lang) => (
-            <Picker.Item
-              key={lang.value}
-              label={lang.label}
-              value={lang.value}
-              color={pickerColor}
-            />
-          ))}
-        </Picker>
-      </View>
+      <ThemedSelect
+        options={languages}
+        value={language}
+        onChange={handleLanguageChange}
+        accessibilityLabel={i18n.t('selectLanguage')}
+        testID="language-select"
+      />
 
       <Text style={[styles.label, { color: theme.colors.onBackground }]}>
         {i18n.t('selectPreview')}
       </Text>
-      <View style={pickerContainerStyle}>
-        <Picker
-          selectedValue={preview}
-          onValueChange={(itemValue) => handlePreviewChange(itemValue)}
-          style={pickerStyle}
-          dropdownIconColor={pickerColor}
-          itemStyle={pickerItemStyle}
-        >
-          <Picker.Item
-            key={i18n.t('optionYes')}
-            label={i18n.t('optionYes')}
-            value={'true'}
-            color={pickerColor}
-          />
-          <Picker.Item
-            key={i18n.t('optionNo')}
-            label={i18n.t('optionNo')}
-            value={'false'}
-            color={pickerColor}
-          />
-        </Picker>
-      </View>
+      <ThemedSelect
+        options={previewOptions}
+        value={preview}
+        onChange={handlePreviewChange}
+        accessibilityLabel={i18n.t('selectPreview')}
+        testID="preview-select"
+      />
 
       <Text style={[styles.label, { color: theme.colors.onBackground }]}>
         {i18n.t('selectTheme')}
       </Text>
-      <View style={pickerContainerStyle}>
-        <Picker
-          selectedValue={themePreference}
-          onValueChange={(itemValue) => handleThemeChange(itemValue)}
-          style={pickerStyle}
-          dropdownIconColor={pickerColor}
-          itemStyle={pickerItemStyle}
-        >
-          {themes.map((item) => (
-            <Picker.Item
-              key={item.value}
-              label={item.label}
-              value={item.value}
-              color={pickerColor}
-            />
-          ))}
-        </Picker>
-      </View>
-
-      <Button mode="outlined" onPress={handleLogout} style={styles.logoutButton}>
-        {i18n.t('logout')}
-      </Button>
+      <ThemedSelect
+        options={themes}
+        value={themePreference}
+        onChange={handleThemeChange}
+        accessibilityLabel={i18n.t('selectTheme')}
+        testID="theme-select"
+      />
 
       {privacyPolicyUrl ? (
         <TouchableOpacity onPress={handlePrivacyPolicy} style={styles.privacyLink}>
@@ -169,27 +115,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-    fontSize: 24,
-  },
   label: {
     marginBottom: 8,
     fontSize: 18,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
-  },
-  logoutButton: {
-    marginTop: 24,
   },
   privacyLink: {
     marginTop: 24,

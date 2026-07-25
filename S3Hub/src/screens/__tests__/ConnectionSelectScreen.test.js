@@ -111,3 +111,28 @@ describe('ConnectionSelectScreen first-run empty state', () => {
     expect(screen.queryByText(i18n.t('noConnectionsHint'))).toBeNull();
   });
 });
+
+// Regression: tapping "Log out" clears currentConnection, and this screen
+// re-renders its rows with no active connection. The active-row check was
+// written as `currentConnection && currentConnection.id === item.id`, which
+// evaluates to NULL (not false) in that state — and a null handed to React
+// Native's accessibilityState throws "expected dynamic type 'boolean', but
+// had type 'null'", crashing the screen right after logout.
+describe('ConnectionSelectScreen with no active connection (post-logout)', () => {
+  it('renders every row unselected instead of crashing', () => {
+    renderScreen({ currentConnection: null });
+
+    // Both connections still list.
+    expect(screen.getByText('AWS S3')).toBeTruthy();
+    expect(screen.getByText('Storj')).toBeTruthy();
+
+    // Every row must report a real boolean, never null.
+    screen.getAllByRole('button').forEach((row) => {
+      const selected = row.props.accessibilityState?.selected;
+      if (selected !== undefined) {
+        expect(typeof selected).toBe('boolean');
+        expect(selected).toBe(false);
+      }
+    });
+  });
+});

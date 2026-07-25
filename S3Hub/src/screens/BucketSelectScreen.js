@@ -2,13 +2,15 @@
 
 import React, { useEffect, useState, useContext, useCallback, useRef } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
-import { Text, List, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { listBuckets } from '../services/s3Service';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
-import ProviderSpine, { RegionTag } from '../components/ProviderSpine';
+import StorageListRow from '../components/StorageListRow';
+import ScreenTitle from '../components/ScreenTitle';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 export default function BucketSelectScreen({ navigation }) {
@@ -107,26 +109,16 @@ export default function BucketSelectScreen({ navigation }) {
   const activeRegionLabel = currentConnection?.region || currentConnection?.endpoint;
 
   const renderBucketItem = ({ item }) => (
-    <View style={styles.rowWrapper}>
-      <List.Item
-        title={item.Name}
-        description={() => <RegionTag value={activeRegionLabel} />}
-        onPress={() => handleBucketSelect(item)}
-        left={(props) => <List.Icon {...props} icon="bucket" />}
-        right={() => (selectedBucket === item.Name ? <List.Icon icon="check" /> : null)}
-        style={
-          selectedBucket === item.Name
-            ? [styles.selectedItem, { backgroundColor: theme.colors.secondaryContainer }]
-            : null
-        }
-      />
-      {/* Declared AFTER List.Item on purpose: RN paints later siblings on
-          top, and the selected-row highlight above gives List.Item an OPAQUE
-          secondaryContainer background that would otherwise cover the spine.
-          The spine is pointerEvents="none", so press/ripple on the row are
-          unaffected by it sitting on top. */}
-      <ProviderSpine providerId={activeProviderId} />
-    </View>
+    <StorageListRow
+      title={item.Name}
+      regionLabel={activeRegionLabel}
+      providerId={activeProviderId}
+      selected={selectedBucket === item.Name}
+      onPress={() => handleBucketSelect(item)}
+      renderMark={({ color }) => (
+        <MaterialCommunityIcons name="bucket-outline" size={24} color={color} />
+      )}
+    />
   );
 
   if (loading) {
@@ -149,9 +141,7 @@ export default function BucketSelectScreen({ navigation }) {
 
   return (
     <View style={containerStyle}>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.onBackground }]}>
-        {i18n.t('selectBucket')}
-      </Text>
+      <ScreenTitle>{i18n.t('selectBucket')}</ScreenTitle>
       <FlatList
         data={buckets}
         keyExtractor={(item) => item.Name}
@@ -173,11 +163,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-    fontSize: 24,
-  },
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -187,18 +172,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     marginTop: 20,
-  },
-  selectedItem: {
-    // backgroundColor is themed inline (theme.colors.secondaryContainer) at
-    // the call site — a pale cyan-ish highlight in both MD3 conventions and
-    // this design's own secondary family, so it reads as "selected" without
-    // reaching for the amber primary accent (reserved for actions).
-  },
-  // Wraps each row so ProviderSpine (position: 'absolute', anchored to this
-  // View) can lay its brand-color bar over the row's left edge without
-  // adding to the row's own width/flex layout or touch target.
-  rowWrapper: {
-    position: 'relative',
   },
   emptyContainer: {
     alignItems: 'center',

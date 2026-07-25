@@ -115,30 +115,20 @@ describe('AuthContext', () => {
     });
   });
 
-  describe('logout', () => {
-    it('clears the in-memory and persisted current connection/bucket without deleting any connection', async () => {
-      connectionRepository.getConnections.mockResolvedValue([CONNECTION_A, CONNECTION_B]);
+  describe('no logout action', () => {
+    it('exposes no `logout`: deleting a connection is the only sign-out path', async () => {
+      // Task 5.5 added a `logout` action (plus a Settings button) on the
+      // reasoning that the app had no sign-out affordance. Both were removed
+      // as redundant: `deleteConnection` above already clears the active
+      // connection/bucket, in memory and persisted, when the deleted one was
+      // active and none remain — which is exactly what logout did.
+      connectionRepository.getConnections.mockResolvedValue([CONNECTION_A]);
       connectionRepository.getCurrentConnection.mockResolvedValue(CONNECTION_A);
-      connectionRepository.getCurrentBucket.mockResolvedValue('my-bucket');
 
       const { result } = renderAuthContext();
       await waitFor(() => expect(result.current.isLoading).toBe(false));
-      expect(result.current.currentConnection?.id).toBe('connA');
-      expect(result.current.currentBucket).toBe('my-bucket');
 
-      await act(async () => {
-        await result.current.logout();
-      });
-
-      expect(result.current.currentConnection).toBeNull();
-      expect(result.current.currentBucket).toBeNull();
-      // The stored connections themselves are untouched: logging out never
-      // deletes a connection, it only deactivates the current one.
-      expect(result.current.connections.map((c) => c.id)).toEqual(['connA', 'connB']);
-      expect(connectionRepository.deleteConnection).not.toHaveBeenCalled();
-      expect(connectionRepository.saveConnections).not.toHaveBeenCalled();
-      expect(connectionRepository.clearCurrentConnection).toHaveBeenCalled();
-      expect(connectionRepository.clearCurrentBucket).toHaveBeenCalled();
+      expect(result.current.logout).toBeUndefined();
     });
   });
 
