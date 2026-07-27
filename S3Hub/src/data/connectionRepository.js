@@ -40,6 +40,12 @@ const KEYS = {
   LANGUAGE: 'appLanguage',
   PREVIEW: 'preview',
   THEME: 'appTheme',
+  // Two keys rather than one composite 'modified:desc' value: one key per
+  // preference is this file's existing convention, each value validates
+  // independently (see domain/fileSorting's resolvers), and there is no
+  // packed format to migrate later.
+  SORT_CRITERION: 'sortCriterion',
+  SORT_DIRECTION: 'sortDirection',
 };
 
 // Backfills a missing or duplicate `id` on each connection. Connections
@@ -335,4 +341,30 @@ export async function getTheme() {
 // Persists the theme.
 export async function saveTheme(value) {
   await SecureStore.setItemAsync(KEYS.THEME, value);
+}
+
+// --- Sort preference (plain strings; global, applies to every bucket) ---
+//
+// Neither getter validates: a stored-but-unknown value is resolved by
+// domain/fileSorting.resolveSortCriterion / resolveSortDirection at the point
+// of use, which is also where the per-criterion default direction lives.
+
+// Returns the stored sort criterion, or null if none is stored.
+export async function getSortCriterion() {
+  return SecureStore.getItemAsync(KEYS.SORT_CRITERION);
+}
+
+// Persists the sort criterion.
+export async function saveSortCriterion(value) {
+  await SecureStore.setItemAsync(KEYS.SORT_CRITERION, value);
+}
+
+// Returns the stored sort direction, or null if none is stored.
+export async function getSortDirection() {
+  return SecureStore.getItemAsync(KEYS.SORT_DIRECTION);
+}
+
+// Persists the sort direction.
+export async function saveSortDirection(value) {
+  await SecureStore.setItemAsync(KEYS.SORT_DIRECTION, value);
 }

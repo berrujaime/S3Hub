@@ -577,4 +577,44 @@ describe('connectionRepository', () => {
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith('appTheme', 'light');
     });
   });
+
+  describe('sort preference', () => {
+    it('returns the stored sort criterion', async () => {
+      SecureStore.getItemAsync.mockResolvedValue('modified');
+
+      await expect(repo.getSortCriterion()).resolves.toBe('modified');
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith('sortCriterion');
+    });
+
+    it('returns null when no sort criterion is stored', async () => {
+      SecureStore.getItemAsync.mockResolvedValue(null);
+
+      await expect(repo.getSortCriterion()).resolves.toBeNull();
+    });
+
+    it('persists the sort criterion', async () => {
+      await repo.saveSortCriterion('name');
+
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith('sortCriterion', 'name');
+    });
+
+    it('returns the stored sort direction', async () => {
+      SecureStore.getItemAsync.mockResolvedValue('desc');
+
+      await expect(repo.getSortDirection()).resolves.toBe('desc');
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith('sortDirection');
+    });
+
+    it('returns null when no sort direction is stored', async () => {
+      SecureStore.getItemAsync.mockResolvedValue(null);
+
+      await expect(repo.getSortDirection()).resolves.toBeNull();
+    });
+
+    it('persists the sort direction', async () => {
+      await repo.saveSortDirection('asc');
+
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith('sortDirection', 'asc');
+    });
+  });
 });
