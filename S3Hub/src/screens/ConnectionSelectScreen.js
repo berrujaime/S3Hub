@@ -2,13 +2,14 @@
 
 import React, { useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Image } from 'react-native';
-import { Text, FAB, IconButton, useTheme } from 'react-native-paper';
+import { Text, IconButton, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext';
 import { getProvider } from '../domain/providers';
 import StorageListRow from '../components/StorageListRow';
 import ScreenTitle from '../components/ScreenTitle';
+import ActionFab from '../components/ActionFab';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 import i18n from '../locales/translations';
 
@@ -132,7 +133,7 @@ export default function ConnectionSelectScreen({ navigation }) {
         renderItem={renderConnectionItem}
         ListEmptyComponent={renderEmptyState}
       />
-      <FAB
+      <ActionFab
         style={styles.fab}
         icon="plus"
         onPress={handleAddConnection}

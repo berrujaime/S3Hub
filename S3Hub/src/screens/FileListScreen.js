@@ -20,7 +20,6 @@ import {
   uploadEmptyFolder,
 } from '../services/s3Service';
 import {
-  FAB,
   Button,
   IconButton,
   Dialog,
@@ -51,6 +50,7 @@ import { mapS3Error } from '../domain/errors';
 import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 import ScreenTitle from '../components/ScreenTitle';
+import ActionFab from '../components/ActionFab';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 // Cache namespace derived from the ITEM's own fetch-time origin (stamped in
@@ -1069,7 +1069,8 @@ export default function FileListScreen() {
         />
       )}
 
-      <FAB
+      <ActionFab
+        prominence="secondary"
         style={styles.createFolderFab}
         icon="folder-plus"
         onPress={() => setIsDialogVisible(true)}
@@ -1122,7 +1123,7 @@ export default function FileListScreen() {
         </KeyboardAvoidingView>
       </Portal>
 
-      <FAB
+      <ActionFab
         style={styles.fab}
         icon="upload"
         onPress={handleUpload}
@@ -1244,8 +1245,15 @@ const styles = StyleSheet.create({
   createFolderFab: {
     position: 'absolute',
     margin: 16,
+    // Both FABs use `right: 0`, so their margin decides how far the CENTRE
+    // sits from the screen edge -- and they are different sizes. At 40dp the
+    // small FAB's centre would land 36dp from the edge against the 56dp
+    // FAB's 44dp, leaving the two visibly off-axis. +8 lines them up.
+    marginRight: 24,
     right: 0,
-    bottom: 140,
+    // Upload occupies 64 -> 120, so this is a clean 16dp gap (was 140, i.e.
+    // an off-grid 20dp).
+    bottom: 136,
   },
   flatListContent: {
     paddingBottom: 80,
