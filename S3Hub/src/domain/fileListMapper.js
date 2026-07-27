@@ -2,6 +2,7 @@
 // No React, AWS SDK, or Expo imports — fully unit-testable.
 
 import { classifyKey } from './fileTypes';
+import { sortFiles, toEpochMs } from './fileSorting';
 
 // Extension knowledge lives in `domain/fileTypes` (it also has to answer how
 // to OPEN a key and what MIME type it is, and one owner beats three copies of
@@ -9,26 +10,17 @@ import { classifyKey } from './fileTypes';
 // home and callers/tests import it from here.
 export { classifyKey };
 
+// Sorting lives in `domain/fileSorting` for the same reason: three criteria,
+// a category order, a direction, and preference validation are a separate
+// responsibility from mapping a listing to items. Re-exported here because
+// this module was its original home.
+export { sortFiles };
+
 // Returns true when a mediaType supports on-demand preview (thumbnail/player).
 // Only image and video items get signed preview URLs; other file types are
 // rendered with a generic icon instead.
 export const isPreviewableMediaType = (mediaType) => {
   return mediaType === 'image' || mediaType === 'video';
-};
-
-// Sorts a list of items: folders first (alphabetically), then non-video
-// files (images, audio, documents, archives, other — alphabetically), then
-// videos (alphabetically).
-// Returns a new array without mutating the input.
-export const sortFiles = (filesArray) => {
-  return [...filesArray].sort((a, b) => {
-    if (a.isFolder && !b.isFolder) return -1;
-    if (!a.isFolder && b.isFolder) return 1;
-    if (a.isFolder && b.isFolder) return a.name.localeCompare(b.name);
-    if (a.isVideo && !b.isVideo) return 1;
-    if (!a.isVideo && b.isVideo) return -1;
-    return a.name.localeCompare(b.name);
-  });
 };
 
 // Parses a delimiter-based S3 listing into list items (files first, then
@@ -69,6 +61,11 @@ export const parseObjects = (listing, currentPath) => {
       isFolder: false,
       isVideo: mediaType === 'video',
       mediaType,
+      // Normalized to epoch ms HERE, at parse time, rather than at sort
+      // time: the file-list cache round-trips items through JSON.stringify,
+      // where a number survives intact but a Date would come back as a
+      // string (see domain/fileSorting.toEpochMs).
+      lastModified: toEpochMs(object.LastModified),
       url: null,
     });
   });
@@ -87,6 +84,9 @@ export const parseObjects = (listing, currentPath) => {
       key: prefix,
       name,
       isFolder: true,
+      // CommonPrefixes are pure prefixes: no date exists. Folders always
+      // sort first by name, so this never affects the output.
+      lastModified: null,
     });
   });
 

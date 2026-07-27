@@ -171,13 +171,17 @@ describe('parseObjects', () => {
   it('derives folder rows from commonPrefixes, stripping the current prefix', () => {
     const listing = { contents: [], commonPrefixes: ['sub/'] };
     const result = parseObjects(listing, '');
-    expect(result).toEqual([{ id: 'sub/', key: 'sub/', name: 'sub', isFolder: true }]);
+    expect(result).toEqual([
+      { id: 'sub/', key: 'sub/', name: 'sub', isFolder: true, lastModified: null },
+    ]);
   });
 
   it('builds folder rows relative to a non-root currentPath', () => {
     const listing = { contents: [], commonPrefixes: ['root/sub/'] };
     const result = parseObjects(listing, 'root/');
-    expect(result).toEqual([{ id: 'root/sub/', key: 'root/sub/', name: 'sub', isFolder: true }]);
+    expect(result).toEqual([
+      { id: 'root/sub/', key: 'root/sub/', name: 'sub', isFolder: true, lastModified: null },
+    ]);
   });
 
   it('preserves the given commonPrefixes order for multiple folders', () => {
@@ -207,6 +211,7 @@ describe('parseObjects', () => {
         isFolder: false,
         isVideo: false,
         mediaType: 'image',
+        lastModified: null,
         url: null,
       },
       {
@@ -217,6 +222,7 @@ describe('parseObjects', () => {
         isFolder: false,
         isVideo: false,
         mediaType: 'document',
+        lastModified: null,
         url: null,
       },
       {
@@ -227,6 +233,7 @@ describe('parseObjects', () => {
         isFolder: false,
         isVideo: true,
         mediaType: 'video',
+        lastModified: null,
         url: null,
       },
       {
@@ -237,6 +244,7 @@ describe('parseObjects', () => {
         isFolder: false,
         isVideo: false,
         mediaType: 'archive',
+        lastModified: null,
         url: null,
       },
     ]);
@@ -307,6 +315,7 @@ describe('parseObjects', () => {
         isFolder: false,
         isVideo: false,
         mediaType: 'image',
+        lastModified: null,
         url: null,
       },
     ]);
@@ -321,6 +330,7 @@ describe('parseObjects', () => {
         key: 'My Photos + Vidéos/',
         name: 'My Photos + Vidéos',
         isFolder: true,
+        lastModified: null,
       },
     ]);
   });
@@ -346,6 +356,72 @@ describe('parseObjects', () => {
     expect(() => parseObjects(listing, '')).not.toThrow();
     const result = parseObjects(listing, '');
     expect(result.map((i) => i.name)).toEqual(['sub']);
+  });
+});
+
+describe('parseObjects: lastModified', () => {
+  it('captures LastModified as epoch milliseconds from a Date', () => {
+    const when = new Date('2026-01-02T03:04:05.000Z');
+    const listing = {
+      contents: [{ Key: 'a.jpg', Size: 1, LastModified: when }],
+      commonPrefixes: [],
+    };
+
+    expect(parseObjects(listing, '')[0].lastModified).toBe(when.getTime());
+  });
+
+  it('captures LastModified from an ISO string', () => {
+    // Defensive: this app lists arbitrary S3-compatible providers, whose
+    // responses are not guaranteed to be as well-formed as AWS's.
+    const listing = {
+      contents: [{ Key: 'a.jpg', Size: 1, LastModified: '2026-01-02T03:04:05.000Z' }],
+      commonPrefixes: [],
+    };
+
+    expect(parseObjects(listing, '')[0].lastModified).toBe(
+      new Date('2026-01-02T03:04:05.000Z').getTime(),
+    );
+  });
+
+  it('stores null when LastModified is absent or unparseable', () => {
+    const listing = {
+      contents: [
+        { Key: 'a.jpg', Size: 1 },
+        { Key: 'b.jpg', Size: 1, LastModified: 'nonsense' },
+      ],
+      commonPrefixes: [],
+    };
+    const result = parseObjects(listing, '');
+
+    // null, never undefined or NaN: one sentinel for the comparator to check,
+    // and it survives the cache's JSON round-trip explicitly.
+    expect(result[0].lastModified).toBeNull();
+    expect(result[1].lastModified).toBeNull();
+  });
+
+  it('gives folder rows a null lastModified', () => {
+    // CommonPrefixes are pure prefixes -- no date exists. Harmless because
+    // folders always sort first by name.
+    const listing = { contents: [], commonPrefixes: ['sub/'] };
+
+    expect(parseObjects(listing, '')[0].lastModified).toBeNull();
+  });
+});
+
+describe('sortFiles re-export', () => {
+  it('is still exported from fileListMapper', () => {
+    // It now LIVES in domain/fileSorting; this module re-exports it because
+    // it was its original home and callers/tests import it from here.
+    expect(typeof sortFiles).toBe('function');
+  });
+
+  it('accepts a criterion and direction', () => {
+    const input = [
+      { name: 'a.jpg', key: 'a.jpg', isFolder: false, mediaType: 'image' },
+      { name: 'b.jpg', key: 'b.jpg', isFolder: false, mediaType: 'image' },
+    ];
+
+    expect(sortFiles(input, 'name', 'desc').map((i) => i.name)).toEqual(['b.jpg', 'a.jpg']);
   });
 });
 
