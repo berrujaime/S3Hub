@@ -1,11 +1,12 @@
 // src/components/ActionFab.js
 //
-// The app's floating action buttons. Amber (theme.colors.primary) marks the
-// primary action of a screen -- the same accent the active tab
-// (AppNavigator.js) and every contained Button already use. Before this,
-// the FABs passed no color at all, so Paper applied its MD3 default of
-// secondaryContainer: pale blue in this theme, making the most prominent
-// affordance on each screen the only one NOT using the action color.
+// The app's floating action buttons. Every FAB in the app is this one button:
+// filled amber (theme.colors.primary), flat, 56dp, differing only by icon.
+// Amber is the same accent the active tab (AppNavigator.js) and every
+// contained Button already use. Before this component existed the FABs passed
+// no color at all, so Paper applied its MD3 default of secondaryContainer --
+// pale blue in this theme -- making the most prominent affordance on each
+// screen the only one NOT using the action color.
 //
 // WARNING -- do NOT "simplify" this to <FAB variant="primary">.
 // Paper maps that variant to theme.colors.primaryContainer /
@@ -15,66 +16,51 @@
 // the same trap theme.js:50-58 documents for react-navigation's `card`:
 // Paper's un-overridden MD3 tokens are tints of ITS own purple primary, not
 // this theme's amber. The filled amber therefore comes from explicit style +
-// color props.
+// color props, and `variant` is swallowed below so no caller can reach it.
 //
-// variant="surface" IS safe and is exactly the secondary treatment: Paper
-// maps it to elevation.level3 for the background (utils.ts:195) and
-// colors.primary for the icon (utils.ts:238), both defined by this theme in
-// light and dark.
+// There is deliberately no second, lower-emphasis level. An earlier version
+// had one (a 40dp variant="surface" FAB with an amber border) to give the two
+// stacked FABs in Files a hierarchy, but on device the two buttons read as
+// mismatched rather than ranked, so both are now identical. The border went
+// with it: it existed only because the surface background measured 1.11:1
+// against the page (invisible AS A BUTTON, WCAG 1.4.11 wants 3:1), whereas
+// the filled amber measures 4.35:1 light / 8.03:1 dark on its own.
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { FAB, useTheme } from 'react-native-paper';
 
 /**
- * Floating action button at one of two emphasis levels.
+ * The app's floating action button: filled amber, flat, 56dp.
  * @param {Object} props
- * @param {'primary'|'secondary'} [props.prominence] - 'primary' (default) is
- *   a 56dp filled amber FAB for the screen's main action; 'secondary' is a
- *   40dp low-emphasis one for a supporting action beside it.
  * @param {Object} [props.style] - Positioning, supplied by the caller (screen
  *   layout is not button identity). Merged LAST so it can place the FAB
  *   without dropping its background.
+ * @param {string} props.icon - What distinguishes one FAB from another.
  */
-export default function ActionFab({ prominence = 'primary', style, variant, color, ...rest }) {
-  // `variant` and `color` are deliberately destructured out and discarded
-  // (never spread via `rest`): they are this component's identity, not a
-  // caller's choice. Without this, a caller could pass variant="primary"
-  // straight through to Paper and hit the exact purple trap the WARNING
-  // above documents -- from ActionFab itself.
+export default function ActionFab({ style, variant, color, mode, ...rest }) {
+  // `variant`, `color` and `mode` are deliberately destructured out and
+  // discarded (never spread via `rest`): they are this component's identity,
+  // not a caller's choice. Without this a caller could pass variant="primary"
+  // straight through to Paper and hit the purple trap the WARNING above
+  // documents -- from ActionFab itself -- or re-add the drop shadow that
+  // `mode="flat"` exists to remove.
   const theme = useTheme();
 
-  if (prominence === 'secondary') {
-    return (
-      // `rest` is spread FIRST so a caller can never override the props that
-      // define this component's identity (size/variant/border).
-      <FAB
-        {...rest}
-        size="small"
-        variant="surface"
-        style={[styles.secondary, { borderColor: theme.colors.primary }, style]}
-      />
-    );
-  }
-
   return (
+    // `rest` is spread FIRST so the identity props below always win.
+    //
+    // mode="flat" is what removes the drop shadow, which read as artificial
+    // on device. Paper derives the MD3 elevation as
+    // `isFlatMode || disabled ? 0 : 3` (FAB.js:126,138), so this is the
+    // supported switch; overriding elevation/shadowOpacity by style would
+    // mean fighting Paper's own Surface elevation per platform instead.
+    //
+    // No `size`: Paper's default is 'medium' (56dp), which is the one size
+    // this app uses.
     <FAB
       {...rest}
+      mode="flat"
       color={theme.colors.onPrimary}
       style={[{ backgroundColor: theme.colors.primary }, style]}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  secondary: {
-    // Load-bearing, not decoration. variant="surface" resolves the background
-    // to elevation.level3, which measures 1.11:1 (light) / 1.42:1 (dark)
-    // against the page background -- the button is invisible AS A BUTTON and
-    // only its icon reads, with the shape carried by a very faint elevation
-    // shadow. WCAG 1.4.11 requires 3:1 for a boundary that identifies a
-    // control. A colors.primary border measures 4.35:1 / 8.03:1 and doubles
-    // as reinforcement that amber means action. (A colors.outline border was
-    // measured and rejected: 1.54:1 / 1.83:1, still failing.)
-    borderWidth: 1,
-  },
-});

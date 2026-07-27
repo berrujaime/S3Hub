@@ -1086,7 +1086,6 @@ export default function FileListScreen() {
       )}
 
       <ActionFab
-        prominence="secondary"
         style={styles.createFolderFab}
         icon="folder-plus"
         onPress={() => setIsDialogVisible(true)}
@@ -1260,15 +1259,15 @@ const styles = StyleSheet.create({
   },
   createFolderFab: {
     position: 'absolute',
+    // Same `margin: 16` and `right: 0` as the upload FAB above. Both are 56dp
+    // now, so an equal margin puts both centres 44dp from the screen edge and
+    // they share one vertical axis. (An earlier version needed marginRight:24
+    // here to compensate for this FAB being 40dp; that correction became a
+    // 8dp misalignment once the sizes matched.)
     margin: 16,
-    // Both FABs use `right: 0`, so their margin decides how far the CENTRE
-    // sits from the screen edge -- and they are different sizes. At 40dp the
-    // small FAB's centre would land 36dp from the edge against the 56dp
-    // FAB's 44dp, leaving the two visibly off-axis. +8 lines them up.
-    marginRight: 24,
     right: 0,
-    // Upload occupies 64 -> 120, so this is a clean 16dp gap (was 140, i.e.
-    // an off-grid 20dp).
+    // Upload occupies 64 -> 136 including its margin, so this leaves a clean
+    // 16dp gap between the two.
     bottom: 136,
   },
   flatListContent: {
