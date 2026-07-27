@@ -405,4 +405,170 @@ describe('useFileList', () => {
       expect(result.current.mediaFiles[0].name).toBe('image.jpg');
     });
   });
+
+  describe('(d) sorting is a client-side reorder, never a refetch', () => {
+    // Six items so PAGE_SIZE slicing is observable, in a deliberately
+    // scrambled order.
+    const listingForSort = {
+      contents: [
+        { Key: 'b.jpg', Size: 1, LastModified: new Date('2026-01-02T00:00:00.000Z') },
+        { Key: 'a.mp4', Size: 1, LastModified: new Date('2026-01-03T00:00:00.000Z') },
+        { Key: 'c.pdf', Size: 1, LastModified: new Date('2026-01-01T00:00:00.000Z') },
+      ],
+      commonPrefixes: ['zfolder/'],
+    };
+
+    it('does not call listAllObjects again when the criterion changes', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'type', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(listAllObjects).toHaveBeenCalledTimes(1);
+
+      rerender({ criterion: 'name', direction: 'asc' });
+      await waitFor(() => expect(result.current.fullFiles[1].name).toBe('a.mp4'));
+
+      // The regression this guards: putting the criterion into fetchFiles'
+      // useCallback deps changes its identity, which is itself a dep of the
+      // main fetch effect -- so a pure reorder would refetch the listing AND
+      // re-sign every preview URL.
+      expect(listAllObjects).toHaveBeenCalledTimes(1);
+    });
+
+    it('reorders fullFiles when the criterion changes', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'type', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // 'type': folder first, then image, video, document.
+      expect(result.current.fullFiles.map((f) => f.name)).toEqual([
+        'zfolder',
+        'b.jpg',
+        'a.mp4',
+        'c.pdf',
+      ]);
+
+      rerender({ criterion: 'name', direction: 'asc' });
+
+      await waitFor(() =>
+        expect(result.current.fullFiles.map((f) => f.name)).toEqual([
+          'zfolder',
+          'a.mp4',
+          'b.jpg',
+          'c.pdf',
+        ]),
+      );
+    });
+
+    it('honours the direction', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'name', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ criterion: 'name', direction: 'desc' });
+
+      await waitFor(() =>
+        expect(result.current.fullFiles.map((f) => f.name)).toEqual([
+          'zfolder',
+          'c.pdf',
+          'b.jpg',
+          'a.mp4',
+        ]),
+      );
+    });
+
+    it('rebuilds displayedFiles and mediaFiles alongside fullFiles', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'type', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ criterion: 'name', direction: 'desc' });
+      await waitFor(() => expect(result.current.fullFiles[1].name).toBe('c.pdf'));
+
+      // displayedFiles is a slice of fullFiles and mediaFiles drives the
+      // media viewer's paging, so a reorder that updated only fullFiles
+      // would leave a window sliced from the PREVIOUS order.
+      expect(result.current.displayedFiles).toEqual(result.current.fullFiles.slice(0, PAGE_SIZE));
+      // mediaFiles is fullFiles FILTERED, so it keeps the new order: under
+      // name-desc the files run c.pdf, b.jpg, a.mp4, and c.pdf is not
+      // previewable.
+      expect(result.current.mediaFiles.map((f) => f.name)).toEqual(['b.jpg', 'a.mp4']);
+    });
+
+    it('resets the pagination window to the first page on reorder', async () => {
+      // More than one page, so a stale window is detectable.
+      const many = Array.from({ length: PAGE_SIZE + 3 }, (_, i) => ({
+        Key: `file-${String(i).padStart(3, '0')}.jpg`,
+        Size: 1,
+        LastModified: new Date('2026-01-01T00:00:00.000Z'),
+      }));
+      listAllObjects.mockResolvedValue({ contents: many, commonPrefixes: [] });
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'name', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => {
+        result.current.loadMoreFiles();
+      });
+      await waitFor(() => expect(result.current.displayedFiles.length).toBe(PAGE_SIZE + 3));
+
+      rerender({ criterion: 'name', direction: 'desc' });
+
+      await waitFor(() => expect(result.current.displayedFiles.length).toBe(PAGE_SIZE));
+    });
+
+    it('applies the active criterion to search results', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result, rerender } = renderHook(
+        ({ criterion, direction }) => useFileList(CONNECTION_A, 'bucket-a', criterion, direction),
+        { initialProps: { criterion: 'name', direction: 'asc' } },
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => {
+        result.current.setSearchQuery('.');
+      });
+      await waitFor(() => expect(result.current.visibleFiles.length).toBe(3));
+      expect(result.current.visibleFiles.map((f) => f.name)).toEqual(['a.mp4', 'b.jpg', 'c.pdf']);
+
+      rerender({ criterion: 'name', direction: 'desc' });
+
+      await waitFor(() =>
+        expect(result.current.visibleFiles.map((f) => f.name)).toEqual(['c.pdf', 'b.jpg', 'a.mp4']),
+      );
+    });
+
+    it('defaults to the type criterion when no preference is passed', async () => {
+      listAllObjects.mockResolvedValue(listingForSort);
+
+      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.fullFiles.map((f) => f.name)).toEqual([
+        'zfolder',
+        'b.jpg',
+        'a.mp4',
+        'c.pdf',
+      ]);
+    });
+  });
 });

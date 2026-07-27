@@ -10,6 +10,7 @@ import {
   stampItemOrigin,
   stripVolatileFields,
 } from '../domain/fileListMapper';
+import { DEFAULT_SORT_CRITERION, defaultDirectionFor } from '../domain/fileSorting';
 import { getCacheKey } from '../domain/cacheKeys';
 import { getCachedItems, setCachedItems, removeCachedItems } from '../data/fileCacheRepository';
 import { initializeMediaCache, clearEntireCache } from '../services/mediaCache';
@@ -50,7 +51,12 @@ const attachSignedUrls = async (items, connection, bucket) => {
 // Owns the file-list data: fetching, pagination, navigation, search and the
 // media-cache lifecycle. Ports the exact behavior of the original
 // FileListScreen, now consuming the extracted domain/data/service modules.
-export default function useFileList(currentConnection, currentBucket) {
+export default function useFileList(
+  currentConnection,
+  currentBucket,
+  sortCriterion = DEFAULT_SORT_CRITERION,
+  sortDirection = defaultDirectionFor(DEFAULT_SORT_CRITERION),
+) {
   const [fullFiles, setFullFiles] = useState([]);
   const [displayedFiles, setDisplayedFiles] = useState([]);
   const [mediaFiles, setMediaFiles] = useState([]);
@@ -78,6 +84,36 @@ export default function useFileList(currentConnection, currentBucket) {
   // change (parity with the previous unconditional clear-on-mount).
   const prevOriginRef = useRef({ connectionId: undefined, bucket: undefined });
 
+  // Sort preference read INSIDE fetchFiles through refs, deliberately not
+  // through its useCallback deps. fetchFiles' identity is a dependency of
+  // the main fetch effect below, so adding the criterion there would refetch
+  // the whole listing -- and re-sign every preview URL -- for what is a
+  // purely client-side reorder. The reorder effect below keeps these current.
+  const sortCriterionRef = useRef(sortCriterion);
+  const sortDirectionRef = useRef(sortDirection);
+  // Mirrors `fullFiles` so the reorder effect can re-sort the loaded listing
+  // without taking `fullFiles` as a dependency (which would re-run it on
+  // every fetch and reset the pagination window).
+  const fullFilesRef = useRef([]);
+
+  // Single owner of "this is the listing now". fullFiles, displayedFiles and
+  // mediaFiles must always be rebuilt TOGETHER: displayedFiles is a
+  // page-slice of fullFiles, and mediaFiles drives the media viewer's paging
+  // (FileListScreen's handleModalReachEnd compares against
+  // displayedFiles.length), so updating one without the others leaves a
+  // window sliced from a previous order. The page counter resets to 1 for
+  // the same reason. The cache-hit path, the fresh-fetch path and the
+  // reorder effect all go through here -- the first two previously
+  // duplicated this block verbatim.
+  const applyItems = useCallback((items) => {
+    fullFilesRef.current = items;
+    setFullFiles(items);
+    setDisplayedFiles(items.slice(0, PAGE_SIZE));
+    setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
+    setLoading(false);
+    setPage(1);
+  }, []);
+
   const fetchFiles = useCallback(
     // `forceRefresh` (pull-to-refresh, Task 5.8) skips the cache-hit branch
     // below so a manual refresh always re-lists the bucket from the server —
@@ -95,6 +131,8 @@ export default function useFileList(currentConnection, currentBucket) {
           // stamping existed lack the fields entirely.
           const sortedItems = sortFiles(
             stampItemOrigin(cachedItems, currentConnection?.id, currentBucket),
+            sortCriterionRef.current,
+            sortDirectionRef.current,
           );
           // The cache never stores `url` (see stripVolatileFields below), so
           // previewable items always need a freshly-signed URL here.
@@ -102,13 +140,7 @@ export default function useFileList(currentConnection, currentBucket) {
           if (!isActive()) {
             return; // Unmounted, or superseded by a newer fetch: cancel.
           }
-          setFullFiles(sortedItems);
-          setDisplayedFiles(sortedItems.slice(0, PAGE_SIZE));
-          setMediaFiles(
-            sortedItems.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)),
-          );
-          setLoading(false);
-          setPage(1);
+          applyItems(sortedItems);
           return; // Exit early to avoid fetching from server.
         }
 
@@ -140,16 +172,12 @@ export default function useFileList(currentConnection, currentBucket) {
         await attachSignedUrls(items, currentConnection, currentBucket);
 
         // Sort first, then dedupe (preserving the original sequence).
-        items = sortFiles(items);
+        items = sortFiles(items, sortCriterionRef.current, sortDirectionRef.current);
         items = dedupeById(items);
 
         // Update state and cache.
         if (isActive()) {
-          setFullFiles(items);
-          setDisplayedFiles(items.slice(0, PAGE_SIZE));
-          setMediaFiles(items.filter((f) => !f.isFolder && isPreviewableMediaType(f.mediaType)));
-          setLoading(false);
-          setPage(1);
+          applyItems(items);
           // Never persist `url`: it's a presigned URL with a 1h TTL, far
           // shorter than the file-list cache's TTL (see
           // domain/fileListMapper.stripVolatileFields).
@@ -163,7 +191,7 @@ export default function useFileList(currentConnection, currentBucket) {
         }
       }
     },
-    [currentConnection, currentBucket, currentPath],
+    [currentConnection, currentBucket, currentPath, applyItems],
   );
 
   const loadMoreFiles = useCallback(() => {
@@ -244,10 +272,7 @@ export default function useFileList(currentConnection, currentBucket) {
         // ref so the next real (connection, bucket) is treated as a change
         // (matching the previous unconditional clear-on-mount behavior).
         prevOriginRef.current = { connectionId: undefined, bucket: undefined };
-        setFullFiles([]);
-        setDisplayedFiles([]);
-        setMediaFiles([]);
-        setLoading(false);
+        applyItems([]);
         return;
       }
 
@@ -275,7 +300,28 @@ export default function useFileList(currentConnection, currentBucket) {
     return () => {
       active = false;
     };
-  }, [currentConnection, currentBucket, currentPath, fetchFiles]);
+  }, [currentConnection, currentBucket, currentPath, fetchFiles, applyItems]);
+
+  // Re-sorts the ALREADY-LOADED listing when the sort preference changes.
+  // This is a client-side reorder, not a new request: listAllObjects
+  // paginates until the current level is exhausted, so fullFiles always
+  // holds the complete current-level listing and there is nothing to fetch.
+  //
+  // The refs are updated here (not in fetchFiles' deps) so the next fetch
+  // sorts with the current preference while fetchFiles' identity stays
+  // stable — see the refs' declaration above.
+  useEffect(() => {
+    sortCriterionRef.current = sortCriterion;
+    sortDirectionRef.current = sortDirection;
+
+    // Nothing loaded yet: skip. Calling applyItems here would set
+    // loading=false during the very first fetch and flash the empty state.
+    if (fullFilesRef.current.length === 0) {
+      return;
+    }
+
+    applyItems(sortFiles(fullFilesRef.current, sortCriterion, sortDirection));
+  }, [sortCriterion, sortDirection, applyItems]);
 
   // Filter the already-loaded items client-side by name (case-insensitive).
   // No new S3 requests are triggered. Existing sorting is preserved.
@@ -290,9 +336,13 @@ export default function useFileList(currentConnection, currentBucket) {
   // (what's returned verbatim when there is no query).
   const visibleFiles = useMemo(() => {
     return trimmedQuery
-      ? sortFiles(fullFiles.filter((file) => file.name.toLowerCase().includes(trimmedQuery)))
+      ? sortFiles(
+          fullFiles.filter((file) => file.name.toLowerCase().includes(trimmedQuery)),
+          sortCriterion,
+          sortDirection,
+        )
       : displayedFiles;
-  }, [trimmedQuery, fullFiles, displayedFiles]);
+  }, [trimmedQuery, fullFiles, displayedFiles, sortCriterion, sortDirection]);
   const showNoResults = trimmedQuery !== '' && visibleFiles.length === 0;
 
   return {
