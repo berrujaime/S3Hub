@@ -6,6 +6,12 @@ import * as connectionRepository from '../data/connectionRepository';
 import { getDeviceLocale } from '../data/deviceLocale';
 import { reconcileCurrentConnection } from '../domain/cacheKeys';
 import { resolveLocale } from '../domain/localeResolver';
+import {
+  DEFAULT_SORT_CRITERION,
+  defaultDirectionFor,
+  resolveSortCriterion,
+  resolveSortDirection,
+} from '../domain/fileSorting';
 
 export const AuthContext = createContext();
 
@@ -17,6 +23,12 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [preview, setPreview] = useState('true');
   const [theme, setTheme] = useState('system');
+
+  // Global sort preference for the file listing: it applies to every bucket
+  // and connection. Defaults are DERIVED from the domain module, never a
+  // second hardcoded literal that could drift from it.
+  const [sortCriterion, setSortCriterion] = useState(DEFAULT_SORT_CRITERION);
+  const [sortDirection, setSortDirection] = useState(defaultDirectionFor(DEFAULT_SORT_CRITERION));
 
   const setActiveConnection = useCallback(async (connection) => {
     // Reset currentBucket before changing currentConnection
@@ -47,6 +59,25 @@ export const AuthProvider = ({ children }) => {
     setTheme(newTheme);
     await connectionRepository.saveTheme(newTheme);
   }, []);
+
+  // Picking a criterion also RESETS the direction to that criterion's
+  // default (see domain/fileSorting.defaultDirectionFor): choosing "date
+  // modified" should start newest-first, not inherit an 'asc' left over from
+  // sorting by name. The toggle below then overrides it explicitly. This is
+  // the Finder / Explorer column-header convention.
+  const changeSortCriterion = useCallback(async (newCriterion) => {
+    const newDirection = defaultDirectionFor(newCriterion);
+    setSortCriterion(newCriterion);
+    setSortDirection(newDirection);
+    await connectionRepository.saveSortCriterion(newCriterion);
+    await connectionRepository.saveSortDirection(newDirection);
+  }, []);
+
+  const toggleSortDirection = useCallback(async () => {
+    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(newDirection);
+    await connectionRepository.saveSortDirection(newDirection);
+  }, [sortDirection]);
 
   const addConnection = useCallback(
     async (connection) => {
@@ -148,6 +179,18 @@ export const AuthProvider = ({ children }) => {
 
         const storedTheme = await connectionRepository.getTheme();
         setTheme(storedTheme || 'system');
+
+        // Both values go through the domain resolvers, so a preference
+        // written by a future build or a corrupted one falls back instead of
+        // breaking the listing. The direction is resolved AGAINST the
+        // resolved criterion, so a corrupt direction stored alongside
+        // 'modified' becomes 'desc' rather than a fixed 'asc'.
+        const storedSortCriterion = await connectionRepository.getSortCriterion();
+        const resolvedSortCriterion = resolveSortCriterion(storedSortCriterion);
+        setSortCriterion(resolvedSortCriterion);
+
+        const storedSortDirection = await connectionRepository.getSortDirection();
+        setSortDirection(resolveSortDirection(storedSortDirection, resolvedSortCriterion));
       } catch (error) {
         console.error('Error loading stored data:', error);
       } finally {
@@ -167,6 +210,8 @@ export const AuthProvider = ({ children }) => {
       isLoading,
       preview,
       theme,
+      sortCriterion,
+      sortDirection,
       addConnection,
       setActiveConnection,
       setCurrentBucket: setCurrentBucketFunction,
@@ -174,6 +219,8 @@ export const AuthProvider = ({ children }) => {
       changeLanguage,
       changePreview,
       changeTheme,
+      changeSortCriterion,
+      toggleSortDirection,
     }),
     [
       connections,
@@ -183,6 +230,8 @@ export const AuthProvider = ({ children }) => {
       isLoading,
       preview,
       theme,
+      sortCriterion,
+      sortDirection,
       addConnection,
       setActiveConnection,
       setCurrentBucketFunction,
@@ -190,6 +239,8 @@ export const AuthProvider = ({ children }) => {
       changeLanguage,
       changePreview,
       changeTheme,
+      changeSortCriterion,
+      toggleSortDirection,
     ],
   );
 

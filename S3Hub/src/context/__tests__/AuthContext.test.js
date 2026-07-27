@@ -42,6 +42,10 @@ jest.mock('../../data/connectionRepository', () => ({
   savePreview: jest.fn(),
   getTheme: jest.fn(),
   saveTheme: jest.fn(),
+  getSortCriterion: jest.fn(),
+  saveSortCriterion: jest.fn(),
+  getSortDirection: jest.fn(),
+  saveSortDirection: jest.fn(),
 }));
 
 jest.mock('../../data/deviceLocale', () => ({
@@ -65,6 +69,8 @@ describe('AuthContext', () => {
     getDeviceLocale.mockReturnValue('en');
     connectionRepository.getPreview.mockResolvedValue('true');
     connectionRepository.getTheme.mockResolvedValue('system');
+    connectionRepository.getSortCriterion.mockResolvedValue(null);
+    connectionRepository.getSortDirection.mockResolvedValue(null);
     connectionRepository.saveConnections.mockResolvedValue(undefined);
     connectionRepository.deleteConnection.mockResolvedValue(undefined);
     connectionRepository.saveCurrentConnection.mockResolvedValue(undefined);
@@ -171,6 +177,106 @@ describe('AuthContext', () => {
 
       expect(result.current.language).toBe('es');
       expect(connectionRepository.saveLanguage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sort preference', () => {
+    it("defaults to 'type' ascending when nothing is stored", async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue(null);
+      connectionRepository.getSortDirection.mockResolvedValue(null);
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.sortCriterion).toBe('type');
+      expect(result.current.sortDirection).toBe('asc');
+    });
+
+    it('loads a stored criterion and direction', async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue('name');
+      connectionRepository.getSortDirection.mockResolvedValue('desc');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.sortCriterion).toBe('name');
+      expect(result.current.sortDirection).toBe('desc');
+    });
+
+    it("resolves a corrupt direction against the STORED criterion's default", async () => {
+      // The regression this guards: falling back to a fixed 'asc' would show
+      // the oldest files first for a user whose criterion is 'modified'.
+      connectionRepository.getSortCriterion.mockResolvedValue('modified');
+      connectionRepository.getSortDirection.mockResolvedValue('sideways');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.sortCriterion).toBe('modified');
+      expect(result.current.sortDirection).toBe('desc');
+    });
+
+    it('falls back to the default for a corrupt criterion', async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue('size');
+      connectionRepository.getSortDirection.mockResolvedValue(null);
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.sortCriterion).toBe('type');
+    });
+
+    it("changing the criterion applies that criterion's default direction and persists both", async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue(null);
+      connectionRepository.getSortDirection.mockResolvedValue(null);
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.changeSortCriterion('modified');
+      });
+
+      expect(result.current.sortCriterion).toBe('modified');
+      expect(result.current.sortDirection).toBe('desc');
+      expect(connectionRepository.saveSortCriterion).toHaveBeenCalledWith('modified');
+      expect(connectionRepository.saveSortDirection).toHaveBeenCalledWith('desc');
+    });
+
+    it('toggling flips the direction and persists it', async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue('name');
+      connectionRepository.getSortDirection.mockResolvedValue('asc');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.toggleSortDirection();
+      });
+
+      expect(result.current.sortDirection).toBe('desc');
+      expect(connectionRepository.saveSortDirection).toHaveBeenCalledWith('desc');
+
+      await act(async () => {
+        await result.current.toggleSortDirection();
+      });
+
+      expect(result.current.sortDirection).toBe('asc');
+    });
+
+    it('leaves the criterion alone when only the direction is toggled', async () => {
+      connectionRepository.getSortCriterion.mockResolvedValue('modified');
+      connectionRepository.getSortDirection.mockResolvedValue('desc');
+
+      const { result } = renderAuthContext();
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.toggleSortDirection();
+      });
+
+      expect(result.current.sortCriterion).toBe('modified');
+      expect(connectionRepository.saveSortCriterion).not.toHaveBeenCalled();
     });
   });
 });
