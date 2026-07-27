@@ -199,6 +199,22 @@ describe("sortFiles: criterion 'type'", () => {
 
     expect(names(sortFiles(input, 'type', 'asc'))).toEqual(['photo.jpg', 'clip.mp4']);
   });
+
+  it('ranks an unrecognized mediaType after every known category, including other', () => {
+    // rankOf falls back to CATEGORY_RANK.length for a category it doesn't
+    // recognize (a corrupted cache entry, or a future category added to
+    // fileTypes without a matching CATEGORY_RANK entry). Ranking it after
+    // 'other' -- not merely somewhere -- is the property that distinguishes
+    // that intentional fallback from the -1-from-indexOf bug it guards
+    // against, which would sort the unknown item FIRST, ahead of images.
+    const input = [
+      file('unknown.bin', 'ebook'),
+      file('known.bin', 'other'),
+      file('a.jpg', 'image'),
+    ];
+
+    expect(names(sortFiles(input, 'type', 'asc'))).toEqual(['a.jpg', 'known.bin', 'unknown.bin']);
+  });
 });
 
 describe("sortFiles: criterion 'name'", () => {
