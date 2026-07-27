@@ -26,7 +26,30 @@
 // against the page (invisible AS A BUTTON, WCAG 1.4.11 wants 3:1), whereas
 // the filled amber measures 4.35:1 light / 8.03:1 dark on its own.
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { FAB, useTheme } from 'react-native-paper';
+
+// The button's drop shadow: medium intensity, and short rather than
+// stretched. These three numbers are the dials — offsetY for how far it
+// falls, blurRadius for how soft it is, and the colour's alpha for how dark.
+//
+// `boxShadow` and not shadowOffset/shadowOpacity/shadowRadius, because
+// Android ignores those legacy props entirely — it obeys only `elevation`,
+// which is precisely the untunable shadow `mode="flat"` turns off below.
+// boxShadow (RN 0.76+) is the one mechanism that renders on both platforms
+// and exposes offset, blur and alpha as separate dials. On Android it needs
+// the New Architecture, which Expo SDK 53 enables by default.
+//
+// The colour matches MD3's `shadow` token, which Paper defines as pure black
+// in BOTH themes (styles/themes/v3/LightTheme.js:50, `palette.neutral0` =
+// rgba(0,0,0,1)) — so unlike a surface or text colour there is no light/dark
+// variant to follow, and the alpha here is the intensity dial, not a colour
+// choice. Paper's own note about transparency transferring shadows to child
+// nodes applies to translucent BACKGROUNDS; this button's background is
+// opaque amber.
+const SHADOW = [
+  { offsetX: 0, offsetY: 3, blurRadius: 5, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.38)' },
+];
 
 /**
  * The app's floating action button: filled amber, flat, 56dp.
@@ -60,7 +83,13 @@ export default function ActionFab({ style, variant, color, mode, ...rest }) {
       {...rest}
       mode="flat"
       color={theme.colors.onPrimary}
-      style={[{ backgroundColor: theme.colors.primary }, style]}
+      style={[styles.shadow, { backgroundColor: theme.colors.primary }, style]}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  shadow: {
+    boxShadow: SHADOW,
+  },
+});

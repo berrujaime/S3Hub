@@ -49,10 +49,26 @@ describe('ActionFab', () => {
     expect(fab.props.color).toBe(lightTheme.colors.onPrimary);
   });
 
-  it('renders flat, with no drop shadow', () => {
-    // The shadow read as artificial on device. See (b) above for why this is
-    // a mode prop rather than a style override.
+  it("stays flat so Paper's own elevation shadow never renders", () => {
+    // Paper's MD3 elevation-3 shadow read as artificial on device. See (b)
+    // above for why this is a mode prop rather than a style override. The
+    // button still has a shadow -- it is the tuned one below, ours, not
+    // Paper's.
     expect(renderFab().fab.props.mode).toBe('flat');
+  });
+
+  it('carries its own tuned drop shadow', () => {
+    // Deliberately boxShadow rather than shadowOffset/shadowOpacity/
+    // shadowRadius: Android ignores those legacy props entirely and obeys
+    // only `elevation`, which is the untunable shadow we just turned off.
+    // boxShadow is the one mechanism that renders on both platforms AND
+    // exposes offset, blur and alpha separately -- which is what "medium
+    // intensity, not stretched" needs.
+    const { boxShadow } = StyleSheet.flatten(renderFab().fab.props.style);
+
+    expect(boxShadow).toEqual([
+      { offsetX: 0, offsetY: 3, blurRadius: 5, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.38)' },
+    ]);
   });
 
   it('renders at the default 56dp size', () => {
