@@ -14,7 +14,7 @@
 // into the FlatList's RefreshControl.
 import React from 'react';
 import { FlatList, Alert, Dimensions } from 'react-native';
-import { render, screen, act } from '@testing-library/react-native';
+import { render, screen, act, fireEvent } from '@testing-library/react-native';
 import {
   Provider as PaperProvider,
   FAB,
@@ -115,6 +115,8 @@ const renderScreen = (fetchFiles, overrides = {}) => {
     goBack: jest.fn(),
     refreshAfterMutation: jest.fn().mockResolvedValue(undefined),
     setMediaFileUrl: jest.fn(),
+    changeSortCriterion: jest.fn(),
+    toggleSortDirection: jest.fn(),
     ...overrides,
   };
   useFileList.mockReturnValue(mocks);
@@ -122,7 +124,15 @@ const renderScreen = (fetchFiles, overrides = {}) => {
   render(
     <PaperProvider theme={darkTheme}>
       <AuthContext.Provider
-        value={{ currentConnection: CONNECTION, currentBucket: 'bucket-a', preview: 'false' }}
+        value={{
+          currentConnection: CONNECTION,
+          currentBucket: 'bucket-a',
+          preview: 'false',
+          sortCriterion: 'type',
+          sortDirection: 'asc',
+          changeSortCriterion: mocks.changeSortCriterion,
+          toggleSortDirection: mocks.toggleSortDirection,
+        }}
       >
         <FileListScreen />
       </AuthContext.Provider>
@@ -455,5 +465,36 @@ describe('FileListScreen opening non-media files', () => {
 
     expect(openExternally).not.toHaveBeenCalled();
     expect(getSignedUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('FileListScreen sort control', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    i18n.locale = 'en';
+  });
+
+  it('reaches the context action when a new criterion is chosen', () => {
+    const mocks = renderScreen();
+
+    fireEvent.press(screen.getByTestId('sort-menu'));
+    fireEvent.press(screen.getByText('Date modified'));
+
+    expect(mocks.changeSortCriterion).toHaveBeenCalledWith('modified');
+  });
+
+  it('reaches the context toggle when the active criterion is re-picked', () => {
+    const mocks = renderScreen();
+
+    fireEvent.press(screen.getByTestId('sort-menu'));
+    fireEvent.press(screen.getByText('File type'));
+
+    expect(mocks.toggleSortDirection).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the active preference down to useFileList', () => {
+    renderScreen();
+
+    expect(useFileList).toHaveBeenCalledWith(expect.anything(), 'bucket-a', 'type', 'asc');
   });
 });

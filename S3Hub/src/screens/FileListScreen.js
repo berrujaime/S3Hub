@@ -51,6 +51,7 @@ import useFileList from '../hooks/useFileList';
 import useFileSelection from '../hooks/useFileSelection';
 import ScreenTitle from '../components/ScreenTitle';
 import ActionFab from '../components/ActionFab';
+import SortMenu from '../components/SortMenu';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 
 // Cache namespace derived from the ITEM's own fetch-time origin (stamped in
@@ -63,7 +64,15 @@ const itemCacheKey = (item) =>
   item.connectionId && item.bucket ? mediaCacheKey(item.connectionId, item.bucket, item.key) : null;
 
 export default function FileListScreen() {
-  const { currentConnection, currentBucket, preview } = useContext(AuthContext);
+  const {
+    currentConnection,
+    currentBucket,
+    preview,
+    sortCriterion,
+    sortDirection,
+    changeSortCriterion,
+    toggleSortDirection,
+  } = useContext(AuthContext);
 
   const {
     fullFiles,
@@ -81,7 +90,7 @@ export default function FileListScreen() {
     goBack,
     refreshAfterMutation,
     setMediaFileUrl,
-  } = useFileList(currentConnection, currentBucket);
+  } = useFileList(currentConnection, currentBucket, sortCriterion, sortDirection);
 
   const { selectedFiles, toggleSelection, selectAll, clearSelection } = useFileSelection();
 
@@ -975,6 +984,13 @@ export default function FileListScreen() {
           onPress={handleSwitchView}
           style={styles.viewToggleButton}
           accessibilityLabel={viewMode === 'grid' ? i18n.t('listView') : i18n.t('gridView')}
+        />
+        <SortMenu
+          criterion={sortCriterion}
+          direction={sortDirection}
+          onChangeCriterion={changeSortCriterion}
+          onToggleDirection={toggleSortDirection}
+          testID="sort-menu"
         />
         <IconButton
           icon="select-all"
