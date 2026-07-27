@@ -481,6 +481,7 @@ describe('FileListScreen sort control', () => {
     fireEvent.press(screen.getByText('Date modified'));
 
     expect(mocks.changeSortCriterion).toHaveBeenCalledWith('modified');
+    expect(mocks.toggleSortDirection).not.toHaveBeenCalled();
   });
 
   it('reaches the context toggle when the active criterion is re-picked', () => {
@@ -490,6 +491,7 @@ describe('FileListScreen sort control', () => {
     fireEvent.press(screen.getByText('File type'));
 
     expect(mocks.toggleSortDirection).toHaveBeenCalledTimes(1);
+    expect(mocks.changeSortCriterion).not.toHaveBeenCalled();
   });
 
   it('passes the active preference down to useFileList', () => {
