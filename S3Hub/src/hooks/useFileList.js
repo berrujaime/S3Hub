@@ -184,7 +184,7 @@ export default function useFileList(
           await setCachedItems(cacheKey, stripVolatileFields(items));
         }
       } catch (error) {
-        console.error('Error fetching the file list:', error);
+        console.error('Error fetching the file list:', error?.name || error?.code, error?.message);
         if (isActive()) {
           Alert.alert(i18n.t('error'), i18n.t(mapS3Error(error)));
           setLoading(false);
