@@ -22,8 +22,10 @@ import { IconButton, Menu } from 'react-native-paper';
 import i18n from '../locales/translations';
 import { SORT_CRITERIA, resolveSortCriterion } from '../domain/fileSorting';
 
-// One i18n key per criterion, so adding a criterion in the domain module
-// fails loudly here rather than rendering a blank row.
+// One i18n key per criterion. A criterion added to SORT_CRITERIA without a
+// matching entry here renders a missing-translation placeholder (i18n.t
+// silently accepts an undefined key) rather than failing -- so the two must
+// be kept in sync by hand.
 const LABEL_KEYS = {
   type: 'sortByType',
   name: 'sortByName',

@@ -59,6 +59,17 @@ describe('ActionFab', () => {
     expect(renderFab({ prominence: 'secondary' }).fab.props.variant).not.toBe('primary');
   });
 
+  it("does not let a caller's variant/color props reach Paper", () => {
+    // Regression for the trap the WARNING block documents: variant="primary"
+    // must never reach Paper, even if a caller passes it directly to
+    // ActionFab -- for BOTH prominences, not just the component's own
+    // defaults (covered by the test above).
+    expect(renderFab({ variant: 'primary' }).fab.props.variant).not.toBe('primary');
+    expect(renderFab({ prominence: 'secondary', variant: 'primary' }).fab.props.variant).not.toBe(
+      'primary',
+    );
+  });
+
   it("merges a caller's positioning style over its own background", () => {
     const { fab } = renderFab({ style: { position: 'absolute', bottom: 64 } });
     const flattened = StyleSheet.flatten(fab.props.style);

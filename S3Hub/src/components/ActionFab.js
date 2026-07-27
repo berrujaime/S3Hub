@@ -35,7 +35,12 @@ import { FAB, useTheme } from 'react-native-paper';
  *   layout is not button identity). Merged LAST so it can place the FAB
  *   without dropping its background.
  */
-export default function ActionFab({ prominence = 'primary', style, ...rest }) {
+export default function ActionFab({ prominence = 'primary', style, variant, color, ...rest }) {
+  // `variant` and `color` are deliberately destructured out and discarded
+  // (never spread via `rest`): they are this component's identity, not a
+  // caller's choice. Without this, a caller could pass variant="primary"
+  // straight through to Paper and hit the exact purple trap the WARNING
+  // above documents -- from ActionFab itself.
   const theme = useTheme();
 
   if (prominence === 'secondary') {
