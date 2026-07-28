@@ -33,16 +33,16 @@
     <p>All data is stored <strong>exclusively on your device</strong>:</p>
     <ul>
         <li><strong>Credentials</strong> (Access Key and Secret Key): Stored in the platform's encrypted storage (iOS Keychain / Android EncryptedSharedPreferences, via <code>expo-secure-store</code>). They leave your device only to authenticate against the storage endpoint you configure.</li>
-        <li><strong>Connection Metadata</strong> (provider, region, endpoint, account ID, bucket, label): Stored in the App's private local storage. This storage carries no additional encryption applied by the App; it is protected by the operating system's app sandbox and by your device's own encryption. It contains no credentials.</li>
+        <li><strong>Connection Metadata</strong> (provider, region, endpoint, account ID, bucket, label, and an internal identifier): Stored in the App's private local storage. This storage carries no additional encryption applied by the App; it is protected by the operating system's app sandbox and by your device's own encryption. It contains no credentials.</li>
         <li><strong>Preferences</strong> (selected bucket, language, theme, sort order, preview setting): Stored locally on your device.</li>
-        <li><strong>File Cache</strong>: Images and videos you browse or preview are cached locally in the app's cache directory, as thumbnails and at full size, to improve browsing performance. This cache is cleared automatically after 7 days or when the app goes to the background.</li>
+        <li><strong>File Cache</strong>: Files you browse, preview, or open are cached locally in the app's cache directory to improve browsing performance. This is not limited to images and videos — any file you open is cached, including documents and archives. Files are cached at full size and reused for thumbnails. This cache is cleared automatically after 7 days or when the app goes to the background. One exception: when you open a file in another app, a copy is placed in a separate hand-off directory so it stays available while that app reads it. That copy is replaced the next time you open a file, and is removed when you uninstall the App.</li>
         <li><strong>File Listings Cache</strong>: Directory listings are cached locally to reduce API calls. Expires after 7 days.</li>
     </ul>
 
     <h2>Data Sharing</h2>
     <p>S3Hub does <strong>not</strong> share any data with third parties on its own initiative. All network communication occurs directly between your device and the storage endpoint you configure — including a self-hosted or otherwise custom endpoint. No data passes through intermediary servers controlled by the developer.</p>
 
-    <p>When you use the App's share action on a file, that file is handed to whichever app you select (for example a messaging or email client). What that app does with the file is governed by its own privacy policy, not by this one.</p>
+    <p>When you share a file or open it in another app, that file is handed to whichever app you select — for example a messaging client, an email client, or a document viewer. This includes simply opening a file the App cannot display itself, such as a PDF or an archive: that also hands the file to another app. What that app does with the file is governed by its own privacy policy, not by this one.</p>
 
     <h2>Permissions</h2>
     <p>The App may request the following device permissions:</p>
@@ -50,7 +50,6 @@
         <li><strong>Notifications</strong>: To notify you when file uploads complete.</li>
         <li><strong>Media Library / Storage</strong>: To save downloaded files to your device's gallery.</li>
         <li><strong>File Access</strong>: To allow you to select files for upload to your S3 buckets.</li>
-        <li><strong>Sharing</strong>: To hand a file to another app you choose, when you use the share action.</li>
     </ul>
 
     <h2>Data Security</h2>
@@ -67,10 +66,10 @@
     <p>The App connects to the following services at your direction. Each is governed by its own privacy policy:</p>
     <ul>
         <li><strong>Amazon Web Services S3</strong> (<a href="https://aws.amazon.com/privacy/">Privacy Policy</a>)</li>
-        <li><strong>Storj DCS</strong> (<a href="https://www.storj.io/privacy-policy">Privacy Policy</a>)</li>
+        <li><strong>Storj DCS</strong> (<a href="https://www.storj.io/legal/privacy-policy">Privacy Policy</a>)</li>
         <li><strong>Cloudflare R2</strong> (<a href="https://www.cloudflare.com/privacypolicy/">Privacy Policy</a>)</li>
-        <li><strong>Backblaze B2</strong> (<a href="https://www.backblaze.com/company/privacy.html">Privacy Policy</a>)</li>
-        <li><strong>Wasabi</strong> (<a href="https://wasabi.com/privacy-policy/">Privacy Policy</a>)</li>
+        <li><strong>Backblaze B2</strong> (<a href="https://www.backblaze.com/company/policy/privacy">Privacy Policy</a>)</li>
+        <li><strong>Wasabi</strong> (<a href="https://wasabi.com/legal/privacy-policy">Privacy Policy</a>)</li>
         <li><strong>DigitalOcean Spaces</strong> (<a href="https://www.digitalocean.com/legal/privacy-policy">Privacy Policy</a>)</li>
         <li><strong>Google Cloud Storage</strong> (<a href="https://cloud.google.com/terms/cloud-privacy-notice">Privacy Policy</a>)</li>
         <li><strong>Custom / S3-compatible endpoints</strong>: If you configure your own endpoint (for example a self-hosted MinIO server), the third party is whoever operates that endpoint. No policy can be listed here on their behalf.</li>
