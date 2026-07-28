@@ -51,6 +51,7 @@ describe('CachedImage', () => {
 
     await waitFor(() => expect(renderedImage()).toBeTruthy());
     expect(renderedImage().props.resizeMode).toBe('contain');
+    expect(renderedImage().props.style).toEqual({ width: 90, height: 60 });
   });
 
   it('forwards arbitrary extra props, not just resizeMode', async () => {
