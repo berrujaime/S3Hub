@@ -3,8 +3,14 @@ import { ActivityIndicator, Image as RNImage } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { CACHE_DIR, ensureDirectoryExists } from '../services/mediaCache';
 
-// CachedImage component to handle image caching
-const CachedImage = ({ source, style, cacheKey }) => {
+// CachedImage component to handle image caching.
+//
+// Extra props are forwarded to the underlying Image (same signature as
+// CachedVideo). This matters for `resizeMode`: MediaViewerModal asks for
+// "contain" so a preview fits inside its box whole, and dropping the prop
+// silently reverted to React Native's "cover" default, which cropped every
+// image to the box's aspect ratio.
+const CachedImage = ({ source, style, cacheKey, ...props }) => {
   const [imgUri, setImgUri] = useState(null);
 
   useEffect(() => {
@@ -51,7 +57,7 @@ const CachedImage = ({ source, style, cacheKey }) => {
   if (!imgUri) {
     return <ActivityIndicator style={{ flex: 1 }} />;
   } else {
-    return <RNImage style={style} source={{ uri: imgUri }} />;
+    return <RNImage style={style} source={{ uri: imgUri }} {...props} />;
   }
 };
 
