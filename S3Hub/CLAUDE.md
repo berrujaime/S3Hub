@@ -17,7 +17,7 @@ src/
     providers.js   Provider registry (endpoints, regions, path-style, fields). Single source of truth.
     errors.js      Maps SDK/HTTP errors -> stable app error codes + i18n keys.
   data/          Adapters over platform/SDK. Mockable.
-    connectionRepository.js   Wraps expo-secure-store for connection persistence.
+    connectionRepository.js   Wraps expo-secure-store (secrets) and AsyncStorage (non-secret metadata) for connection persistence.
   services/      S3 SDK integration (s3Client, s3Service, authService).
   context/       React state (AuthContext) — consumes data/ + domain/.
   screens/       Presentation only.
@@ -26,7 +26,10 @@ src/
 
 - The domain layer must import nothing from React, the AWS SDK, or Expo. This is what makes it testable without a device.
 - Screens never build endpoints or interpret raw SDK errors directly — they use `domain/`.
-- `android.allowBackup` is set to `false` in `app.json` deliberately — do not remove it thinking it's an oversight. `connectionRepository.js` keeps non-secret connection metadata (provider, region, endpoint, account ID, bucket, label) in AsyncStorage, which Android's default `allowBackup: true` would make eligible for cloud/adb backups. The secrets in `expo-secure-store` are never restorable from such a backup anyway — the Keystore wrapping key is non-exportable — so a restore would only produce connections that can't authenticate.
+
+## Android manifest
+
+`android.allowBackup` is set to `false` in `app.json` deliberately — do not remove it thinking it's an oversight. `connectionRepository.js` keeps non-secret connection metadata (provider, region, endpoint, account ID, bucket, label) in AsyncStorage, which Android's default `allowBackup: true` would make eligible for cloud/adb backups. The secrets in `expo-secure-store` are never restorable from such a backup anyway — the Keystore wrapping key is non-exportable — so a restore would only produce connections that can't authenticate.
 
 ## TDD
 

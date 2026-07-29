@@ -163,7 +163,7 @@ Each URL is verified reachable during implementation; a redirect to a provider's
 
 `app.json` declares no `allowBackup`, so Android applies its default of `true`. Connection **metadata** could therefore be included in Google cloud backups. Secrets are not meaningfully recoverable that way — the wrapping key lives in the Android Keystore and is non-exportable, so restored ciphertext is undecryptable — and the code already degrades that case gracefully: a metadata entry whose secret is missing hydrates to `{}` rather than throwing (`connectionRepository.js:98-111`), and `writeSplit` refuses to overwrite a healthy stored secret with an empty one (`:130-133`).
 
-**Not changed here.** The fix would live in `app.json`'s `android` block, which Global Constraint 1 puts off-limits. Recorded so a future `dataExtractionRules` / `allowBackup` decision can be made deliberately rather than discovered.
+**Not changed here.** The fix would live in `app.json`'s `android` block, which Global Constraint 1 puts off-limits. Recorded so a future `dataExtractionRules` / `allowBackup` decision can be made deliberately rather than discovered. [Superseded by commit ab7dd65: golden rule #1 was later narrowed and android.allowBackup was set to false.]
 
 ## 2.7 Language
 
