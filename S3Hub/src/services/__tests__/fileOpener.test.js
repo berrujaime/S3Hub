@@ -8,7 +8,12 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
-import { openExternally, readTextPreview, TEXT_PREVIEW_LIMIT_BYTES } from '../fileOpener';
+import {
+  openExternally,
+  readTextPreview,
+  clearHandOffDir,
+  TEXT_PREVIEW_LIMIT_BYTES,
+} from '../fileOpener';
 
 jest.mock('expo-file-system', () => ({
   cacheDirectory: 'file:///cache/',
@@ -208,6 +213,42 @@ describe('openExternally guards', () => {
     await expect(openExternally(null, 'application/pdf')).resolves.toBe(false);
     expect(FileSystem.getContentUriAsync).not.toHaveBeenCalled();
     expect(IntentLauncher.startActivityAsync).not.toHaveBeenCalled();
+  });
+});
+
+// clearHandOffDir is the OTHER half of the SHARE_DIR fix: it is called at
+// app/screen startup (hooks/useFileList's mount effect), not on the
+// 'background' AppState transition — see the SHARE_DIR comment in
+// fileOpener.js for why background is the wrong moment.
+describe('clearHandOffDir', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('deletes the hand-off directory idempotently', async () => {
+    FileSystem.deleteAsync.mockResolvedValue(undefined);
+
+    await clearHandOffDir();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(SHARE_DIR, { idempotent: true });
+  });
+
+  it('is safe to call when the directory does not exist (idempotent option handles it)', async () => {
+    FileSystem.deleteAsync.mockResolvedValue(undefined);
+
+    await expect(clearHandOffDir()).resolves.toBeUndefined();
+    await expect(clearHandOffDir()).resolves.toBeUndefined();
+
+    expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('swallows a filesystem error instead of throwing', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    FileSystem.deleteAsync.mockRejectedValue(new Error('EPERM'));
+
+    await expect(clearHandOffDir()).resolves.toBeUndefined();
+
+    console.error.mockRestore();
   });
 });
 

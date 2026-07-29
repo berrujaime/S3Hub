@@ -64,6 +64,32 @@ const stageForHandOff = async (localUri, fileName) => {
   return target;
 };
 
+/**
+ * Deletes the hand-off directory (see SHARE_DIR above).
+ *
+ * Safe to call ONLY at app/screen startup, never on the 'background' AppState
+ * transition. That transition is what fires the instant an external viewer
+ * launches, which is precisely the moment SHARE_DIR exists to protect: the
+ * whole reason the hand-off copy lives outside CACHE_DIR is so it survives
+ * mediaCache.clearEntireCache() running on backgrounding (see the SHARE_DIR
+ * comment). Calling this here too would delete the file the just-launched
+ * viewer is about to read, reintroducing the exact bug SHARE_DIR fixes. By
+ * the time the app is started again, any hand-off has already completed, so
+ * startup is the only moment a stale hand-off is known to be safe to remove.
+ *
+ * Idempotent and never throws, matching the rest of this module: a hand-off
+ * directory that is already gone (or never existed, e.g. first launch) is
+ * not an error.
+ * @returns {Promise<void>}
+ */
+export const clearHandOffDir = async () => {
+  try {
+    await FileSystem.deleteAsync(SHARE_DIR, { idempotent: true });
+  } catch (error) {
+    console.error('Error clearing hand-off directory:', error?.name || error?.code, error?.message);
+  }
+};
+
 // Ceiling for the in-app text viewer. A text object in a bucket can be a
 // multi-GB log; reading it whole would hold the entire string in JS memory
 // (and then hand it to a Text node). 256 KB is far more than anyone scrolls

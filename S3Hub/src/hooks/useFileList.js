@@ -14,6 +14,7 @@ import { DEFAULT_SORT_CRITERION, defaultDirectionFor } from '../domain/fileSorti
 import { getCacheKey } from '../domain/cacheKeys';
 import { getCachedItems, setCachedItems, removeCachedItems } from '../data/fileCacheRepository';
 import { initializeMediaCache, clearEntireCache } from '../services/mediaCache';
+import { clearHandOffDir } from '../services/fileOpener';
 import i18n from '../locales/translations';
 import { mapS3Error } from '../domain/errors';
 
@@ -234,6 +235,13 @@ export default function useFileList(
   // to clear the cache when the app goes to the background.
   useEffect(() => {
     initializeMediaCache();
+    // Belongs at mount, NOT in clearEntireCache or the background branch
+    // below: backgrounding is exactly when an external viewer has just been
+    // handed the staged file (see fileOpener.SHARE_DIR), so clearing it then
+    // would delete the file out from under the viewer that is opening it. By
+    // the time the app is (re)started, any hand-off has already happened, so
+    // startup is the only moment this is safe.
+    clearHandOffDir();
 
     const handleAppStateChange = async (nextAppState) => {
       if (appState.current.match(/active/) && nextAppState === 'background') {
