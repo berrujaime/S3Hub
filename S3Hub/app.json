@@ -18,7 +18,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.BerruApps.S3Hub"
+      "package": "com.BerruApps.S3Hub",
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

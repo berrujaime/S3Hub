@@ -4,7 +4,7 @@ S3Hub is a React Native / Expo (SDK 53) mobile app for browsing and managing S3-
 
 ## Golden rules (do not break)
 
-1. **Google Play 16KB page size compatibility is mandatory.** Do NOT modify the native build config that enables it: `app.json`, `eas.json`, `plugin/with16KPageSize.js`, `plugin/withAndroidPageSize.js`, or `expo-build-properties`. Do not add native modules.
+1. **Google Play 16KB page size compatibility is mandatory.** Do NOT modify the native build config that enables it: `eas.json`, `plugin/with16KPageSize.js`, `plugin/withAndroidPageSize.js`, or, within `app.json`, the `plugins` array or the `expo-build-properties` block (including `compileSdkVersion`/`targetSdkVersion`). Do not add native modules. Other `app.json` metadata may be edited when there's a reason — e.g. `version`, `userInterfaceStyle`, or manifest-only `android` keys such as `android.allowBackup` — but any such edit only takes effect after a native rebuild.
 2. **Do NOT bump `@aws-sdk/*`.** It is pinned at `3.121.0` on purpose (fixes a login / 16KB regression — see commit `807915e`). New providers are added via endpoint configuration only, never an SDK upgrade.
 3. **All code, identifiers, and comments in English.** UI strings always go through i18n (`src/locales/translations.js`), never hardcoded.
 4. **No new bugs.** Keep existing behavior working; changes must be backward compatible with already-stored connections.
@@ -26,6 +26,7 @@ src/
 
 - The domain layer must import nothing from React, the AWS SDK, or Expo. This is what makes it testable without a device.
 - Screens never build endpoints or interpret raw SDK errors directly — they use `domain/`.
+- `android.allowBackup` is set to `false` in `app.json` deliberately — do not remove it thinking it's an oversight. `connectionRepository.js` keeps non-secret connection metadata (provider, region, endpoint, account ID, bucket, label) in AsyncStorage, which Android's default `allowBackup: true` would make eligible for cloud/adb backups. The secrets in `expo-secure-store` are never restorable from such a backup anyway — the Keystore wrapping key is non-exportable — so a restore would only produce connections that can't authenticate.
 
 ## TDD
 
