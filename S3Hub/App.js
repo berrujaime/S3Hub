@@ -23,6 +23,7 @@ import {
 import AppNavigator from './src/navigation/AppNavigator';
 import { lightTheme, darkTheme } from './src/theme/theme';
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import { clearHandOffDir } from './src/services/fileOpener';
 import * as Notifications from 'expo-notifications';
 import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -110,6 +111,25 @@ export default function App() {
     (async () => {
       await Notifications.requestPermissionsAsync();
     })();
+  }, []);
+
+  // Sweep the stale hand-off directory (services/fileOpener.SHARE_DIR) once
+  // per process, here at the root, rather than from a screen-level hook: App
+  // is the only thing guaranteed to mount exactly once per app start,
+  // independent of which tab the user opens first (FilesTab is lazily
+  // mounted and ConnectionsTab is the initial route — see AppNavigator — so
+  // a hook living inside FileListScreen would run on first focus of Files,
+  // not at startup, and could go arbitrarily long without running at all).
+  //
+  // Deliberately NOT run on the 'background' AppState transition: that
+  // transition is exactly what fires the instant an external viewer
+  // launches, so clearing the hand-off directory there would delete the
+  // file the viewer was just given out from under it — the exact bug
+  // SHARE_DIR exists to prevent. See the SHARE_DIR / clearHandOffDir
+  // comments in src/services/fileOpener.js. Startup is the only moment a
+  // stale hand-off is known to be safe to remove.
+  useEffect(() => {
+    clearHandOffDir();
   }, []);
 
   if (!fontsLoaded && !fontError) {

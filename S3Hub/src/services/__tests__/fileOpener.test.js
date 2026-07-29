@@ -216,10 +216,10 @@ describe('openExternally guards', () => {
   });
 });
 
-// clearHandOffDir is the OTHER half of the SHARE_DIR fix: it is called at
-// app/screen startup (hooks/useFileList's mount effect), not on the
-// 'background' AppState transition — see the SHARE_DIR comment in
-// fileOpener.js for why background is the wrong moment.
+// clearHandOffDir is the OTHER half of the SHARE_DIR fix: it is called once
+// per process from App.js's root effect, not on the 'background' AppState
+// transition — see the SHARE_DIR comment in fileOpener.js for why background
+// is the wrong moment.
 describe('clearHandOffDir', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -242,11 +242,25 @@ describe('clearHandOffDir', () => {
     expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('swallows a filesystem error instead of throwing', async () => {
+  it('swallows a filesystem error instead of throwing, logging identity only', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    FileSystem.deleteAsync.mockRejectedValue(new Error('EPERM'));
+    const error = new Error('EPERM');
+    error.name = 'EPERM';
+    FileSystem.deleteAsync.mockRejectedValue(error);
 
     await expect(clearHandOffDir()).resolves.toBeUndefined();
+
+    // Pin the log shape (commit ae17c86 fixed a bug where the full error
+    // object was logged): only the message string plus the error's identity
+    // fields, never the error instance itself -- elsewhere in this codebase
+    // errors carry presigned URLs (bearer credentials), so this is a real
+    // rule, not incidental.
+    expect(console.error).toHaveBeenCalledWith(
+      'Error clearing hand-off directory:',
+      error?.name || error?.code,
+      error?.message,
+    );
+    expect(console.error.mock.calls[0]).not.toContain(error);
 
     console.error.mockRestore();
   });

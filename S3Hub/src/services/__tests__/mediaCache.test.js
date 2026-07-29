@@ -94,6 +94,25 @@ describe('clearEntireCache', () => {
     await expect(clearEntireCache()).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalled();
   });
+
+  // Regression guard for the hand-off directory (fileOpener.js's SHARE_DIR,
+  // `${cacheDirectory}S3HubShare/`): it must survive a cache clear.
+  // clearEntireCache runs on the 'background' AppState transition (see
+  // hooks/useFileList.js), and that transition is exactly what fires the
+  // instant an external viewer launches -- deleting the staged hand-off file
+  // then would delete it out from under the viewer that was just given it
+  // (see the SHARE_DIR comment in fileOpener.js). The hand-off sweep
+  // (clearHandOffDir) is a SEPARATE function called only from App.js at
+  // startup; this test guards against someone folding that sweep into
+  // clearEntireCache instead.
+  it('never deletes a path containing the hand-off directory (S3HubShare)', async () => {
+    AsyncStorage.getAllKeys.mockResolvedValue([]);
+
+    await clearEntireCache();
+
+    const deletedPaths = FileSystem.deleteAsync.mock.calls.map(([path]) => path);
+    expect(deletedPaths.some((path) => path.includes('S3HubShare'))).toBe(false);
+  });
 });
 
 // Tests for the expiration sweep run by initializeMediaCache. The cache dir

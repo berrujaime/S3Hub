@@ -15,13 +15,11 @@
 // hooks/useFileList.js), so no context provider is needed here.
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AppState } from 'react-native';
 import useFileList from '../useFileList';
 import { PAGE_SIZE } from '../../config/cacheConfig';
 import { listAllObjects, getSignedUrl } from '../../services/s3Service';
 import { getCachedItems, setCachedItems, removeCachedItems } from '../../data/fileCacheRepository';
 import { initializeMediaCache, clearEntireCache } from '../../services/mediaCache';
-import { clearHandOffDir } from '../../services/fileOpener';
 
 // Explicit factories (rather than bare `jest.mock(path)` automocking): these
 // modules import native/AWS SDK dependencies (AsyncStorage, expo-file-system,
@@ -34,9 +32,6 @@ jest.mock('../../services/s3Service', () => ({
 jest.mock('../../services/mediaCache', () => ({
   initializeMediaCache: jest.fn(),
   clearEntireCache: jest.fn(),
-}));
-jest.mock('../../services/fileOpener', () => ({
-  clearHandOffDir: jest.fn(),
 }));
 jest.mock('../../data/fileCacheRepository', () => ({
   getCachedItems: jest.fn(),
@@ -57,7 +52,6 @@ describe('useFileList', () => {
     removeCachedItems.mockResolvedValue(undefined);
     clearEntireCache.mockResolvedValue(undefined);
     initializeMediaCache.mockResolvedValue(undefined);
-    clearHandOffDir.mockResolvedValue(undefined);
     getSignedUrl.mockResolvedValue('https://signed.example/url');
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -200,51 +194,16 @@ describe('useFileList', () => {
     });
   });
 
-  // The hand-off directory (services/fileOpener.SHARE_DIR) holds the single
-  // file most recently handed to an external app. It cannot be cleared on
-  // the 'background' AppState transition -- that transition IS what fires
-  // when the external viewer launches, so clearing it there would delete the
-  // file out from under the very app it was just handed to (see the
-  // SHARE_DIR comment in fileOpener.js). Mount is the only safe moment: by
-  // the time the app (re)starts, any hand-off has already happened.
-  describe('(e) hand-off directory cleanup', () => {
-    it('clears the hand-off directory on mount, alongside media cache initialization', async () => {
-      listAllObjects.mockResolvedValue(emptyListing);
-
-      renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
-
-      expect(clearHandOffDir).toHaveBeenCalledTimes(1);
-    });
-
-    // The regression this guards against: a future "cleanup" that moves (or
-    // duplicates) the clearHandOffDir() call into the background-transition
-    // branch, reintroducing the exact bug SHARE_DIR was created to avoid --
-    // the external viewer's file disappearing while it's still being opened.
-    it('does NOT clear the hand-off directory on the background transition, only the media cache', async () => {
-      listAllObjects.mockResolvedValue(emptyListing);
-      // The mount effect seeds `appState.current` from AppState.currentState;
-      // it must read as "active" for the background branch below to fire.
-      AppState.currentState = 'active';
-
-      const { result } = renderHook(() => useFileList(CONNECTION_A, 'bucket-a'));
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      const changeSubscription = AppState.addEventListener.mock.calls.find(
-        ([eventName]) => eventName === 'change',
-      );
-      const handleAppStateChange = changeSubscription[1];
-
-      clearEntireCache.mockClear();
-      clearHandOffDir.mockClear();
-
-      await act(async () => {
-        await handleAppStateChange('background');
-      });
-
-      expect(clearEntireCache).toHaveBeenCalledTimes(1);
-      expect(clearHandOffDir).not.toHaveBeenCalled();
-    });
-  });
+  // Hand-off directory cleanup (services/fileOpener.SHARE_DIR /
+  // clearHandOffDir) is deliberately NOT covered here: the sweep moved to
+  // App.js's root effect (a real once-per-process hook — this hook mounts
+  // lazily, on first focus of the Files tab, so it never guaranteed
+  // "once per app start"). The regression this used to guard —
+  // clearHandOffDir migrating into the background-transition branch, or
+  // into clearEntireCache — is now covered where the hazard actually lives:
+  // see src/services/__tests__/mediaCache.test.js's "never deletes a path
+  // containing the hand-off directory" test on clearEntireCache. Do not
+  // re-add a clearHandOffDir call (or import) to this hook.
 
   // Routed item (Task 6.1, code review): logging out (connection/bucket go
   // to null/undefined) and then logging back into the EXACT SAME connection
