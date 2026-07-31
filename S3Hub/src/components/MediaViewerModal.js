@@ -5,6 +5,7 @@ import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
 import i18n from '../locales/translations';
 import { mediaCacheKey } from '../domain/cacheKeys';
+import { formatSize } from '../domain/fileSize';
 
 // Cache namespace derived from the ITEM's own fetch-time origin (stamped in
 // useFileList), never from live connection/bucket context: during a
@@ -180,8 +181,7 @@ const MediaViewerModal = ({
               {i18n.t('fileName')}: {mediaFiles[currentMediaIndex].name}
             </Text>
             <Text style={[styles.infoText, { color: theme.colors.onSecondaryContainer }]}>
-              {i18n.t('fileSize')}:{' '}
-              {(mediaFiles[currentMediaIndex].size / (1024 * 1024)).toFixed(2)} MB
+              {i18n.t('fileSize')}: {formatSize(mediaFiles[currentMediaIndex].size)}
             </Text>
           </View>
         )}

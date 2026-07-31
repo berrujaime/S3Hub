@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
 import CachedVideo from './CachedVideo';
 import { mediaCacheKey } from '../domain/cacheKeys';
+import { formatSize } from '../domain/fileSize';
 
 // Generic glyph shown for file types that have no visual preview
 // (everything except image/video, which get thumbnails/playback instead).
@@ -176,7 +177,7 @@ const FileItem = ({
           <View style={styles.listTextContainer}>
             <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
             <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
-              {(item.size / (1024 * 1024)).toFixed(2)} MB
+              {formatSize(item.size)}
             </Text>
           </View>
           {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
@@ -260,7 +261,7 @@ const FileItem = ({
           <View style={styles.listTextContainer}>
             <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
             <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
-              {(item.size / (1024 * 1024)).toFixed(2)} MB
+              {formatSize(item.size)}
             </Text>
           </View>
           {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
@@ -318,7 +319,7 @@ const FileItem = ({
           <View style={styles.listTextContainer}>
             <Text style={[styles.listText, { color: theme.colors.onSurface }]}>{item.name}</Text>
             <Text style={[styles.listSubText, { color: theme.colors.onSurfaceVariant }]}>
-              {(item.size / (1024 * 1024)).toFixed(2)} MB
+              {formatSize(item.size)}
             </Text>
           </View>
           {isSelected && <Checkbox status="checked" style={styles.listCheckbox} />}
