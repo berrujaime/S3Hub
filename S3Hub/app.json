@@ -8,7 +8,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0E1116"
     },
     "ios": {
       "supportsTablet": true
@@ -16,7 +16,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "monochromeImage": "./assets/adaptive-icon-mono.png",
+        "backgroundColor": "#0E1116"
       },
       "package": "com.BerruApps.S3Hub",
       "allowBackup": false

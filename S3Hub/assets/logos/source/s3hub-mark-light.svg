@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#F5F7FA"/>
+  <polygon points="279.91,378.00 512.00,244.00 744.09,378.00 512.00,512.00" fill="#FFFFFF"/>
+  <polygon points="279.91,378.00 512.00,512.00 512.00,780.00 279.91,646.00" fill="#EFF3F7"/>
+  <polygon points="512.00,512.00 744.09,378.00 744.09,646.00 512.00,780.00" fill="#E7ECF2"/>
+  <g transform="matrix(0.8660,0.5000,-0.8660,0.5000,512.00,244.00)"><text x="134.00" y="134.00" fill="#10151C" font-family="Space Grotesk" font-weight="700" font-size="166.16" text-anchor="middle" dominant-baseline="central">S</text></g>
+  <g transform="matrix(0.8660,0.5000,0.0000,1.0000,279.91,378.00)"><text x="134.00" y="134.00" fill="#10151C" font-family="Space Grotesk" font-weight="700" font-size="166.16" text-anchor="middle" dominant-baseline="central">S</text></g>
+  <g transform="matrix(0.8660,-0.5000,0.0000,1.0000,512.00,512.00)"><text x="134.00" y="134.00" fill="#10151C" font-family="Space Grotesk" font-weight="700" font-size="166.16" text-anchor="middle" dominant-baseline="central">3</text></g>
+  <polygon points="512.00,244.00 744.09,378.00 744.09,646.00 512.00,780.00 279.91,646.00 279.91,378.00" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linejoin="miter"/>
+  <line x1="512.00" y1="512.00" x2="744.09" y2="378.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <line x1="512.00" y1="512.00" x2="512.00" y2="780.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <line x1="512.00" y1="512.00" x2="279.91" y2="378.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <line x1="512.00" y1="244.00" x2="512.00" y2="138.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="512.00" cy="116.00" r="26.0" fill="#AD610E"/>
+  <path d="M 614.49 129.49 A 396.0 396.0 0 0 1 792.01 231.99" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+  <line x1="744.09" y1="378.00" x2="835.89" y2="325.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="854.95" cy="314.00" r="26.0" fill="#AD610E"/>
+  <path d="M 894.51 409.51 A 396.0 396.0 0 0 1 894.51 614.49" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+  <line x1="744.09" y1="646.00" x2="835.89" y2="699.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="854.95" cy="710.00" r="26.0" fill="#AD610E"/>
+  <path d="M 792.01 792.01 A 396.0 396.0 0 0 1 614.49 894.51" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+  <line x1="512.00" y1="780.00" x2="512.00" y2="886.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="512.00" cy="908.00" r="26.0" fill="#AD610E"/>
+  <path d="M 409.51 894.51 A 396.0 396.0 0 0 1 231.99 792.01" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+  <line x1="279.91" y1="646.00" x2="188.11" y2="699.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="169.05" cy="710.00" r="26.0" fill="#AD610E"/>
+  <path d="M 129.49 614.49 A 396.0 396.0 0 0 1 129.49 409.51" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+  <line x1="279.91" y1="378.00" x2="188.11" y2="325.00" stroke="#10151C" stroke-width="22.0" stroke-linecap="butt"/>
+  <circle cx="169.05" cy="314.00" r="26.0" fill="#AD610E"/>
+  <path d="M 231.99 231.99 A 396.0 396.0 0 0 1 409.51 129.49" fill="none" stroke="#10151C" stroke-width="22.0" stroke-linecap="round" stroke-dasharray="1 48.0"/>
+</svg>

@@ -19,6 +19,13 @@ import { mapS3Error } from '../domain/errors';
 import { SCREEN_TOP_SPACING } from '../theme/spacing';
 import i18n from '../locales/translations';
 
+// The mark is drawn in the theme's own tokens (bone lines on slate for dark,
+// ink lines on white faces for light), so it has to follow the scheme like
+// every other colour on the screen. Both are required statically: Metro
+// cannot resolve a computed require.
+const MARK_LIGHT = require('../../assets/logos/s3hub-mark-light.png');
+const MARK_DARK = require('../../assets/logos/s3hub-mark-dark.png');
+
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
   // This screen renders with headerShown: false (see AppNavigator.js) both
@@ -258,7 +265,8 @@ export default function LoginScreen({ navigation }) {
           </Text>
 
           <Image
-            source={require('../../assets/logos/S3HubLogo_bg.png')}
+            testID="brand-mark"
+            source={theme.dark ? MARK_DARK : MARK_LIGHT}
             style={styles.centeredImage}
             resizeMode="contain"
           />

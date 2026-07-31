@@ -17,12 +17,12 @@ import {
   Platform,
   TextInput as RNTextInput,
 } from 'react-native';
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, within, fireEvent, waitFor, cleanup } from '@testing-library/react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import LoginScreen from '../LoginScreen';
 import { AuthContext } from '../../context/AuthContext';
 import { validateCredentials } from '../../services/authService';
-import { darkTheme } from '../../theme/theme';
+import { darkTheme, lightTheme } from '../../theme/theme';
 import i18n from '../../locales/translations';
 
 // Explicit factories (same rationale as BucketSelectScreen.test.js):
@@ -39,7 +39,7 @@ jest.mock('../../data/connectionRepository', () => ({}));
 // canGoBack defaults to false (the pre-login root-stack case, where
 // LoginScreen is the navigator's only screen); pass `{ canGoBack: () => true }`
 // for the post-login "add connection from tabs" case.
-const renderScreen = (navigationOverrides = {}) => {
+const renderScreen = (navigationOverrides = {}, theme = darkTheme) => {
   const navigation = {
     navigate: jest.fn(),
     goBack: jest.fn(),
@@ -49,7 +49,7 @@ const renderScreen = (navigationOverrides = {}) => {
   const addConnection = jest.fn().mockResolvedValue(undefined);
   const setActiveConnection = jest.fn().mockResolvedValue(undefined);
   render(
-    <PaperProvider theme={darkTheme}>
+    <PaperProvider theme={theme}>
       <AuthContext.Provider value={{ addConnection, setActiveConnection }}>
         <LoginScreen navigation={navigation} />
       </AuthContext.Provider>
@@ -66,6 +66,25 @@ const fillCredentials = () => {
   fireEvent.changeText(inputs[0], 'test-access-key');
   fireEvent.changeText(inputs[1], 'test-secret-key');
 };
+
+describe('LoginScreen brand mark', () => {
+  // The mark is drawn in theme tokens, so a single pinned asset would show
+  // bone-on-slate lines over a white screen (or ink over black). Pins that the
+  // source actually follows the scheme rather than being hardcoded.
+  it('uses a different mark per colour scheme', () => {
+    renderScreen({}, lightTheme);
+    const light = screen.getByTestId('brand-mark').props.source;
+
+    cleanup();
+
+    renderScreen({}, darkTheme);
+    const dark = screen.getByTestId('brand-mark').props.source;
+
+    expect(light).toBeTruthy();
+    expect(dark).toBeTruthy();
+    expect(light).not.toEqual(dark);
+  });
+});
 
 describe('LoginScreen keyboard avoidance', () => {
   it('wraps the form in a KeyboardAvoidingView using the platform-appropriate behavior', () => {
